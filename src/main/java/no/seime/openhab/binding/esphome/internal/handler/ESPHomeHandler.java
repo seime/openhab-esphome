@@ -87,6 +87,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     private static final long PING_INTERVAL_SECONDS = 10;
     public static final int NUM_MISSED_PINGS_BEFORE_DISCONNECT = 4;
     public static final int CONNECT_TIMEOUT = 20;
+    public static final String CHANNEL_CONFIGURATION_KEY = "key";
     private static int API_VERSION_MAJOR = 1;
     private static int API_VERSION_MINOR = 7;
 
@@ -181,7 +182,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         Optional<Channel> channel = thing.getChannels().stream().filter(e -> e.getUID().equals(channelUID)).findFirst();
         channel.ifPresent(channel1 -> {
             try {
-                BigDecimal key = (BigDecimal) channel1.getConfiguration().get("key");
+                BigDecimal key = (BigDecimal) channel1.getConfiguration().get(CHANNEL_CONFIGURATION_KEY);
 
                 switch (channel1.getChannelTypeUID().getId()) {
                     case BindingConstants.CHANNEL_TYPE_SWITCH:
@@ -252,7 +253,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             logger.debug("Received list sensors response");
 
             Configuration configuration = new Configuration();
-            configuration.put("key", rsp.getKey());
+            configuration.put(CHANNEL_CONFIGURATION_KEY, rsp.getKey());
             configuration.put("unit", rsp.getUnitOfMeasurement());
 
             dynamicChannels.add(ChannelBuilder.create(new ChannelUID(thing.getUID(), rsp.getObjectId()))
@@ -270,8 +271,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             logger.debug("Received list binary sensor response");
 
             Configuration configuration = new Configuration();
-            configuration.put("key", rsp.getKey());
-            // configuration.put("unit", rsp.get)
+            configuration.put(CHANNEL_CONFIGURATION_KEY, rsp.getKey());
 
             dynamicChannels.add(ChannelBuilder.create(new ChannelUID(thing.getUID(), rsp.getObjectId()))
                     .withLabel(rsp.getName()).withKind(ChannelKind.STATE)
@@ -286,8 +286,10 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             // Switches
         } else if (message instanceof ListEntitiesSwitchResponse rsp) {
             logger.debug("Received list switch response");
+
             Configuration configuration = new Configuration();
-            configuration.put("key", rsp.getKey());
+            configuration.put(CHANNEL_CONFIGURATION_KEY, rsp.getKey());
+
             dynamicChannels.add(ChannelBuilder.create(new ChannelUID(thing.getUID(), rsp.getObjectId()))
                     .withLabel(rsp.getName()).withKind(ChannelKind.STATE)
                     .withType(new ChannelTypeUID(BindingConstants.BINDING_ID, BindingConstants.CHANNEL_TYPE_SWITCH))
@@ -359,7 +361,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     private Optional<Channel> findChannelByKey(int key) {
         return thing.getChannels().stream()
-                .filter(e -> ((BigDecimal) e.getConfiguration().get("key")).intValue() == key).findFirst();
+                .filter(e -> ((BigDecimal) e.getConfiguration().get(CHANNEL_CONFIGURATION_KEY)).intValue() == key)
+                .findFirst();
     }
 
     private void handleLoginResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -433,11 +436,15 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     }
 
     private enum ConnectionState {
+        // Initial state, no connection
         UNINITIALIZED,
+        // TCP connected to ESPHome, first handshake sent
         HELLO_SENT,
 
+        // First handshake received, login sent (with password)
         LOGIN_SENT,
 
+        // Connection established
         CONNECTED
 
     }
