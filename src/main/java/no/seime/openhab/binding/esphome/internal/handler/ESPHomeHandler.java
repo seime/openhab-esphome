@@ -15,8 +15,11 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
@@ -25,30 +28,26 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.config.core.Configuration;
-import org.openhab.core.library.types.DecimalType;
-import org.openhab.core.library.types.OnOffType;
-import org.openhab.core.library.types.OpenClosedType;
-import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseThingHandler;
-import org.openhab.core.thing.binding.builder.ChannelBuilder;
-import org.openhab.core.thing.type.ChannelKind;
+import org.openhab.core.thing.binding.ThingHandlerService;
+import org.openhab.core.thing.type.ChannelType;
+import org.openhab.core.thing.type.ChannelTypeProvider;
 import org.openhab.core.thing.type.ChannelTypeUID;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.State;
-import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
 import io.esphome.api.BinarySensorStateResponse;
+import io.esphome.api.ClimateStateResponse;
 import io.esphome.api.ConnectRequest;
 import io.esphome.api.ConnectResponse;
 import io.esphome.api.DeviceInfoRequest;
@@ -58,15 +57,17 @@ import io.esphome.api.DisconnectResponse;
 import io.esphome.api.HelloRequest;
 import io.esphome.api.HelloResponse;
 import io.esphome.api.ListEntitiesBinarySensorResponse;
+import io.esphome.api.ListEntitiesClimateResponse;
 import io.esphome.api.ListEntitiesDoneResponse;
 import io.esphome.api.ListEntitiesRequest;
+import io.esphome.api.ListEntitiesSelectResponse;
 import io.esphome.api.ListEntitiesSensorResponse;
 import io.esphome.api.ListEntitiesSwitchResponse;
 import io.esphome.api.PingRequest;
 import io.esphome.api.PingResponse;
+import io.esphome.api.SelectStateResponse;
 import io.esphome.api.SensorStateResponse;
 import io.esphome.api.SubscribeStatesRequest;
-import io.esphome.api.SwitchCommandRequest;
 import io.esphome.api.SwitchStateResponse;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
@@ -74,6 +75,12 @@ import no.seime.openhab.binding.esphome.internal.PacketListener;
 import no.seime.openhab.binding.esphome.internal.comm.PlainTextConnection;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
+import no.seime.openhab.binding.esphome.internal.message.AbstractMessageHandler;
+import no.seime.openhab.binding.esphome.internal.message.BinarySensorMessageHandler;
+import no.seime.openhab.binding.esphome.internal.message.ClimateMessageHandler;
+import no.seime.openhab.binding.esphome.internal.message.SelectMessageHandler;
+import no.seime.openhab.binding.esphome.internal.message.SensorMessageHandler;
+import no.seime.openhab.binding.esphome.internal.message.SwitchMessageHandler;
 
 /**
  * The {@link ESPHomeHandler} is responsible for handling commands, which are
@@ -82,32 +89,51 @@ import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
  * @author Arne Seime - Initial contribution
  */
 @NonNullByDefault
-public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
+public class ESPHomeHandler extends BaseThingHandler implements PacketListener, ChannelTypeProvider {
 
-    private static final long PING_INTERVAL_SECONDS = 10;
     public static final int NUM_MISSED_PINGS_BEFORE_DISCONNECT = 4;
     public static final int CONNECT_TIMEOUT = 20;
-    public static final String CHANNEL_CONFIGURATION_KEY = "key";
+    private static final long PING_INTERVAL_SECONDS = 10;
     private static int API_VERSION_MAJOR = 1;
     private static int API_VERSION_MINOR = 7;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
-
+    private final Map<ChannelTypeUID, ChannelType> generatedChannelTypes = new HashMap<>();
     private @Nullable ESPHomeConfiguration config;
     private @Nullable PlainTextConnection connection;
-
-    private List<Channel> dynamicChannels = new ArrayList<>();
     @Nullable
     private ScheduledFuture<?> pingWatchdog;
     private Instant lastPong = Instant.now();
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
+    private Map<String, AbstractMessageHandler> commandTypeToHandlerMap = new HashMap<>();
+    private Map<Class<? extends GeneratedMessageV3>, AbstractMessageHandler> classToHandlerMap = new HashMap<>();
+    private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
+    private List<Channel> dynamicChannels = new ArrayList<>();
 
     public ESPHomeHandler(Thing thing) {
         super(thing);
+
+        // Register message handlers for each type of message pairs
+        registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
+                SelectStateResponse.class);
+        registerMessageHandler("Sensor", new SensorMessageHandler(this), ListEntitiesSensorResponse.class,
+                SensorStateResponse.class);
+        registerMessageHandler("BinarySensor", new BinarySensorMessageHandler(this),
+                ListEntitiesBinarySensorResponse.class, BinarySensorStateResponse.class);
+        registerMessageHandler("Switch", new SwitchMessageHandler(this), ListEntitiesSwitchResponse.class,
+                SwitchStateResponse.class);
+        registerMessageHandler("Climate", new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,
+                ClimateStateResponse.class);
     }
 
-    private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
+    private void registerMessageHandler(String select, AbstractMessageHandler messageHandler,
+            Class<? extends GeneratedMessageV3> listEntitiesClass, Class<? extends GeneratedMessageV3> stateClass) {
+
+        commandTypeToHandlerMap.put(select, messageHandler);
+        classToHandlerMap.put(listEntitiesClass, messageHandler);
+        classToHandlerMap.put(stateClass, messageHandler);
+    }
 
     @Override
     public void initialize() {
@@ -123,14 +149,16 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     private void connect() {
         try {
+            dynamicChannels.clear();
+            generatedChannelTypes.clear();
+
             logger.info("Trying to connect to {}:{}", config.hostname, config.port);
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
             connection = new PlainTextConnection(this);
-            connection.connect(config.hostname, config.port, CONNECT_TIMEOUT);
 
-            dynamicChannels.clear();
+            connection.connect(config.hostname, config.port, CONNECT_TIMEOUT);
 
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
                     .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
@@ -167,8 +195,12 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         super.dispose();
     }
 
+    public void sendMessage(GeneratedMessageV3 message) throws ProtocolAPIError {
+        connection.send(message);
+    }
+
     @Override
-    public void handleCommand(ChannelUID channelUID, Command command) {
+    public synchronized void handleCommand(ChannelUID channelUID, Command command) {
 
         if (command == RefreshType.REFRESH) {
             try {
@@ -179,21 +211,26 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             return;
         }
 
-        Optional<Channel> channel = thing.getChannels().stream().filter(e -> e.getUID().equals(channelUID)).findFirst();
-        channel.ifPresent(channel1 -> {
+        Optional<Channel> optionalChannel = thing.getChannels().stream().filter(e -> e.getUID().equals(channelUID))
+                .findFirst();
+        optionalChannel.ifPresent(channel -> {
             try {
-                BigDecimal key = (BigDecimal) channel1.getConfiguration().get(CHANNEL_CONFIGURATION_KEY);
-
-                switch (channel1.getChannelTypeUID().getId()) {
-                    case BindingConstants.CHANNEL_TYPE_SWITCH:
-                        connection.send(SwitchCommandRequest.newBuilder().setKey(key.intValue())
-                                .setState(command == OnOffType.ON).build());
-                        break;
-                    default:
-                        logger.warn("Unknown channel type {}", channelUID.getId());
+                String commandClass = (String) channel.getConfiguration().get(BindingConstants.COMMAND_CLASS);
+                if (commandClass == null) {
+                    logger.warn("No command class for channel {}", channelUID);
+                    return;
                 }
+
+                AbstractMessageHandler abstractMessageHandler = commandTypeToHandlerMap.get(commandClass);
+                if (abstractMessageHandler == null) {
+                    logger.warn("No message handler for command class {}", commandClass);
+                } else {
+                    int key = ((BigDecimal) channel.getConfiguration().get(BindingConstants.COMMAND_KEY)).intValue();
+                    abstractMessageHandler.handleCommand(channel, command, key);
+                }
+
             } catch (Exception e) {
-                logger.error("Error sending command {} to channel {}: {}", command, channelUID, e.getMessage());
+                logger.error("Error sending command {} to channel {}: {}", command, channelUID, e.getMessage(), e);
             }
         });
     }
@@ -239,7 +276,10 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             props.put("manufacturer", rsp.getManufacturer());
             props.put("compilation_time", rsp.getCompilationTime());
             updateThing(editThing().withProperties(props).build());
-
+        } else if (message instanceof ListEntitiesDoneResponse) {
+            updateThing(editThing().withChannels(dynamicChannels).build());
+            logger.debug("Done updating channels");
+            connection.send(SubscribeStatesRequest.getDefaultInstance());
         } else if (message instanceof PingRequest) {
             logger.debug("Responding to ping request");
             connection.send(PingResponse.getDefaultInstance());
@@ -247,72 +287,20 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         } else if (message instanceof PingResponse) {
             logger.debug("Received ping response");
             lastPong = Instant.now();
-
-            // Sensor (numeric)
-        } else if (message instanceof ListEntitiesSensorResponse rsp) {
-            logger.debug("Received list sensors response");
-
-            Configuration configuration = new Configuration();
-            configuration.put(CHANNEL_CONFIGURATION_KEY, rsp.getKey());
-            configuration.put("unit", rsp.getUnitOfMeasurement());
-
-            dynamicChannels.add(ChannelBuilder.create(new ChannelUID(thing.getUID(), rsp.getObjectId()))
-                    .withLabel(rsp.getName()).withKind(ChannelKind.STATE)
-                    .withType(new ChannelTypeUID(BindingConstants.BINDING_ID, channelType(rsp.getObjectId())))
-                    .withConfiguration(configuration).build());
-
-        } else if (message instanceof SensorStateResponse rsp) {
-            logger.debug("Received sensor state response");
-            findChannelByKey(rsp.getKey()).ifPresent(channel -> updateState(channel.getUID(),
-                    toNumberState(channel.getConfiguration(), rsp.getState(), rsp.getMissingState())));
-
-            // Binary sensor
-        } else if (message instanceof ListEntitiesBinarySensorResponse rsp) {
-            logger.debug("Received list binary sensor response");
-
-            Configuration configuration = new Configuration();
-            configuration.put(CHANNEL_CONFIGURATION_KEY, rsp.getKey());
-
-            dynamicChannels.add(ChannelBuilder.create(new ChannelUID(thing.getUID(), rsp.getObjectId()))
-                    .withLabel(rsp.getName()).withKind(ChannelKind.STATE)
-                    .withType(new ChannelTypeUID(BindingConstants.BINDING_ID, BindingConstants.CHANNEL_TYPE_CONTACT))
-                    .withConfiguration(configuration).build());
-
-        } else if (message instanceof BinarySensorStateResponse rsp) {
-            logger.debug("Received sensor state response");
-            findChannelByKey(rsp.getKey()).ifPresent(
-                    channel -> updateState(channel.getUID(), toContactState(rsp.getState(), rsp.getMissingState())));
-
-            // Switches
-        } else if (message instanceof ListEntitiesSwitchResponse rsp) {
-            logger.debug("Received list switch response");
-
-            Configuration configuration = new Configuration();
-            configuration.put(CHANNEL_CONFIGURATION_KEY, rsp.getKey());
-
-            dynamicChannels.add(ChannelBuilder.create(new ChannelUID(thing.getUID(), rsp.getObjectId()))
-                    .withLabel(rsp.getName()).withKind(ChannelKind.STATE)
-                    .withType(new ChannelTypeUID(BindingConstants.BINDING_ID, BindingConstants.CHANNEL_TYPE_SWITCH))
-                    .withConfiguration(configuration).build());
-        } else if (message instanceof SwitchStateResponse rsp) {
-            logger.debug("Received switch state response");
-            findChannelByKey(rsp.getKey())
-                    .ifPresent(channel -> updateState(channel.getUID(), rsp.getState() ? OnOffType.ON : OnOffType.OFF));
-
-        } else if (message instanceof ListEntitiesDoneResponse) {
-            updateThing(editThing().withChannels(dynamicChannels).build());
-            logger.debug("Done updating channels");
-            connection.send(SubscribeStatesRequest.getDefaultInstance());
-
         } else if (message instanceof DisconnectRequest) {
             connection.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
-
         } else if (message instanceof DisconnectResponse) {
             connection.close(true);
         } else {
-            logger.debug("Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
-                    message.getClass().getName(), message);
+            // Regular messages handled by message handlers
+            AbstractMessageHandler abstractMessageHandler = classToHandlerMap.get(message.getClass());
+            if (abstractMessageHandler != null) {
+                abstractMessageHandler.handleMessage(message);
+            } else {
+                logger.warn("Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
+                        message.getClass().getName(), message);
+            }
         }
     }
 
@@ -323,46 +311,6 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         if (pingWatchdog != null) {
             pingWatchdog.cancel(true);
         }
-    }
-
-    private String channelType(String objectId) {
-        switch (objectId) {
-            case "humidity":
-                return BindingConstants.CHANNEL_TYPE_HUMIDITY;
-            case "temperature":
-                return BindingConstants.CHANNEL_TYPE_TEMPERATURE;
-            default:
-                logger.warn(
-                        "Not implemented channel type for {}. Defaulting to 'Number'. Create a PR or create an issue at https://github.com/seime/openhab-esphome/issues. Stack-trace to aid where to add support. Also remember to add appropriate channel-type in src/main/resources/thing/channel-types.xml: {}",
-                        objectId, Thread.currentThread().getStackTrace());
-                return BindingConstants.CHANNEL_TYPE_NUMBER;
-        }
-    }
-
-    private State toNumberState(Configuration configuration, float state, boolean missingState) {
-        if (missingState) {
-            return UnDefType.UNDEF;
-        } else {
-            String unit = (String) configuration.get("unit");
-            if (unit != null) {
-                return new QuantityType<>(state + unit);
-            }
-            return new DecimalType(state);
-        }
-    }
-
-    private State toContactState(boolean state, boolean missingState) {
-        if (missingState) {
-            return UnDefType.UNDEF;
-        } else {
-            return state ? OpenClosedType.OPEN : OpenClosedType.CLOSED;
-        }
-    }
-
-    private Optional<Channel> findChannelByKey(int key) {
-        return thing.getChannels().stream()
-                .filter(e -> ((BigDecimal) e.getConfiguration().get(CHANNEL_CONFIGURATION_KEY)).intValue() == key)
-                .findFirst();
     }
 
     private void handleLoginResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -415,6 +363,11 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         }
     }
 
+    @Override
+    public void updateState(ChannelUID channelUID, State state) {
+        super.updateState(channelUID, state);
+    }
+
     private void handleHelloResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
             logger.debug("Received hello response {}", helloResponse);
@@ -433,6 +386,29 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         }
 
         // Check if
+    }
+
+    @Override
+    public Collection<Class<? extends ThingHandlerService>> getServices() {
+        return Collections.singleton(CallbackChannelsTypeProvider.class);
+    }
+
+    public void addChannelType(ChannelType channelType) {
+        generatedChannelTypes.put(channelType.getUID(), channelType);
+    }
+
+    @Override
+    public Collection<ChannelType> getChannelTypes(@Nullable final Locale locale) {
+        return generatedChannelTypes.values();
+    }
+
+    @Override
+    public @Nullable ChannelType getChannelType(final ChannelTypeUID channelTypeUID, @Nullable final Locale locale) {
+        return generatedChannelTypes.get(channelTypeUID);
+    }
+
+    public void addChannel(Channel channel) {
+        dynamicChannels.add(channel);
     }
 
     private enum ConnectionState {

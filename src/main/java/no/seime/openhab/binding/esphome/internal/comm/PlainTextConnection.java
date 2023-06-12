@@ -42,6 +42,7 @@ public class PlainTextConnection {
 
     public synchronized void send(GeneratedMessageV3 message) throws ProtocolAPIError {
         try {
+            logger.debug("Sending message: {}", message);
             outputStream.write(encodeFrame(message));
 
         } catch (IOException e) {
