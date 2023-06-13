@@ -32,11 +32,10 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T extends GeneratedMessageV3> {
 
+    private final Logger logger = LoggerFactory.getLogger(AbstractMessageHandler.class);
     protected ESPHomeHandler handler;
 
-    private final Logger logger = LoggerFactory.getLogger(AbstractMessageHandler.class);
-
-    public AbstractMessageHandler(ESPHomeHandler handler) {
+    protected AbstractMessageHandler(ESPHomeHandler handler) {
         this.handler = handler;
     }
 
@@ -57,9 +56,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         if (tags != null && !tags.isEmpty()) {
             builder.withTags(tags);
         }
-        final ChannelType channelType = builder.build();
-
-        return channelType;
+        return builder.build();
     }
 
     protected Configuration configuration(int key, String subCommand, String commandClass) {

@@ -94,8 +94,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     public static final int NUM_MISSED_PINGS_BEFORE_DISCONNECT = 4;
     public static final int CONNECT_TIMEOUT = 20;
     private static final long PING_INTERVAL_SECONDS = 10;
-    private static int API_VERSION_MAJOR = 1;
-    private static int API_VERSION_MINOR = 7;
+    private static final int API_VERSION_MAJOR = 1;
+    private static final int API_VERSION_MINOR = 7;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Map<ChannelTypeUID, ChannelType> generatedChannelTypes = new HashMap<>();
@@ -106,10 +106,10 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     private Instant lastPong = Instant.now();
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
-    private Map<String, AbstractMessageHandler> commandTypeToHandlerMap = new HashMap<>();
-    private Map<Class<? extends GeneratedMessageV3>, AbstractMessageHandler> classToHandlerMap = new HashMap<>();
+    private final Map<String, AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3>> commandTypeToHandlerMap = new HashMap<>();
+    private final Map<Class<? extends GeneratedMessageV3>, AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3>> classToHandlerMap = new HashMap<>();
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
-    private List<Channel> dynamicChannels = new ArrayList<>();
+    private final List<Channel> dynamicChannels = new ArrayList<>();
 
     public ESPHomeHandler(Thing thing) {
         super(thing);
@@ -127,7 +127,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
                 ClimateStateResponse.class);
     }
 
-    private void registerMessageHandler(String select, AbstractMessageHandler messageHandler,
+    private void registerMessageHandler(String select,
+            AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> messageHandler,
             Class<? extends GeneratedMessageV3> listEntitiesClass, Class<? extends GeneratedMessageV3> stateClass) {
 
         commandTypeToHandlerMap.put(select, messageHandler);
@@ -141,7 +142,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         config = getConfigAs(ESPHomeConfiguration.class);
 
         if (config.hostname != null && !config.hostname.isEmpty()) {
-            scheduler.submit(() -> connect());
+            scheduler.submit(this::connect);
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No hostname configured");
         }
@@ -168,7 +169,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         } catch (ProtocolException e) {
             logger.warn("Error initial connection", e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-            reconnectFuture = scheduler.schedule(() -> connect(), CONNECT_TIMEOUT * 2, TimeUnit.SECONDS);
+            reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2l, TimeUnit.SECONDS);
         }
     }
 
@@ -221,7 +222,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
                     return;
                 }
 
-                AbstractMessageHandler abstractMessageHandler = commandTypeToHandlerMap.get(commandClass);
+                AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = commandTypeToHandlerMap
+                        .get(commandClass);
                 if (abstractMessageHandler == null) {
                     logger.warn("No message handler for command class {}", commandClass);
                 } else {
@@ -294,7 +296,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
             connection.close(true);
         } else {
             // Regular messages handled by message handlers
-            AbstractMessageHandler abstractMessageHandler = classToHandlerMap.get(message.getClass());
+            AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
+                    .get(message.getClass());
             if (abstractMessageHandler != null) {
                 abstractMessageHandler.handleMessage(message);
             } else {
@@ -344,7 +347,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
                                     NUM_MISSED_PINGS_BEFORE_DISCONNECT, PING_INTERVAL_SECONDS));
-                    reconnectFuture = scheduler.schedule(() -> connect(), 30, TimeUnit.SECONDS);
+                    reconnectFuture = scheduler.schedule(this::connect, 30, TimeUnit.SECONDS);
 
                 } else {
 

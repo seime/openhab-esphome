@@ -22,7 +22,6 @@ import org.eclipse.jdt.annotation.Nullable;
 
 public class ESPHomeConfiguration {
 
-    @Nullable
     public String hostname;
     @Nullable
     public String password;

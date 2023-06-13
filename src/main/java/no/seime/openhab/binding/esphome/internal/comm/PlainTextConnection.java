@@ -34,10 +34,24 @@ public class PlainTextConnection {
     private InputStream inputStream;
     private OutputStream outputStream;
 
-    private PlainTextPacketStreamReader packetStreamReader;
+    private final PlainTextPacketStreamReader packetStreamReader;
 
     public PlainTextConnection(PacketListener listener) {
         packetStreamReader = new PlainTextPacketStreamReader(listener);
+    }
+
+    public static byte[] encodeFrame(GeneratedMessageV3 message) {
+        byte[] protoBytes = message.toByteArray();
+        byte[] idVarUint = VarIntConverter
+                .intToBytes(message.getDescriptorForType().getOptions().getExtension(io.esphome.api.ApiOptions.id));
+        byte[] protoBytesLengthVarUint = VarIntConverter.intToBytes(protoBytes.length);
+
+        byte[] frame = new byte[1 + idVarUint.length + protoBytesLengthVarUint.length + protoBytes.length];
+        System.arraycopy(protoBytesLengthVarUint, 0, frame, 1, protoBytesLengthVarUint.length);
+        System.arraycopy(idVarUint, 0, frame, idVarUint.length + 1, protoBytesLengthVarUint.length);
+        System.arraycopy(protoBytes, 0, frame, idVarUint.length + protoBytesLengthVarUint.length + 1,
+                protoBytes.length);
+        return frame;
     }
 
     public synchronized void send(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -88,19 +102,5 @@ public class PlainTextConnection {
         } catch (IOException e) {
             logger.debug("Error closing connection", e);
         }
-    }
-
-    public static byte[] encodeFrame(GeneratedMessageV3 message) {
-        byte[] protoBytes = message.toByteArray();
-        byte[] idVarUint = VarIntConverter
-                .intToBytes(message.getDescriptorForType().getOptions().getExtension(io.esphome.api.ApiOptions.id));
-        byte[] protoBytesLengthVarUint = VarIntConverter.intToBytes(protoBytes.length);
-
-        byte[] frame = new byte[1 + idVarUint.length + protoBytesLengthVarUint.length + protoBytes.length];
-        System.arraycopy(protoBytesLengthVarUint, 0, frame, 1, protoBytesLengthVarUint.length);
-        System.arraycopy(idVarUint, 0, frame, idVarUint.length + 1, protoBytesLengthVarUint.length);
-        System.arraycopy(protoBytes, 0, frame, idVarUint.length + protoBytesLengthVarUint.length + 1,
-                protoBytes.length);
-        return frame;
     }
 }

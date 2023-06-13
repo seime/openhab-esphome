@@ -41,11 +41,11 @@ public class PlainTextPacketStreamReader {
     private Thread thread;
     private InputStream inputStream;
 
-    private PacketListener listener;
+    private final PacketListener listener;
 
     private boolean closeQuietly = false;
 
-    private Map<Integer, Class<? extends GeneratedMessageV3>> messageTypeToMessageClass = new HashMap<>();
+    private final Map<Integer, Class<? extends GeneratedMessageV3>> messageTypeToMessageClass = new HashMap<>();
 
     public PlainTextPacketStreamReader(PacketListener listener) {
         this.listener = listener;

@@ -61,12 +61,9 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
         if ("esphomelib".equals(application)) {
             final ThingUID deviceUID = getThingUID(service);
             if (deviceUID != null) {
-                final DiscoveryResult discoveryResult = DiscoveryResultBuilder.create(deviceUID)
-                        .withThingType(THING_TYPE_DEVICE).withProperty(PROPERTY_HOSTNAME, service.getServer())
-                        .withLabel("ESPHome " + service.getName())
-
+                return DiscoveryResultBuilder.create(deviceUID).withThingType(THING_TYPE_DEVICE)
+                        .withProperty(PROPERTY_HOSTNAME, service.getServer()).withLabel("ESPHome " + service.getName())
                         .withRepresentationProperty(PROPERTY_HOSTNAME).build();
-                return discoveryResult;
             }
         }
         return null;

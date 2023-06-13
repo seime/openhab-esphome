@@ -13,7 +13,7 @@
 package no.seime.openhab.binding.esphome.internal.comm;
 
 public abstract class ProtocolException extends Exception {
-    public ProtocolException(String message) {
+    protected ProtocolException(String message) {
         super(message);
     }
 }
