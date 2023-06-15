@@ -35,6 +35,7 @@ public class PlainTextConnection {
     private OutputStream outputStream;
 
     private final PlainTextPacketStreamReader packetStreamReader;
+    private String hostname;
 
     public PlainTextConnection(PacketListener listener) {
         packetStreamReader = new PlainTextPacketStreamReader(listener);
@@ -56,22 +57,23 @@ public class PlainTextConnection {
 
     public synchronized void send(GeneratedMessageV3 message) throws ProtocolAPIError {
         try {
-            logger.debug("Sending message: {}", message);
+            logger.debug("[{}] Sending message: {}", hostname, message.getClass().getSimpleName());
             outputStream.write(encodeFrame(message));
 
         } catch (IOException e) {
-            throw new ProtocolAPIError("Error sending message " + e);
+            throw new ProtocolAPIError(String.format("[%s] Error sending message " + e, hostname));
         }
     }
 
     public void connect(String hostname, int port, int connectTimeout) throws ProtocolAPIError {
+        this.hostname = hostname;
         try {
             socket = new Socket();
             socket.setTcpNoDelay(true);
             socket.setKeepAlive(true);
             socket.connect(new InetSocketAddress(hostname, port), connectTimeout * 1000);
 
-            logger.info("Socket opened to {} at port {}.", hostname, port);
+            logger.info("[{}] Socket opened to {} at port {}.", hostname, hostname, port);
 
             inputStream = new BufferedInputStream(socket.getInputStream());
             outputStream = socket.getOutputStream();
@@ -84,7 +86,7 @@ public class PlainTextConnection {
     }
 
     public void close(boolean quietly) {
-        logger.info("Disconnecting socket.");
+        logger.info("[{}] Disconnecting socket.", hostname);
         try {
             if (packetStreamReader != null) {
                 packetStreamReader.close(quietly);
@@ -100,7 +102,7 @@ public class PlainTextConnection {
                 socket.close();
             }
         } catch (IOException e) {
-            logger.debug("Error closing connection", e);
+            logger.debug("[{}] Error closing connection", hostname, e);
         }
     }
 }
