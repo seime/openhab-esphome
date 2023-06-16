@@ -261,12 +261,16 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     public void onEndOfStream() {
         updateStatus(ThingStatus.OFFLINE);
         connection.close(true);
+        pingWatchdog.cancel(true);
+        pingWatchdog = null;
     }
 
     @Override
     public void onParseError() {
         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, "Parse error");
         connection.close(true);
+        pingWatchdog.cancel(true);
+        pingWatchdog = null;
     }
 
     private void handleConnected(GeneratedMessageV3 message) throws ProtocolAPIError {
