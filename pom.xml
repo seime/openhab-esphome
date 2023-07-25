@@ -7,10 +7,10 @@
   <parent>
     <groupId>org.openhab.addons.bundles</groupId>
     <artifactId>org.openhab.addons.reactor.bundles</artifactId>
-    <version>3.4.3</version>
+    <version>4.0.0</version>
   </parent>
 
-  <version>3.4.4-SNAPSHOT</version>
+  <version>4.1.0-SNAPSHOT</version>
 
   <artifactId>no.seime.openhab.binding.esphome</artifactId>
 
@@ -18,8 +18,9 @@
 
   <properties>
     <oh.java.version>17</oh.java.version>
-    <maven.compiler.source>${oh.java.version}</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>${oh.java.version}</maven.compiler.target>
+    <maven.compiler.compilerVersion>${oh.java.version}</maven.compiler.compilerVersion>
     <spotless.version>2.36.0</spotless.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <proto.version>3.22.1</proto.version>
@@ -42,13 +43,6 @@
   </distributionManagement>
 
   <dependencies>
-    <dependency>
-      <groupId>com.google.code.gson</groupId>
-      <artifactId>gson</artifactId>
-      <version>2.9.0</version>
-    </dependency>
-
-
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
@@ -178,6 +172,12 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>oh3</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
     </profile>
   </profiles>
 
