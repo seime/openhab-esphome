@@ -10,9 +10,9 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal.comm;
+package no.seime.openhab.binding.esphome.internal.internal.comm;
 
-import static no.seime.openhab.binding.esphome.internal.comm.VarIntConverter.bytesToInt;
+import static no.seime.openhab.binding.esphome.internal.internal.comm.VarIntConverter.bytesToInt;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 import com.google.protobuf.GeneratedMessageV3;
 
 import io.esphome.api.Api;
-import no.seime.openhab.binding.esphome.internal.PacketListener;
+import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
 
 public class PlainTextPacketStreamReader {
 

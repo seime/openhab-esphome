@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal.comm;
+package no.seime.openhab.binding.esphome.internal.internal.comm;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.PacketListener;
+import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
 
 public class PlainTextConnection {
 
@@ -59,6 +59,7 @@ public class PlainTextConnection {
         try {
             logger.debug("[{}] Sending message: {}", hostname, message.getClass().getSimpleName());
             outputStream.write(encodeFrame(message));
+            outputStream.flush();
 
         } catch (IOException e) {
             throw new ProtocolAPIError(String.format("[%s] Error sending message " + e, hostname));

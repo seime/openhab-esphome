@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.comm;
+package no.seime.openhab.binding.esphome.internal.comm;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,9 +26,9 @@ import com.google.protobuf.GeneratedMessageV3;
 
 import io.esphome.api.HelloRequest;
 import io.esphome.api.HelloResponse;
-import no.seime.openhab.binding.esphome.internal.PacketListener;
-import no.seime.openhab.binding.esphome.internal.comm.PlainTextConnection;
-import no.seime.openhab.binding.esphome.internal.comm.PlainTextPacketStreamReader;
+import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
+import no.seime.openhab.binding.esphome.internal.internal.comm.PlainTextConnection;
+import no.seime.openhab.binding.esphome.internal.internal.comm.PlainTextPacketStreamReader;
 
 public class PlainTextPacketStreamReaderTest {
 

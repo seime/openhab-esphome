@@ -16,6 +16,12 @@
 		<description>Measured humidity</description>
 		<state readOnly="true" pattern="%.1f %%"/>
 	</channel-type>
+	<channel-type id="distance">
+		<item-type>Number:Length</item-type>
+		<label>Lenght</label>
+		<description>Length of measurement</description>
+		<state readOnly="true" pattern="%.2f %unit%"/>
+	</channel-type>
 	<channel-type id="number">
 		<item-type>Number</item-type>
 		<label>Generic number</label>

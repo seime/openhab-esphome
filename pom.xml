@@ -19,7 +19,7 @@
   <properties>
     <oh.java.version>17</oh.java.version>
     <maven.compiler.source>${oh.java.version}</maven.compiler.source>
-    <maven.compiler.target>11</maven.compiler.target>
+    <maven.compiler.target>17</maven.compiler.target>
     <spotless.version>2.36.0</spotless.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <proto.version>3.22.1</proto.version>
@@ -48,6 +48,13 @@
       <version>2.9.0</version>
     </dependency>
 
+
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>31.0.1-jre</version>
+      <scope>provided</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.slf4j</groupId>

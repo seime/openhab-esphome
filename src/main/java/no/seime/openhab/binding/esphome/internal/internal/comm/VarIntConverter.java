@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal.comm;
+package no.seime.openhab.binding.esphome.internal.internal.comm;
 
 /**
  * Helper utility for converting integers to and from varints

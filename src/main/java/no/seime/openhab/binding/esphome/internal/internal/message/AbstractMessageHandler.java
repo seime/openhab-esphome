@@ -1,4 +1,4 @@
-package no.seime.openhab.binding.esphome.internal.message;
+package no.seime.openhab.binding.esphome.internal.internal.message;
 
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -26,9 +26,9 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
 
 public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T extends GeneratedMessageV3> {
 
@@ -92,6 +92,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
                 return BindingConstants.CHANNEL_TYPE_HUMIDITY;
             case "temperature":
                 return BindingConstants.CHANNEL_TYPE_TEMPERATURE;
+            case "distance":
+                return BindingConstants.CHANNEL_TYPE_DISTANCE;
             default:
                 logger.warn(
                         "Not implemented channel type for {}. Defaulting to 'Number'. Create a PR or create an issue at https://github.com/seime/openhab-esphome/issues. Stack-trace to aid where to add support. Also remember to add appropriate channel-type in src/main/resources/thing/channel-types.xml: {}",
@@ -112,13 +114,13 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         }
     }
 
-    protected Optional<Channel> findChannelByKey(int key) {
+    public Optional<Channel> findChannelByKey(int key) {
         return handler.getThing().getChannels().stream()
                 .filter(e -> BigDecimal.valueOf(key).equals(e.getConfiguration().get(BindingConstants.COMMAND_KEY)))
                 .findFirst();
     }
 
-    protected Optional<Channel> findChannelByKeyAndField(int key, String field) {
+    public Optional<Channel> findChannelByKeyAndField(int key, String field) {
         return handler.getThing().getChannels().stream()
                 .filter(e -> BigDecimal.valueOf(key).equals(e.getConfiguration().get(BindingConstants.COMMAND_KEY))
                         && field.equals(e.getConfiguration().get(BindingConstants.COMMAND_FIELD)))

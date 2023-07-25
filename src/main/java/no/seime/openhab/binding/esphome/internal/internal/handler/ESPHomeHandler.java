@@ -10,7 +10,7 @@
  * <p>
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal.handler;
+package no.seime.openhab.binding.esphome.internal.internal.handler;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -69,18 +69,18 @@ import io.esphome.api.SelectStateResponse;
 import io.esphome.api.SensorStateResponse;
 import io.esphome.api.SubscribeStatesRequest;
 import io.esphome.api.SwitchStateResponse;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
-import no.seime.openhab.binding.esphome.internal.PacketListener;
-import no.seime.openhab.binding.esphome.internal.comm.PlainTextConnection;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
-import no.seime.openhab.binding.esphome.internal.message.AbstractMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.BinarySensorMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.ClimateMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.SelectMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.SensorMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.SwitchMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.internal.ESPHomeConfiguration;
+import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
+import no.seime.openhab.binding.esphome.internal.internal.comm.PlainTextConnection;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolException;
+import no.seime.openhab.binding.esphome.internal.internal.message.AbstractMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.BinarySensorMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.ClimateMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.SelectMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.SensorMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.SwitchMessageHandler;
 
 /**
  * The {@link ESPHomeHandler} is responsible for handling commands, which are
@@ -203,6 +203,11 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     @Override
     public synchronized void handleCommand(ChannelUID channelUID, Command command) {
 
+        if (connectionState != ConnectionState.CONNECTED) {
+            logger.warn("[{}] Not connected, ignoring command {}", config.hostname, command);
+            return;
+        }
+
         if (command == RefreshType.REFRESH) {
             try {
                 connection.send(SubscribeStatesRequest.getDefaultInstance());
@@ -263,6 +268,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         connection.close(true);
         pingWatchdog.cancel(true);
         pingWatchdog = null;
+        reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2l, TimeUnit.SECONDS);
     }
 
     @Override
@@ -271,6 +277,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         connection.close(true);
         pingWatchdog.cancel(true);
         pingWatchdog = null;
+        reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2l, TimeUnit.SECONDS);
     }
 
     private void handleConnected(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -320,6 +327,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         if (pingWatchdog != null) {
             pingWatchdog.cancel(true);
         }
+        reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2l, TimeUnit.SECONDS);
     }
 
     private void handleLoginResponse(GeneratedMessageV3 message) throws ProtocolAPIError {

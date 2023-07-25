@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal;
+package no.seime.openhab.binding.esphome.internal.internal;
 
 import java.io.IOException;
 
@@ -18,7 +18,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 
 @NonNullByDefault
 public interface PacketListener {

@@ -1,4 +1,4 @@
-package no.seime.openhab.binding.esphome.internal.message;
+package no.seime.openhab.binding.esphome.internal.internal.message;
 
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.OnOffType;
@@ -12,9 +12,9 @@ import org.openhab.core.types.Command;
 import io.esphome.api.ListEntitiesSwitchResponse;
 import io.esphome.api.SwitchCommandRequest;
 import io.esphome.api.SwitchStateResponse;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
 
 public class SwitchMessageHandler extends AbstractMessageHandler<ListEntitiesSwitchResponse, SwitchStateResponse> {
 

@@ -1,6 +1,9 @@
-package no.seime.openhab.binding.esphome.internal.message;
+package no.seime.openhab.binding.esphome.internal.internal.message;
 
 import java.util.Collections;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import org.openhab.core.library.types.DecimalType;
@@ -13,14 +16,21 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
 
 import io.esphome.api.ClimateCommandRequest;
 import io.esphome.api.ClimateStateResponse;
 import io.esphome.api.ListEntitiesClimateResponse;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.EnumHelper;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.internal.EnumHelper;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
 
 public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesClimateResponse, ClimateStateResponse> {
 
@@ -33,52 +43,104 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
     public static final String CHANNEL_CURRENT_TEMPERATURE = "current_temperature";
     public static final String CHANNEL_MODE = "mode";
 
+    private final Logger logger = LoggerFactory.getLogger(ClimateMessageHandler.class);
+
+    private ReentrantLock lock = new ReentrantLock();
+
+    private LoadingCache<Integer, ClimateCommandRequest.Builder> commands;
+
+    private Thread expiryThread = null;
+
     public ClimateMessageHandler(ESPHomeHandler handler) {
         super(handler);
+
+        commands = CacheBuilder.newBuilder().maximumSize(10).expireAfterAccess(400, TimeUnit.MILLISECONDS)
+                .removalListener((RemovalListener<Integer, ClimateCommandRequest.Builder>) notification -> {
+                    if (notification.getValue() != null) {
+                        try {
+                            logger.info("Sending climate command for key {}", notification.getValue().getKey());
+                            handler.sendMessage(notification.getValue().build());
+                        } catch (ProtocolAPIError e) {
+                            logger.error("Failed to send climate command for key {}", notification.getValue().getKey(),
+                                    e);
+                        }
+                    }
+                }).build(new CacheLoader<>() {
+                    public ClimateCommandRequest.Builder load(Integer key) {
+                        return ClimateCommandRequest.newBuilder().setKey(key);
+                    }
+                });
     }
 
     @Override
-    public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
-        ClimateCommandRequest.Builder builder = ClimateCommandRequest.newBuilder().setKey(key);
-        String subCommand = (String) channel.getConfiguration().get(BindingConstants.COMMAND_FIELD);
-        switch (subCommand) {
-            case CHANNEL_MODE:
-                builder.setMode(EnumHelper.toClimateMode(command.toString())).setHasMode(true);
-                break;
-            case CHANNEL_TARGET_TEMPERATURE:
-                if (command instanceof QuantityType<?> qt) {
-                    builder.setTargetTemperature(qt.floatValue());
-                } else if (command instanceof DecimalType dc) {
-                    builder.setTargetTemperature(dc.floatValue());
-                }
+    public void handleCommand(Channel channel, Command command, int key) {
+        try {
+            lock.lock();
+            ClimateCommandRequest.Builder builder = commands.get(key);
+            String subCommand = (String) channel.getConfiguration().get(BindingConstants.COMMAND_FIELD);
+            switch (subCommand) {
+                case CHANNEL_MODE:
+                    builder.setMode(EnumHelper.toClimateMode(command.toString())).setHasMode(true);
+                    break;
+                case CHANNEL_TARGET_TEMPERATURE:
+                    if (command instanceof QuantityType<?> qt) {
+                        builder.setTargetTemperature(qt.floatValue());
+                    } else if (command instanceof DecimalType dc) {
+                        builder.setTargetTemperature(dc.floatValue());
+                    }
 
-                builder.setHasTargetTemperature(true);
-                break;
-            case CHANNEL_FAN_MODE:
-                builder.setFanMode(EnumHelper.toFanMode(command.toString())).setHasFanMode(true);
-                break;
-            case CHANNEL_CUSTOM_FAN_MODE:
-                builder.setCustomFanMode(command.toString()).setHasCustomFanMode(true);
-                break;
-            case CHANNEL_PRESET:
-                builder.setPreset(EnumHelper.toClimatePreset(command.toString())).setHasPreset(true);
-                break;
-            case CHANNEL_CUSTOM_PRESET:
-                builder.setCustomPreset(command.toString()).setHasCustomPreset(true);
-                break;
-            case CHANNEL_SWING_MODE:
-                builder.setSwingMode(EnumHelper.toClimateSwingMode(command.toString())).setHasSwingMode(true);
-                break;
+                    builder.setHasTargetTemperature(true);
+                    break;
+                case CHANNEL_FAN_MODE:
+                    builder.setFanMode(EnumHelper.toFanMode(command.toString())).setHasFanMode(true);
+                    break;
+                case CHANNEL_CUSTOM_FAN_MODE:
+                    builder.setCustomFanMode(command.toString()).setHasCustomFanMode(true);
+                    break;
+                case CHANNEL_PRESET:
+                    builder.setPreset(EnumHelper.toClimatePreset(command.toString())).setHasPreset(true);
+                    break;
+                case CHANNEL_CUSTOM_PRESET:
+                    builder.setCustomPreset(command.toString()).setHasCustomPreset(true);
+                    break;
+                case CHANNEL_SWING_MODE:
+                    builder.setSwingMode(EnumHelper.toClimateSwingMode(command.toString())).setHasSwingMode(true);
+                    break;
+            }
+            // Start a thread that will clean up the cache (send the pending messages)
+            if (expiryThread == null || !expiryThread.isAlive()) {
+                expiryThread = new Thread(() -> {
+                    while (commands.size() > 0) {
+                        try {
+                            lock.lock();
+                            logger.info("Calling cleanup");
+                            commands.cleanUp();
+                        } finally {
+                            lock.unlock();
+                        }
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException e) {
+                            logger.error("Error sleeping", e);
+                        }
+
+                    }
+                });
+                expiryThread.start();
+            }
+
+        } catch (ExecutionException e) {
+            logger.error("Error buffering climate command", e);
+        } finally {
+            lock.unlock();
         }
-
-        handler.sendMessage(builder.build());
     }
 
     public void buildChannels(ListEntitiesClimateResponse rsp) {
 
         ChannelType channelTypeTargetTemperature = addChannelType(
                 rsp.getObjectId() + "_" + BindingConstants.CHANNEL_NAME_TARGET_TEMPERATURE, "Target temperature",
-                "Number:Temperature", Collections.emptyList(), "%.1f", null);
+                "Number:Temperature", Collections.emptyList(), "%.1f %unit%", null);
 
         Channel channelTargetTemperature = ChannelBuilder
                 .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_TARGET_TEMPERATURE))
@@ -90,7 +152,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportsCurrentTemperature()) {
             ChannelType channelType = addChannelType(
                     rsp.getObjectId() + "_" + BindingConstants.CHANNEL_NAME_CURRENT_TEMPERATURE, "Current temperature",
-                    "Number:Temperature", Collections.emptyList(), "%.1f", null);
+                    "Number:Temperature", Collections.emptyList(), "%.1f %unit%", null);
 
             Channel channel = ChannelBuilder
                     .create(new ChannelUID(handler.getThing().getUID(),

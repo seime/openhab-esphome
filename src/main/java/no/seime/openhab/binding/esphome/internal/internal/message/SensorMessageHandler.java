@@ -1,4 +1,4 @@
-package no.seime.openhab.binding.esphome.internal.message;
+package no.seime.openhab.binding.esphome.internal.internal.message;
 
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.thing.Channel;
@@ -11,9 +11,9 @@ import org.openhab.core.types.Command;
 import io.esphome.api.ListEntitiesSensorResponse;
 import io.esphome.api.SelectCommandRequest;
 import io.esphome.api.SensorStateResponse;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
 
 public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSensorResponse, SensorStateResponse> {
 

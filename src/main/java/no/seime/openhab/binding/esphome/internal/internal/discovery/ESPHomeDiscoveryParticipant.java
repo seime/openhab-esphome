@@ -10,9 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal.discovery;
-
-import static no.seime.openhab.binding.esphome.internal.BindingConstants.THING_TYPE_DEVICE;
+package no.seime.openhab.binding.esphome.internal.internal.discovery;
 
 import java.util.Collections;
 import java.util.Set;
@@ -30,6 +28,8 @@ import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
+
 /**
  * The {@link ESPHomeDiscoveryParticipant} is responsible for discovering
  * ESPHome devices
@@ -46,7 +46,7 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
 
     @Override
     public Set<ThingTypeUID> getSupportedThingTypeUIDs() {
-        return Collections.singleton(THING_TYPE_DEVICE);
+        return Collections.singleton(BindingConstants.THING_TYPE_DEVICE);
     }
 
     @Override
@@ -61,7 +61,7 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
         if ("esphomelib".equals(application)) {
             final ThingUID deviceUID = getThingUID(service);
             if (deviceUID != null) {
-                return DiscoveryResultBuilder.create(deviceUID).withThingType(THING_TYPE_DEVICE)
+                return DiscoveryResultBuilder.create(deviceUID).withThingType(BindingConstants.THING_TYPE_DEVICE)
                         .withProperty(PROPERTY_HOSTNAME, service.getServer()).withLabel("ESPHome " + service.getName())
                         .withRepresentationProperty(PROPERTY_HOSTNAME).build();
             }
@@ -75,7 +75,7 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
             String serviceName = service.getName();
             logger.debug("Found ESPHome devices via mDNS:{} v4:{} v6:{}", serviceName, service.getInet4Addresses(),
                     service.getInet6Addresses());
-            return new ThingUID(THING_TYPE_DEVICE, serviceName);
+            return new ThingUID(BindingConstants.THING_TYPE_DEVICE, serviceName);
         }
         return null;
     }

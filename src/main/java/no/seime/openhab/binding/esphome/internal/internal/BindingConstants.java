@@ -10,7 +10,7 @@
  * <p>
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal;
+package no.seime.openhab.binding.esphome.internal.internal;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.thing.ThingTypeUID;
@@ -34,6 +34,7 @@ public class BindingConstants {
     public static final String COMMAND_FIELD = "command_field";
 
     public static final String CHANNEL_TYPE_TEMPERATURE = "temperature";
+    public static final String CHANNEL_TYPE_DISTANCE = "distance";
     public static final String CHANNEL_TYPE_HUMIDITY = "humidity";
     public static final String CHANNEL_TYPE_NUMBER = "number";
     public static final String CHANNEL_TYPE_SWITCH = "switch";

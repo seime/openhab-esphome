@@ -1,4 +1,4 @@
-package no.seime.openhab.binding.esphome.internal;
+package no.seime.openhab.binding.esphome.internal.internal;
 
 import io.esphome.api.ClimateFanMode;
 import io.esphome.api.ClimateMode;

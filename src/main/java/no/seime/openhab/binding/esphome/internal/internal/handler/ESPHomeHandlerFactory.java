@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal.handler;
+package no.seime.openhab.binding.esphome.internal.internal.handler;
 
 import java.util.Set;
 
@@ -23,7 +23,7 @@ import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
 import org.osgi.service.component.annotations.Component;
 
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
 
 /**
  * The {@link ESPHomeHandlerFactory} is responsible for creating things and thing

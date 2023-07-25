@@ -10,21 +10,10 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal;
+package no.seime.openhab.binding.esphome.internal.internal.comm;
 
-import org.eclipse.jdt.annotation.Nullable;
-
-/**
- * The {@link ESPHomeConfiguration} class contains fields mapping thing configuration parameters.
- *
- * @author Arne Seime - Initial contribution
- */
-
-public class ESPHomeConfiguration {
-
-    public String hostname;
-    @Nullable
-    public String password;
-
-    public int port = 6053;
+public class RequiresEncryptionAPIError extends ProtocolException {
+    public RequiresEncryptionAPIError(String message) {
+        super(message);
+    }
 }

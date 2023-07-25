@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package no.seime.openhab.binding.esphome.internal.handler;
+package no.seime.openhab.binding.esphome.internal.internal.handler;
 
 import java.util.Collection;
 import java.util.Collections;
