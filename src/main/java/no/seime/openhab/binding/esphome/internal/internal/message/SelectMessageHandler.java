@@ -1,6 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.internal.message;
 
-import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Channel;
@@ -30,7 +30,7 @@ public class SelectMessageHandler extends AbstractMessageHandler<ListEntitiesSel
 
     public void buildChannels(ListEntitiesSelectResponse rsp) {
         ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "String",
-                rsp.getOptionsList().stream().collect(Collectors.toList()), "%s", null);
+                new ArrayList<>(rsp.getOptionsList()), "%s", null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

@@ -34,7 +34,7 @@ public class PlainTextConnection {
     private InputStream inputStream;
     private OutputStream outputStream;
 
-    private final PlainTextPacketStreamReader packetStreamReader;
+    private PlainTextPacketStreamReader packetStreamReader;
     private String hostname;
 
     public PlainTextConnection(PacketListener listener) {
@@ -91,16 +91,20 @@ public class PlainTextConnection {
         try {
             if (packetStreamReader != null) {
                 packetStreamReader.close(quietly);
+                packetStreamReader = null;
             }
             if (inputStream != null) {
                 inputStream.close();
+                inputStream = null;
             }
             if (outputStream != null) {
                 outputStream.flush();
                 outputStream.close();
+                outputStream = null;
             }
             if (socket != null) {
                 socket.close();
+                socket = null;
             }
         } catch (IOException e) {
             logger.debug("[{}] Error closing connection", hostname, e);

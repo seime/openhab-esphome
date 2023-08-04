@@ -34,7 +34,7 @@ public class VarIntConverter {
             byte temp = (byte) (value & 0x7F);
             value >>= 7;
             if (value != 0) {
-                temp |= 0x80;
+                temp |= (byte) 0x80;
             }
             ret[index] = temp;
             index++;

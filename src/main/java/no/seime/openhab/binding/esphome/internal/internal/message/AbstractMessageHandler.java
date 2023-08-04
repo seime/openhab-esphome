@@ -33,7 +33,7 @@ import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler
 public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T extends GeneratedMessageV3> {
 
     private final Logger logger = LoggerFactory.getLogger(AbstractMessageHandler.class);
-    protected ESPHomeHandler handler;
+    protected final ESPHomeHandler handler;
 
     protected AbstractMessageHandler(ESPHomeHandler handler) {
         this.handler = handler;
@@ -87,19 +87,17 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     }
 
     protected String channelType(String objectId) {
-        switch (objectId) {
-            case "humidity":
-                return BindingConstants.CHANNEL_TYPE_HUMIDITY;
-            case "temperature":
-                return BindingConstants.CHANNEL_TYPE_TEMPERATURE;
-            case "distance":
-                return BindingConstants.CHANNEL_TYPE_DISTANCE;
-            default:
+        return switch (objectId) {
+            case "humidity" -> BindingConstants.CHANNEL_TYPE_HUMIDITY;
+            case "temperature" -> BindingConstants.CHANNEL_TYPE_TEMPERATURE;
+            case "distance" -> BindingConstants.CHANNEL_TYPE_DISTANCE;
+            default -> {
                 logger.warn(
                         "Not implemented channel type for {}. Defaulting to 'Number'. Create a PR or create an issue at https://github.com/seime/openhab-esphome/issues. Stack-trace to aid where to add support. Also remember to add appropriate channel-type in src/main/resources/thing/channel-types.xml: {}",
                         objectId, Thread.currentThread().getStackTrace());
-                return BindingConstants.CHANNEL_TYPE_NUMBER;
-        }
+                yield BindingConstants.CHANNEL_TYPE_NUMBER;
+            }
+        };
     }
 
     protected State toNumberState(Configuration configuration, float state, boolean missingState) {

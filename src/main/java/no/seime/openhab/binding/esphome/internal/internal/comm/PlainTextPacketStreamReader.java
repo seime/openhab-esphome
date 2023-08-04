@@ -45,7 +45,7 @@ public class PlainTextPacketStreamReader {
 
     private boolean closeQuietly = false;
 
-    private final Map<Integer, Class<? extends GeneratedMessageV3>> messageTypeToMessageClass = new HashMap<>();
+    private final Map<Integer, Method> messageTypeToMessageClass = new HashMap<>();
 
     public PlainTextPacketStreamReader(PacketListener listener) {
         this.listener = listener;
@@ -53,13 +53,15 @@ public class PlainTextPacketStreamReader {
         // Build a cache of message id to message class
         Api.getDescriptor().getMessageTypes().forEach(messageDescriptor -> {
             try {
-                int id = messageDescriptor.getOptions().getExtension(io.esphome.api.ApiOptions.id).intValue();
+                int id = messageDescriptor.getOptions().getExtension(io.esphome.api.ApiOptions.id);
                 if (id > 0) {
                     Class<? extends GeneratedMessageV3> subclass = Class.forName(messageDescriptor.getFullName())
                             .asSubclass(GeneratedMessageV3.class);
-                    messageTypeToMessageClass.put(id, subclass);
+                    Method parseMethod = subclass.getDeclaredMethod("parseFrom", byte[].class);
+
+                    messageTypeToMessageClass.put(id, parseMethod);
                 }
-            } catch (ClassNotFoundException e) {
+            } catch (ClassNotFoundException | NoSuchMethodException e) {
                 throw new RuntimeException(e);
             }
         });
@@ -162,22 +164,20 @@ public class PlainTextPacketStreamReader {
     }
 
     private void decodeProtoMessage(int messageType, byte[] bytes) {
-        logger.info("Received packet of type {} with data {}", messageType, bytes);
+        logger.debug("Received packet of type {} with data {}", messageType, bytes);
 
         try {
-            Class<? extends GeneratedMessageV3> protoClass = messageTypeToMessageClass.get(messageType);
-            if (protoClass != null) {
-                Method parseMethod = protoClass.getDeclaredMethod("parseFrom", byte[].class);
+            Method parseMethod = messageTypeToMessageClass.get(messageType);
+            if (parseMethod != null) {
                 GeneratedMessageV3 invoke = (GeneratedMessageV3) parseMethod.invoke(null, bytes);
                 if (invoke != null) {
                     listener.onPacket(invoke);
                 } else {
-                    logger.warn("Received null packet of type {}", protoClass);
+                    logger.warn("Received null packet of type {}", parseMethod);
                 }
             }
-        } catch (ProtocolAPIError | IllegalAccessException | InvocationTargetException | NoSuchMethodException
-                | IOException e) {
-            logger.debug("Error parsing packet", e);
+        } catch (ProtocolAPIError | IllegalAccessException | InvocationTargetException | IOException e) {
+            logger.warn("Error parsing packet", e);
             listener.onParseError();
         }
     }
