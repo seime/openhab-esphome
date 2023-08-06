@@ -28,8 +28,7 @@
 			</parameter>
 			<parameter name="password" type="text" required="false">
 				<context>password</context>
-				<label>Password</label>
-
+				<label>Password for plaintext connection</label>
 				<description>Password to access the device</description>
 			</parameter>
 		</config-description>

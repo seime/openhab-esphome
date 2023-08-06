@@ -4,42 +4,4 @@
 	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
 	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
 
-	<channel-type id="temperature">
-		<item-type>Number:Temperature</item-type>
-		<label>Temperature</label>
-		<description>Measured temperature</description>
-		<state readOnly="true" pattern="%.1f %unit%"/>
-	</channel-type>
-	<channel-type id="humidity">
-		<item-type>Number:Dimensionless</item-type>
-		<label>Humidity</label>
-		<description>Measured humidity</description>
-		<state readOnly="true" pattern="%.1f %%"/>
-	</channel-type>
-	<channel-type id="distance">
-		<item-type>Number:Length</item-type>
-		<label>Lenght</label>
-		<description>Length of measurement</description>
-		<state readOnly="true" pattern="%.2f %unit%"/>
-	</channel-type>
-	<channel-type id="number">
-		<item-type>Number</item-type>
-		<label>Generic number</label>
-		<description>Generic number channel when no specific mapping exist (yet)</description>
-		<state readOnly="true"/>
-	</channel-type>
-	<channel-type id="switch">
-		<item-type>Switch</item-type>
-		<label>Switch</label>
-		<description>Switch / relay</description>
-	</channel-type>
-	<channel-type id="contact">
-		<item-type>Contact</item-type>
-		<label>Contact</label>
-		<description>Contact</description>
-		<state readOnly="true"/>
-
-	</channel-type>
-
-
 </thing:thing-descriptions>

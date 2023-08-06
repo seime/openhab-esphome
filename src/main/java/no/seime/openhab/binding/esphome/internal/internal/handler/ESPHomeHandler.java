@@ -259,16 +259,17 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         updateStatus(ThingStatus.OFFLINE);
         connection.close(true);
         pingWatchdog.cancel(true);
-        pingWatchdog = null;
+        connectionState = ConnectionState.UNINITIALIZED;
         reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
     }
 
     @Override
     public void onParseError() {
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, "Parse error");
+        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
+                "Parse error. This could be due to api encryption being used by ESPHome device. Update your ESPHome device to use plaintext password until this is implemented in the binding.");
         connection.close(true);
         pingWatchdog.cancel(true);
-        pingWatchdog = null;
+        connectionState = ConnectionState.UNINITIALIZED;
         reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
     }
 
@@ -355,7 +356,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
                                     NUM_MISSED_PINGS_BEFORE_DISCONNECT, PING_INTERVAL_SECONDS));
-                    reconnectFuture = scheduler.schedule(this::connect, 30, TimeUnit.SECONDS);
+                    reconnectFuture = scheduler.schedule(this::connect, 10, TimeUnit.SECONDS);
 
                 } else {
 

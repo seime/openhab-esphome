@@ -11,11 +11,13 @@ the [ESPHome dashboard](https://esphome.io/guides/installing_esphome.html) for t
 
 <img src="esphomedashboard.png" alt="ESPHome dashboard" width="30%"/>
 
-Benefits of using the native API:
+Benefits of using the native API over MQTT:
 
+- State descriptions on openHAB channels with value options
 - No need for an MQTT broker
 - Slightly faster than messaging over MQTT (according to the ESPHome documentation)
-- State descriptions on openHAB channels with value options
+
+Read more here: https://esphome.io/components/api#advantages-over-mqtt
 
 ## Getting started for non ESPHome users
 
@@ -25,17 +27,29 @@ Benefits of using the native API:
 4. Install the ESPHome binding in openHAB
 5. Wait for discovery to find your device - or add manually in a thing file.
 
+> **Note:** At the current state of the binding, it is highly recommended to use file based configuration for things and
+> items as channel types etc most likely will change.
+
+## FAQ
+
+- My ESPHome thing reports `COMMUNICATION_ERROR: Parse error`. What is wrong?
+
+  > This is most likely because you have encryption set on your ESPHome device. The binding does not support encrypted
+  > connections yet, so you need to disable encryption on your device.
+
+Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
+
 ## Supported Things
 
 - `device`: A device flashed with https://esphome.io/ firmware.
 
 ## Limitations as of 2023-06-13
 
-- Only plaintext connections are supported, not encrypted. This is insecure and should not be used on untrusted
-  networks.
+- **Only plaintext connections with password** are supported, not encrypted. This is insecure and should not be used on
+  untrusted
+  networks, but is your only option at this time. I *intend* to add encryption.
 - Only `sensor`, `binary sensor` `switch`, `climate` and `select` is supported. Plans to add more, but not yet
-  implemented. I need _your_
-  help.
+  implemented. I need _your_ help.
 
 ## Discovery
 
@@ -45,27 +59,15 @@ The binding uses mDNS to automatically discover devices on the network.
 
 ### `device` Thing Configuration
 
-| Name     | Type    | Description                                                                    | Default | Required | Advanced |
-|----------|---------|--------------------------------------------------------------------------------|---------|----------|----------|
-| hostname | text    | Hostname or IP address of the device. Typically something like 'myboard.local' | N/A     | yes      | no       |
-| password | text    | Password to access the device if password protected                            | N/A     | no       | no       |
-| port     | integer | IP Port of the device                                                          | 6053    | no       | no       |
+| Name       | Type      | Description                                                                    | Default | Required | Advanced |
+|------------|-----------|--------------------------------------------------------------------------------|---------|----------|----------|
+| `hostname` | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local' | N/A     | yes      | no       |
+| `password` | `text`    | Password to access the device if password protected                            | N/A     | no       | no       |
+| `port`     | `integer` | IP Port of the device                                                          | 6053    | no       | no       |
 
 ## Channels
 
-Channels are auto-generated based on the device configuration.
-
-Some possible channel _types_ are:
-
-| Channel Typep | Type                 | Read/Write | Description                                       |
-|---------------|----------------------|------------|---------------------------------------------------|
-| temperature   | Number:Temperature   | R          | Sensor reported temperature                       |
-| humidity      | Number:Dimensionless | R          | Sensor reported relative humidity                 |
-| number        | Number               | R          | For all other yet to be supported types of values |
-| switch        | Switch               | RW         | Switches and relays                               |
-| contact       | Switch               | RW         | Binary sensors                                    |
-
-_Actual_ channel name is based on the ESPHome configuration.
+Channels are auto-generated based on actual device configuration.
 
 ## Full Example
 

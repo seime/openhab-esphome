@@ -84,9 +84,9 @@ public class PlainTextPacketStreamReader {
                         return;
                     }
 
-                    dataReceived(data);
+                    headerReceived(data);
                 } catch (ProtocolException | IOException e) {
-                    logger.debug("Error reading from socket {}", e.getMessage());
+                    logger.debug("Error reading from socket", e);
                     keepRunning = false;
                     if (!closeQuietly) {
                         logger.debug("End of stream");
@@ -100,30 +100,30 @@ public class PlainTextPacketStreamReader {
         thread.start();
     }
 
-    public void dataReceived(byte[] data) throws IOException, ProtocolException {
-        if (data[0] != PREAMBLE) {
-            if (data[0] == ENCRYPTION_REQUIRED) {
+    public void headerReceived(byte[] headerData) throws IOException, ProtocolException {
+        if (headerData[0] != PREAMBLE) {
+            if (headerData[0] == ENCRYPTION_REQUIRED) {
                 handleAndClose(new RequiresEncryptionAPIError("Connection requires encryption"));
                 return;
             }
 
-            handleAndClose(new ProtocolAPIError(String.format("Invalid preamble %02x", data[0])));
+            handleAndClose(new ProtocolAPIError(String.format("Invalid preamble %02x", headerData[0])));
             return;
         }
 
         byte[] encodedProtoPacketLenghtBuffer;
         byte[] encodedMessageTypeBuffer;
 
-        if ((data[1] & VAR_INT_MARKER) == VAR_INT_MARKER) {
+        if ((headerData[1] & VAR_INT_MARKER) == VAR_INT_MARKER) {
             // Length is longer than 1 byte
-            encodedProtoPacketLenghtBuffer = Arrays.copyOfRange(data, 1, 3);
+            encodedProtoPacketLenghtBuffer = Arrays.copyOfRange(headerData, 1, 3);
             encodedMessageTypeBuffer = new byte[0];
         } else {
             // This is the most common case with 99% of messages
             // needing a single byte for length and type which means
             // we avoid 2 calls to readexactly
-            encodedProtoPacketLenghtBuffer = Arrays.copyOfRange(data, 1, 2);
-            encodedMessageTypeBuffer = Arrays.copyOfRange(data, 2, 3);
+            encodedProtoPacketLenghtBuffer = Arrays.copyOfRange(headerData, 1, 2);
+            encodedMessageTypeBuffer = Arrays.copyOfRange(headerData, 2, 3);
         }
 
         // If the message is long, we need to read the rest of the length

@@ -82,7 +82,7 @@ public class PlainTextConnection {
             packetStreamReader.parseStream(inputStream);
 
         } catch (IOException e) {
-            throw new ProtocolAPIError("Failed to connect to " + hostname + ":" + port + ": " + e.getMessage());
+            throw new ProtocolAPIError("Failed to connect to '" + hostname + "' port " + port, e);
         }
     }
 

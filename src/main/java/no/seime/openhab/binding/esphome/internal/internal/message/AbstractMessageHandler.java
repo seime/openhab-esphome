@@ -12,6 +12,7 @@ import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.thing.Channel;
+import org.openhab.core.thing.type.AutoUpdatePolicy;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.thing.type.ChannelTypeBuilder;
 import org.openhab.core.thing.type.ChannelTypeUID;
@@ -40,23 +41,31 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     }
 
     protected ChannelType addChannelType(final String channelTypePrefix, final String label, final String itemType,
-            final Collection<?> options, @Nullable final String pattern, @Nullable final Set<String> tags) {
+            final Collection<?> options, @Nullable final String pattern, @Nullable final Set<String> tags,
+            boolean readOnly, String category) {
         final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
                 channelTypePrefix + handler.getThing().getUID().getId());
         final List<StateOption> stateOptions = options.stream().map(e -> new StateOption(e.toString(), e.toString()))
                 .collect(Collectors.toList());
 
-        StateDescriptionFragmentBuilder stateDescription = StateDescriptionFragmentBuilder.create().withReadOnly(false)
-                .withOptions(stateOptions);
+        StateDescriptionFragmentBuilder stateDescription = StateDescriptionFragmentBuilder.create()
+                .withReadOnly(readOnly).withOptions(stateOptions);
         if (pattern != null) {
             stateDescription = stateDescription.withPattern(pattern);
         }
-        final StateChannelTypeBuilder builder = ChannelTypeBuilder.state(channelTypeUID, label, itemType)
+        final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID, label, itemType)
                 .withStateDescriptionFragment(stateDescription.build());
         if (tags != null && !tags.isEmpty()) {
-            builder.withTags(tags);
+            channelTypeBuilder.withTags(tags);
         }
-        return builder.build();
+
+        if (category != null) {
+            channelTypeBuilder.withCategory(category);
+        }
+
+        channelTypeBuilder.withAutoUpdatePolicy(AutoUpdatePolicy.VETO);
+
+        return channelTypeBuilder.build();
     }
 
     protected Configuration configuration(int key, String subCommand, String commandClass) {
@@ -86,29 +95,43 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         handler.addChannel(channel);
     }
 
-    protected String channelType(String objectId) {
-        return switch (objectId) {
-            case "humidity" -> BindingConstants.CHANNEL_TYPE_HUMIDITY;
-            case "temperature" -> BindingConstants.CHANNEL_TYPE_TEMPERATURE;
-            case "distance" -> BindingConstants.CHANNEL_TYPE_DISTANCE;
-            default -> {
-                logger.warn(
-                        "Not implemented channel type for {}. Defaulting to 'Number'. Create a PR or create an issue at https://github.com/seime/openhab-esphome/issues. Stack-trace to aid where to add support. Also remember to add appropriate channel-type in src/main/resources/thing/channel-types.xml: {}",
-                        objectId, Thread.currentThread().getStackTrace());
-                yield BindingConstants.CHANNEL_TYPE_NUMBER;
-            }
-        };
-    }
-
-    protected State toNumberState(Configuration configuration, float state, boolean missingState) {
+    protected State toNumericState(Configuration configuration, float state, boolean missingState) {
         if (missingState) {
             return UnDefType.UNDEF;
         } else {
-            String unit = (String) configuration.get("unit");
-            if (unit != null) {
-                return new QuantityType<>(state + unit);
+            String deviceClass = (String) configuration.get("deviceClass");
+            if (deviceClass != null) {
+                SensorDeviceClass sensorDeviceClass = SensorDeviceClass.fromDeviceClass(deviceClass);
+                if (sensorDeviceClass != null) {
+                    if (sensorDeviceClass.getItemType().startsWith("Number")) {
+                        String unit = (String) configuration.get("unit");
+                        if (unit != null) {
+                            if ("%".equals(unit)) {
+                                // TODO PercentType does not seem to work well
+                                return new DecimalType(state);
+                            }
+                            try {
+                                return new QuantityType<>(state + unit);
+                            } catch (IllegalArgumentException e) {
+                                logger.warn("Error constructing QuantityType from {} and {}", state, unit, e);
+                                return new DecimalType(state);
+                            }
+                        } else {
+                            return new DecimalType(state);
+                        }
+                    } else {
+                        logger.warn("Expected SensorDeviceClass {} to be of item type Number[:Dimension]", deviceClass);
+                        return UnDefType.UNDEF;
+                    }
+                } else {
+                    logger.warn("Unknown deviceClass '{}' reported by device, binding needs to be updated",
+                            deviceClass);
+                    return new DecimalType(state);
+                }
+            } else {
+                logger.warn("Device class unspecified, returning DecimalType");
+                return new DecimalType(state);
             }
-            return new DecimalType(state);
         }
     }
 

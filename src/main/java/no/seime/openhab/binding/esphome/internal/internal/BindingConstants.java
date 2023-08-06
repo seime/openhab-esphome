@@ -33,12 +33,6 @@ public class BindingConstants {
     public static final String COMMAND_CLASS = "command_class";
     public static final String COMMAND_FIELD = "command_field";
 
-    public static final String CHANNEL_TYPE_TEMPERATURE = "temperature";
-    public static final String CHANNEL_TYPE_DISTANCE = "distance";
-    public static final String CHANNEL_TYPE_HUMIDITY = "humidity";
-    public static final String CHANNEL_TYPE_NUMBER = "number";
-    public static final String CHANNEL_TYPE_SWITCH = "switch";
-    public static final String CHANNEL_TYPE_CONTACT = "contact";
     public static final String CHANNEL_NAME_MODE = "mode";
     public static final String CHANNEL_NAME_CURRENT_TEMPERATURE = "current_temperature";
     public static final String CHANNEL_NAME_TARGET_TEMPERATURE = "target_temperature";

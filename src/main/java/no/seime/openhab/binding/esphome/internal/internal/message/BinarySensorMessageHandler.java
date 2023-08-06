@@ -1,12 +1,15 @@
 package no.seime.openhab.binding.esphome.internal.internal.message;
 
+import java.util.Collections;
+import java.util.Set;
+
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.OpenClosedType;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
-import org.openhab.core.thing.type.ChannelTypeUID;
+import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
 import org.openhab.core.types.UnDefType;
@@ -14,7 +17,6 @@ import org.openhab.core.types.UnDefType;
 import io.esphome.api.BinarySensorStateResponse;
 import io.esphome.api.ListEntitiesBinarySensorResponse;
 import io.esphome.api.SelectCommandRequest;
-import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
 
@@ -34,12 +36,14 @@ public class BinarySensorMessageHandler
     public void buildChannels(ListEntitiesBinarySensorResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, null);
 
+        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "Contact", Collections.emptySet(),
+                null, Set.of("OpenState"), false, "door");
+
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                .withLabel(rsp.getName()).withKind(ChannelKind.STATE)
-                .withType(new ChannelTypeUID(BindingConstants.BINDING_ID, BindingConstants.CHANNEL_TYPE_CONTACT))
+                .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withConfiguration(configuration).build();
 
-        super.registerChannel(channel, null);
+        super.registerChannel(channel, channelType);
     }
 
     public void handleState(BinarySensorStateResponse rsp) {
