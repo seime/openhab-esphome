@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.measure.Unit;
+
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
@@ -11,6 +13,7 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +60,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         // TOOD state pattern should be moved to SensorDeviceClass enum as current impl does not handle
         // strings/enums/timestamps
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
-                itemType(rsp.getName(), rsp.getDeviceClass()), Collections.emptyList(),
+                itemType(rsp.getUnitOfMeasurement(), rsp.getName(), sensorDeviceClass), Collections.emptyList(),
                 "%." + rsp.getAccuracyDecimals() + "f " + rsp.getUnitOfMeasurement(), tags, true,
                 sensorDeviceClass != null ? sensorDeviceClass.getCategory() : null);
 
@@ -67,22 +70,53 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         super.registerChannel(channel, channelType);
     }
 
-    private String itemType(String name, String deviceClass) {
-        if (deviceClass == null || "".equals(deviceClass)) {
-            logger.warn(
-                    "No device_class reported by sensor '{}'. Add device_class attribute to sensor configuration in ESPHome. Defaulting to plain Number without dimension",
-                    name);
-            return "Number";
-        } else {
-            String itemType = SensorDeviceClass.getItemTypeForDeviceClass(deviceClass);
-            if (itemType == null) {
-                itemType = "Number";
+    private String itemType(String unitOfMeasurement, String name, SensorDeviceClass deviceClass) {
+
+        String itemTypeFromUnit = getItemTypeBaseOnUnit(unitOfMeasurement);
+
+        String itemTypeToUse;
+
+        if (itemTypeFromUnit != null && deviceClass != null) {
+            if (!deviceClass.getItemType().equals(itemTypeFromUnit)) {
+                // Verify that unit matches device_class as well
+                itemTypeToUse = itemTypeFromUnit;
                 logger.warn(
-                        "No item type found for device class '{}' for sensor '{}'. Defaulting to Number. Check valid values at first enum string entry in https://github.com/seime/openhab-esphome/blob/master/src/main/java/no/seime/openhab/binding/esphome/internal/internal/message/SensorDeviceClass.java",
-                        deviceClass, name);
+                        "Unexpected combination of device_class '{}' and unit '{}'. Returning item type '{}' based on unit",
+                        deviceClass.getDeviceClass(), unitOfMeasurement, itemTypeToUse);
+
+            } else {
+                itemTypeToUse = deviceClass.getItemType();
+                logger.debug("Using item type '{}' based on device_class '{}' and unit '{}'", itemTypeToUse,
+                        deviceClass.getDeviceClass(), unitOfMeasurement);
             }
-            return itemType;
+
+        } else if (itemTypeFromUnit != null) {
+            itemTypeToUse = itemTypeFromUnit;
+            logger.debug(
+                    "Using item type '{}' based on unit '{}' since device_class is either missing from ESPHome device or openhab mapping is incomplete",
+                    itemTypeToUse, unitOfMeasurement);
+        } else if (deviceClass != null) {
+            itemTypeToUse = deviceClass.getItemType();
+            logger.debug("Using item type '{}' based on device_class '{}' ", itemTypeToUse,
+                    deviceClass.getDeviceClass());
+        } else {
+            logger.warn(
+                    "Could not determine item type for sensor '{}' as neither device_class nor unit_of_measurement is present. Consider augmenting your ESPHome configuration. Using default 'Number'",
+                    name);
+            itemTypeToUse = "Number";
         }
+        return itemTypeToUse;
+    }
+
+    private String getItemTypeBaseOnUnit(String unitOfMeasurement) {
+        Unit<?> unit = UnitUtils.parseUnit(unitOfMeasurement);
+        if (unit != null) {
+            String dimensionName = UnitUtils.getDimensionName(unit);
+            if (dimensionName != null) {
+                return "Number:" + dimensionName;
+            }
+        }
+        return null;
     }
 
     public void handleState(SensorStateResponse rsp) {

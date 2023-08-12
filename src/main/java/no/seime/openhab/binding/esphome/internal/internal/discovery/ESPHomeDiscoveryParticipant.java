@@ -12,8 +12,10 @@
  */
 package no.seime.openhab.binding.esphome.internal.internal.discovery;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.jmdns.ServiceInfo;
 
@@ -61,8 +63,21 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
         if ("esphomelib".equals(application)) {
             final ThingUID deviceUID = getThingUID(service);
             if (deviceUID != null) {
+
+                StringBuilder b = new StringBuilder("ESPHome device ");
+                if (service.getName() != null) {
+                    b.append(service.getName());
+                }
+                if (service.getServer() != null) {
+                    b.append(" (").append(service.getServer()).append(")");
+                }
+                if (service.getInet4Addresses().length != 0) {
+                    b.append(" ").append(Arrays.stream(service.getInet4Addresses()).map(e -> e.getHostAddress())
+                            .collect(Collectors.joining()));
+                }
+
                 return DiscoveryResultBuilder.create(deviceUID).withThingType(BindingConstants.THING_TYPE_DEVICE)
-                        .withProperty(PROPERTY_HOSTNAME, service.getServer()).withLabel("ESPHome " + service.getName())
+                        .withProperty(PROPERTY_HOSTNAME, service.getServer()).withLabel(b.toString())
                         .withRepresentationProperty(PROPERTY_HOSTNAME).build();
             }
         }
