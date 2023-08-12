@@ -29,6 +29,7 @@ jobs:
         key: ${{ runner.java }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: |
           ${{ runner.java }}-maven-
+          ${{ runner.java }}-maven-${{ hashFiles('**/pom.xml') }}
 
     - name: Downgrade version
       run: mvn versions:set -DnewVersion=3.4.4-SNAPSHOT
@@ -69,6 +70,7 @@ jobs:
         key: ${{ runner.java }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: |
           ${{ runner.java }}-maven-
+          ${{ runner.java }}-maven-${{ hashFiles('**/pom.xml') }}
 
     - name: Build
       run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=17 clean verify
