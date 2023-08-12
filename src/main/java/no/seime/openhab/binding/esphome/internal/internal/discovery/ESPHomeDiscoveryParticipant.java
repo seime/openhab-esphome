@@ -15,6 +15,7 @@ package no.seime.openhab.binding.esphome.internal.internal.discovery;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import javax.jmdns.ServiceInfo;
@@ -90,7 +91,7 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
             String serviceName = service.getName();
             logger.debug("Found ESPHome devices via mDNS:{} v4:{} v6:{}", serviceName, service.getInet4Addresses(),
                     service.getInet6Addresses());
-            return new ThingUID(BindingConstants.THING_TYPE_DEVICE, serviceName);
+            return new ThingUID(BindingConstants.THING_TYPE_DEVICE, UUID.randomUUID().toString());
         }
         return null;
     }
