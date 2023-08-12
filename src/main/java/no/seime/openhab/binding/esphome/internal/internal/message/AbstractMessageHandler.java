@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.measure.Unit;
+
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
@@ -30,6 +32,7 @@ import com.google.protobuf.GeneratedMessageV3;
 import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
+import tech.units.indriya.unit.Units;
 
 public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T extends GeneratedMessageV3> {
 
@@ -104,17 +107,20 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
                 SensorDeviceClass sensorDeviceClass = SensorDeviceClass.fromDeviceClass(deviceClass);
                 if (sensorDeviceClass != null) {
                     if (sensorDeviceClass.getItemType().startsWith("Number")) {
-                        String unit = (String) configuration.get("unit");
-                        if (unit != null) {
-                            if ("%".equals(unit)) {
+                        String unitString = (String) configuration.get("unit");
+                        if (unitString != null) {
+                            if ("%".equals(unitString)) {
                                 // TODO PercentType does not seem to work well
                                 return new DecimalType(state);
                             }
-                            try {
-                                return new QuantityType<>(state + unit);
-                            } catch (IllegalArgumentException e) {
-                                logger.warn("Error constructing QuantityType from {} and {}", state, unit, e);
+                            Unit<?> unit = Units.getInstance().getUnit(unitString);
+                            if (unit != null) {
+                                return new QuantityType<>(state, unit);
+                            } else {
+                                logger.warn("Unit '{}' unknown to openHAB, returning DecimalType for state '{}'",
+                                        unitString);
                                 return new DecimalType(state);
+
                             }
                         } else {
                             return new DecimalType(state);

@@ -2,6 +2,7 @@ package no.seime.openhab.binding.esphome.internal.internal.message;
 
 public enum SensorDeviceClass {
 
+    GENERIC_NUMBER("generic_number", "Number", "zoom", null),
     ENUM("enum", "String", "text", null),
     TIMESTAMP("timestamp", "DateTime", "time", null),
     APPARENT_POWER("apparent_power", "Number:Power", "energy", null),
@@ -105,6 +106,7 @@ public enum SensorDeviceClass {
 
     @Override
     public String toString() {
-        return "SensorDeviceClass{" + "deviceClass='" + deviceClass + '\'' + ", itemType='" + itemType + '\'' + '}';
+        return "SensorDeviceClass{" + "deviceClass='" + deviceClass + '\'' + ", itemType='" + itemType + '\''
+                + ", category='" + category + '\'' + ", measurementType='" + measurementType + '\'' + '}';
     }
 }

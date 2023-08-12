@@ -37,18 +37,29 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
   > This is most likely because you have encryption set on your ESPHome device. The binding does not support encrypted
   > connections yet, so you need to disable encryption on your device.
 
+- I get warnings
+  like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
+
+  > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
+  > type in openHAB.
+  > Solution: Specify a `device_class` to your ESPHome configuration. Eexample: <br/>
+  > ![img.png](esphomeconfig_deviceclass.png)
+  > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
+  device_class values (**use lowercase values**)
+
 Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
 
 ## Supported Things
 
 - `device`: A device flashed with https://esphome.io/ firmware.
 
-## Limitations as of 2023-06-13
+## Limitations as of 2023-08-12
 
 - **Only plaintext connections with password** are supported, not encrypted. This is insecure and should not be used on
   untrusted
   networks, but is your only option at this time. I *intend* to add encryption.
-- Only `sensor`, `binary sensor` `switch`, `climate` and `select` is supported. Plans to add more, but not yet
+- Only `sensor`, `binary_sensor`, `text_sensor` `switch`, `climate` and `select` is supported. Plans to add more, but
+  not yet
   implemented. I need _your_ help.
 
 ## Discovery

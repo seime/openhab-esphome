@@ -130,91 +130,86 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
 
     public void buildChannels(ListEntitiesClimateResponse rsp) {
 
-        ChannelType channelTypeTargetTemperature = addChannelType(rsp.getUniqueId(), "Target temperature",
-                "Number:Temperature", Collections.emptyList(), "%.1f %unit%", Set.of("Setpoint", "Temperature"), false,
-                "temperature");
+        ChannelType channelTypeTargetTemperature = addChannelType(rsp.getUniqueId() + CHANNEL_TARGET_TEMPERATURE,
+                "Target temperature", "Number:Temperature", Collections.emptyList(), "%.1f %unit%",
+                Set.of("Setpoint", "Temperature"), false, "temperature");
 
         Channel channelTargetTemperature = ChannelBuilder
-                .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_TARGET_TEMPERATURE))
+                .create(new ChannelUID(handler.getThing().getUID(), CHANNEL_TARGET_TEMPERATURE))
                 .withLabel("Target temperature").withKind(ChannelKind.STATE)
                 .withType(channelTypeTargetTemperature.getUID())
                 .withConfiguration(configuration(rsp.getKey(), CHANNEL_TARGET_TEMPERATURE, "Climate")).build();
         super.registerChannel(channelTargetTemperature, channelTypeTargetTemperature);
 
         if (rsp.getSupportsCurrentTemperature()) {
-            ChannelType channelType = addChannelType(rsp.getUniqueId(), "Current temperature", "Number:Temperature",
-                    Collections.emptyList(), "%.1f %unit%", Set.of("Measurement", "Temperature"), true, "temperature");
+            ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_TEMPERATURE,
+                    "Current temperature", "Number:Temperature", Collections.emptyList(), "%.1f %unit%",
+                    Set.of("Measurement", "Temperature"), true, "temperature");
 
             Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(),
-                            BindingConstants.CHANNEL_NAME_CURRENT_TEMPERATURE))
+                    .create(new ChannelUID(handler.getThing().getUID(), CHANNEL_CURRENT_TEMPERATURE))
                     .withLabel("Current temperature").withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_CURRENT_TEMPERATURE, null)).build();
             super.registerChannel(channel, channelType);
         }
 
         if (rsp.getSupportedModesCount() > 0) {
-            ChannelType channelType = addChannelType(rsp.getUniqueId(), "Mode", "String",
+            ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_MODE, "Mode", "String",
                     rsp.getSupportedModesList().stream().map(EnumHelper::stripEnumPrefix).collect(Collectors.toList()),
                     "%s", null, false, "climate");
 
-            Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_MODE))
+            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), CHANNEL_MODE))
                     .withLabel("Mode").withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_MODE, "Climate")).build();
             super.registerChannel(channel, channelType);
         }
         if (rsp.getSupportedFanModesCount() > 0) {
             ChannelType channelType = addChannelType(
-                    rsp.getUniqueId(), "Fan Mode", "String", rsp.getSupportedFanModesList().stream()
+                    rsp.getUniqueId() + CHANNEL_FAN_MODE, "Fan Mode", "String", rsp.getSupportedFanModesList().stream()
                             .map(EnumHelper::stripEnumPrefix).collect(Collectors.toList()),
                     "%s", Set.of("Setpoint", "Wind"), false, "fan");
 
-            Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_FAN_MODE))
+            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), CHANNEL_FAN_MODE))
                     .withLabel("Fan Mode").withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_FAN_MODE, "Climate")).build();
             super.registerChannel(channel, channelType);
         }
         if (rsp.getSupportedCustomFanModesCount() > 0) {
-            ChannelType channelType = addChannelType(BindingConstants.CHANNEL_NAME_CUSTOM_FAN_MODE, "Custom Fan Mode",
+            ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CUSTOM_FAN_MODE, "Custom Fan Mode",
                     "String", new ArrayList<>(rsp.getSupportedCustomFanModesList()), "%s", Set.of("Setpoint", "Wind"),
                     false, "fan");
 
             Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_CUSTOM_FAN_MODE))
+                    .create(new ChannelUID(handler.getThing().getUID(), CHANNEL_CUSTOM_FAN_MODE))
                     .withLabel("Custom Fan Mode").withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_CUSTOM_FAN_MODE, "Climate")).build();
             super.registerChannel(channel, channelType);
         }
         if (rsp.getSupportedPresetsCount() > 0) {
-            ChannelType channelType = addChannelType(rsp.getObjectId() + "_" + BindingConstants.CHANNEL_NAME_PRESET,
-                    "Preset", "String", rsp.getSupportedPresetsList().stream().map(EnumHelper::stripEnumPrefix)
-                            .collect(Collectors.toList()),
+            ChannelType channelType = addChannelType(
+                    rsp.getObjectId() + CHANNEL_PRESET, "Preset", "String", rsp.getSupportedPresetsList().stream()
+                            .map(EnumHelper::stripEnumPrefix).collect(Collectors.toList()),
                     "%s", Set.of("Setpoint"), false, "climate");
-            Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_PRESET))
+            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), CHANNEL_PRESET))
                     .withLabel("Preset").withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_PRESET, "Climate")).build();
             super.registerChannel(channel, channelType);
         }
         if (rsp.getSupportedCustomPresetsCount() > 0) {
-            ChannelType channelType = addChannelType(
-                    rsp.getObjectId() + "_" + BindingConstants.CHANNEL_NAME_CUSTOM_PRESET, "Custom Preset", "String",
-                    new ArrayList<>(rsp.getSupportedCustomPresetsList()), "%s", Set.of("Setpoint"), false, "climate");
-            Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_CUSTOM_PRESET))
+            ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CUSTOM_PRESET, "Custom Preset",
+                    "String", new ArrayList<>(rsp.getSupportedCustomPresetsList()), "%s", Set.of("Setpoint"), false,
+                    "climate");
+            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), CHANNEL_CUSTOM_PRESET))
                     .withLabel("Custom Preset").withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_CUSTOM_PRESET, "Climate")).build();
             super.registerChannel(channel, channelType);
         }
         if (rsp.getSupportedSwingModesCount() > 0) {
-            ChannelType channelType = addChannelType(rsp.getObjectId() + "_" + BindingConstants.CHANNEL_NAME_SWING_MODE,
-                    "Swing Mode", "String", rsp.getSupportedSwingModesList().stream().map(EnumHelper::stripEnumPrefix)
-                            .collect(Collectors.toList()),
+            ChannelType channelType = addChannelType(
+                    rsp.getUniqueId() + CHANNEL_SWING_MODE, "Swing Mode", "String", rsp.getSupportedSwingModesList()
+                            .stream().map(EnumHelper::stripEnumPrefix).collect(Collectors.toList()),
                     "%s", Set.of("Setpoint", "Wind"), false, "fan");
-            Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), BindingConstants.CHANNEL_NAME_SWING_MODE))
+            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), CHANNEL_SWING_MODE))
                     .withLabel("Swing Mode").withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_SWING_MODE, "Climate")).build();
             super.registerChannel(channel, channelType);

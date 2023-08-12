@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import io.esphome.api.ListEntitiesSensorResponse;
 import io.esphome.api.SelectCommandRequest;
+import io.esphome.api.SensorStateClass;
 import io.esphome.api.SensorStateResponse;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
@@ -35,12 +36,14 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
     public void buildChannels(ListEntitiesSensorResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, null);
-        if (!"None".equals(rsp.getUnitOfMeasurement())) {
+        if (!"None".equals(rsp.getUnitOfMeasurement()) && !"".equals(rsp.getUnitOfMeasurement())) {
             configuration.put("unit", rsp.getUnitOfMeasurement());
         }
         String deviceClass = rsp.getDeviceClass();
         if (deviceClass != null) {
             configuration.put("deviceClass", deviceClass);
+        } else if (rsp.getStateClass() != SensorStateClass.STATE_CLASS_NONE) {
+            configuration.put("deviceClass", "generic_number");
         }
 
         SensorDeviceClass sensorDeviceClass = SensorDeviceClass.fromDeviceClass(deviceClass);
@@ -53,9 +56,10 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
         // TOOD state pattern should be moved to SensorDeviceClass enum as current impl does not handle
         // strings/enums/timestamps
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType(rsp.getDeviceClass()),
-                Collections.emptyList(), "%." + rsp.getAccuracyDecimals() + "f " + rsp.getUnitOfMeasurement(), tags,
-                true, sensorDeviceClass != null ? sensorDeviceClass.getCategory() : null);
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
+                itemType(rsp.getName(), rsp.getDeviceClass()), Collections.emptyList(),
+                "%." + rsp.getAccuracyDecimals() + "f " + rsp.getUnitOfMeasurement(), tags, true,
+                sensorDeviceClass != null ? sensorDeviceClass.getCategory() : null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
@@ -63,15 +67,22 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         super.registerChannel(channel, channelType);
     }
 
-    private String itemType(String deviceClass) {
-        String itemType = SensorDeviceClass.getItemTypeForDeviceClass(deviceClass);
-        if (itemType == null) {
-            itemType = "String";
+    private String itemType(String name, String deviceClass) {
+        if (deviceClass == null || "".equals(deviceClass)) {
             logger.warn(
-                    "No item type found for device class {}. Defaulting to String. Create a PR or create an issue at https://github.com/seime/openhab-esphome/issues. Stack-trace to aid where to add support. ");
+                    "No device_class reported by sensor '{}'. Add device_class attribute to sensor configuration in ESPHome. Defaulting to plain Number without dimension",
+                    name);
+            return "Number";
+        } else {
+            String itemType = SensorDeviceClass.getItemTypeForDeviceClass(deviceClass);
+            if (itemType == null) {
+                itemType = "Number";
+                logger.warn(
+                        "No item type found for device class '{}' for sensor '{}'. Defaulting to Number. Check valid values at first enum string entry in https://github.com/seime/openhab-esphome/blob/master/src/main/java/no/seime/openhab/binding/esphome/internal/internal/message/SensorDeviceClass.java",
+                        deviceClass, name);
+            }
+            return itemType;
         }
-
-        return itemType;
     }
 
     public void handleState(SensorStateResponse rsp) {

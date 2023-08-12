@@ -63,12 +63,14 @@ import io.esphome.api.ListEntitiesRequest;
 import io.esphome.api.ListEntitiesSelectResponse;
 import io.esphome.api.ListEntitiesSensorResponse;
 import io.esphome.api.ListEntitiesSwitchResponse;
+import io.esphome.api.ListEntitiesTextSensorResponse;
 import io.esphome.api.PingRequest;
 import io.esphome.api.PingResponse;
 import io.esphome.api.SelectStateResponse;
 import io.esphome.api.SensorStateResponse;
 import io.esphome.api.SubscribeStatesRequest;
 import io.esphome.api.SwitchStateResponse;
+import io.esphome.api.TextSensorStateResponse;
 import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
@@ -81,6 +83,7 @@ import no.seime.openhab.binding.esphome.internal.internal.message.ClimateMessage
 import no.seime.openhab.binding.esphome.internal.internal.message.SelectMessageHandler;
 import no.seime.openhab.binding.esphome.internal.internal.message.SensorMessageHandler;
 import no.seime.openhab.binding.esphome.internal.internal.message.SwitchMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.TextSensorMessageHandler;
 
 /**
  * The {@link ESPHomeHandler} is responsible for handling commands, which are
@@ -121,6 +124,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
                 SensorStateResponse.class);
         registerMessageHandler("BinarySensor", new BinarySensorMessageHandler(this),
                 ListEntitiesBinarySensorResponse.class, BinarySensorStateResponse.class);
+        registerMessageHandler("TextSensor", new TextSensorMessageHandler(this), ListEntitiesTextSensorResponse.class,
+                TextSensorStateResponse.class);
         registerMessageHandler("Switch", new SwitchMessageHandler(this), ListEntitiesSwitchResponse.class,
                 SwitchStateResponse.class);
         registerMessageHandler("Climate", new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,

@@ -32,13 +32,4 @@ public class BindingConstants {
     public static final String COMMAND_KEY = "command_key";
     public static final String COMMAND_CLASS = "command_class";
     public static final String COMMAND_FIELD = "command_field";
-
-    public static final String CHANNEL_NAME_MODE = "mode";
-    public static final String CHANNEL_NAME_CURRENT_TEMPERATURE = "current_temperature";
-    public static final String CHANNEL_NAME_TARGET_TEMPERATURE = "target_temperature";
-    public static final String CHANNEL_NAME_SWING_MODE = "swing_mode";
-    public static final String CHANNEL_NAME_FAN_MODE = "fan_mode";
-    public static final String CHANNEL_NAME_CUSTOM_FAN_MODE = "custom_fan_mode";
-    public static final String CHANNEL_NAME_PRESET = "preset";
-    public static final String CHANNEL_NAME_CUSTOM_PRESET = "custom_preset";
 }

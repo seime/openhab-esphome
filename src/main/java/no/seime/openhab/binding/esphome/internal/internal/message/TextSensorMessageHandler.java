@@ -4,7 +4,7 @@ import java.util.Collections;
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
-import org.openhab.core.library.types.OpenClosedType;
+import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
@@ -14,16 +14,16 @@ import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
 import org.openhab.core.types.UnDefType;
 
-import io.esphome.api.BinarySensorStateResponse;
-import io.esphome.api.ListEntitiesBinarySensorResponse;
+import io.esphome.api.ListEntitiesTextSensorResponse;
 import io.esphome.api.SelectCommandRequest;
+import io.esphome.api.TextSensorStateResponse;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
 
-public class BinarySensorMessageHandler
-        extends AbstractMessageHandler<ListEntitiesBinarySensorResponse, BinarySensorStateResponse> {
+public class TextSensorMessageHandler
+        extends AbstractMessageHandler<ListEntitiesTextSensorResponse, TextSensorStateResponse> {
 
-    public BinarySensorMessageHandler(ESPHomeHandler handler) {
+    public TextSensorMessageHandler(ESPHomeHandler handler) {
         super(handler);
     }
 
@@ -33,11 +33,11 @@ public class BinarySensorMessageHandler
     }
 
     @Override
-    public void buildChannels(ListEntitiesBinarySensorResponse rsp) {
+    public void buildChannels(ListEntitiesTextSensorResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, null);
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "Contact", Collections.emptySet(),
-                null, Set.of("OpenState"), true, "door");
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "String", Collections.emptySet(),
+                null, Set.of("Status"), true, "text");
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
@@ -46,17 +46,17 @@ public class BinarySensorMessageHandler
         super.registerChannel(channel, channelType);
     }
 
-    public void handleState(BinarySensorStateResponse rsp) {
-
-        findChannelByKey(rsp.getKey()).ifPresent(channel -> handler.updateState(channel.getUID(),
-                toContactState(rsp.getState(), rsp.getMissingState())));
+    @Override
+    public void handleState(TextSensorStateResponse rsp) {
+        findChannelByKey(rsp.getKey()).ifPresent(
+                channel -> handler.updateState(channel.getUID(), toTextState(rsp.getState(), rsp.getMissingState())));
     }
 
-    protected State toContactState(boolean state, boolean missingState) {
+    protected State toTextState(String state, boolean missingState) {
         if (missingState) {
             return UnDefType.UNDEF;
         } else {
-            return state ? OpenClosedType.OPEN : OpenClosedType.CLOSED;
+            return new StringType(state);
         }
     }
 }
