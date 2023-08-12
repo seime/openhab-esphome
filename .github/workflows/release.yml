@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '11' ]
+        java: [ '17' ]
         maven: [ '3.9.4' ]
         os: [ 'ubuntu-latest' ]
     name: Build OH3 (Java ${{ matrix.java }}, ${{ matrix.os }})
