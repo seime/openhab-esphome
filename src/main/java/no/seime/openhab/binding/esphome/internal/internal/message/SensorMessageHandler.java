@@ -43,7 +43,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
             configuration.put("unit", rsp.getUnitOfMeasurement());
         }
         String deviceClass = rsp.getDeviceClass();
-        if (deviceClass != null) {
+        if (deviceClass != null && !"".equals(deviceClass)) {
             configuration.put("deviceClass", deviceClass);
         } else if (rsp.getStateClass() != SensorStateClass.STATE_CLASS_NONE) {
             configuration.put("deviceClass", "generic_number");

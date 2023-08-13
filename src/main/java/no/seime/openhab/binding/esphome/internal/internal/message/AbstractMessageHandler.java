@@ -107,37 +107,39 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
                 SensorDeviceClass sensorDeviceClass = SensorDeviceClass.fromDeviceClass(deviceClass);
                 if (sensorDeviceClass != null) {
                     if (sensorDeviceClass.getItemType().startsWith("Number")) {
-                        String unitString = (String) configuration.get("unit");
-                        if (unitString != null) {
-                            if ("%".equals(unitString)) {
-                                // TODO PercentType does not seem to work well
-                                return new DecimalType(state);
-                            }
-                            Unit<?> unit = UnitUtils.parseUnit(unitString);
-                            if (unit != null) {
-                                return new QuantityType<>(state, unit);
-                            } else {
-                                logger.warn("Unit '{}' unknown to openHAB, returning DecimalType for state '{}'",
-                                        unitString, state);
-                                return new DecimalType(state);
-
-                            }
-                        } else {
-                            return new DecimalType(state);
-                        }
+                        return toNumericState(configuration, state);
                     } else {
-                        logger.warn("Expected SensorDeviceClass {} to be of item type Number[:Dimension]", deviceClass);
+                        logger.warn(
+                                "Expected SensorDeviceClass '{}' to be of item type Number[:Dimension]. Returning undef",
+                                deviceClass);
                         return UnDefType.UNDEF;
                     }
                 } else {
-                    logger.warn("Unknown deviceClass '{}' reported by device, binding needs to be updated",
-                            deviceClass);
-                    return new DecimalType(state);
+                    return toNumericState(configuration, state);
                 }
             } else {
-                logger.warn("Device class unspecified, returning DecimalType");
+                return toNumericState(configuration, state);
+            }
+        }
+    }
+
+    private State toNumericState(Configuration configuration, float state) {
+        String unitString = (String) configuration.get("unit");
+        if (unitString != null) {
+            if ("%".equals(unitString)) {
+                // TODO PercentType does not seem to work well
                 return new DecimalType(state);
             }
+            Unit<?> unit = UnitUtils.parseUnit(unitString);
+            if (unit != null) {
+                return new QuantityType<>(state, unit);
+            } else {
+                logger.warn("Unit '{}' unknown to openHAB, returning DecimalType for state '{}'", unitString, state);
+                return new DecimalType(state);
+
+            }
+        } else {
+            return new DecimalType(state);
         }
     }
 
