@@ -13,6 +13,7 @@
 package no.seime.openhab.binding.esphome.internal.internal.handler;
 
 import java.math.BigDecimal;
+import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -74,7 +75,9 @@ import io.esphome.api.TextSensorStateResponse;
 import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
-import no.seime.openhab.binding.esphome.internal.internal.comm.PlainTextConnection;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ConnectionSelector;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ESPHomeConnection;
+import no.seime.openhab.binding.esphome.internal.internal.comm.PlainTextStreamHandler;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolException;
 import no.seime.openhab.binding.esphome.internal.internal.message.AbstractMessageHandler;
@@ -102,8 +105,9 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Map<ChannelTypeUID, ChannelType> generatedChannelTypes = new HashMap<>();
+    private final ConnectionSelector connectionSelector;
     private @Nullable ESPHomeConfiguration config;
-    private @Nullable PlainTextConnection connection;
+    private @Nullable ESPHomeConnection connection;
     @Nullable
     private ScheduledFuture<?> pingWatchdog;
     private Instant lastPong = Instant.now();
@@ -114,8 +118,9 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private final List<Channel> dynamicChannels = new ArrayList<>();
 
-    public ESPHomeHandler(Thing thing) {
+    public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector) {
         super(thing);
+        this.connectionSelector = connectionSelector;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -162,9 +167,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
-            connection = new PlainTextConnection(this);
-
-            connection.connect(config.hostname, config.port, CONNECT_TIMEOUT);
+            connection = new ESPHomeConnection(connectionSelector, new PlainTextStreamHandler(this));
+            connection.connect(new InetSocketAddress(config.hostname, config.port));
 
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
                     .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();

@@ -1,13 +1,13 @@
 /**
  * Copyright (c) 2023 Contributors to the Seime Openhab Addons project
- *
+ * <p>
  * See the NOTICE file(s) distributed with this work for additional
  * information.
- *
+ * <p>
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
  * http://www.eclipse.org/legal/epl-2.0
- *
+ * <p>
  * SPDX-License-Identifier: EPL-2.0
  */
 package no.seime.openhab.binding.esphome.internal.internal.comm;
@@ -15,9 +15,9 @@ package no.seime.openhab.binding.esphome.internal.internal.comm;
 import static no.seime.openhab.binding.esphome.internal.internal.comm.VarIntConverter.bytesToInt;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,24 +30,20 @@ import com.google.protobuf.GeneratedMessageV3;
 import io.esphome.api.Api;
 import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
 
-public class PlainTextPacketStreamReader {
+public class PlainTextStreamHandler implements StreamHandler {
 
     public static final int PREAMBLE = 0x00;
     public static final int ENCRYPTION_REQUIRED = 0x01;
     public static final int VAR_INT_MARKER = 0x80;
-    private final Logger logger = LoggerFactory.getLogger(PlainTextPacketStreamReader.class);
-
-    private boolean keepRunning = true;
-    private Thread thread;
-    private InputStream inputStream;
+    private final Logger logger = LoggerFactory.getLogger(PlainTextStreamHandler.class);
 
     private final PacketListener listener;
 
-    private boolean closeQuietly = false;
+    private ByteBuffer buffer = ByteBuffer.allocate(1024);
 
     private final Map<Integer, Method> messageTypeToMessageClass = new HashMap<>();
 
-    public PlainTextPacketStreamReader(PacketListener listener) {
+    public PlainTextStreamHandler(PacketListener listener) {
         this.listener = listener;
 
         // Build a cache of message id to message class
@@ -67,40 +63,19 @@ public class PlainTextPacketStreamReader {
         });
     }
 
-    public void parseStream(InputStream inputStream) {
-        this.inputStream = inputStream;
-        thread = new Thread(() -> {
-            while (keepRunning) {
-                try {
-
-                    byte[] data = new byte[3];
-                    int read = inputStream.read(data);
-                    if (read == -1) {
-                        keepRunning = false;
-                        if (!closeQuietly) {
-                            logger.debug("End of stream");
-                            listener.onEndOfStream();
-                        }
-                        return;
-                    }
-
-                    headerReceived(data);
-                } catch (ProtocolException | IOException e) {
-                    logger.debug("Error reading from socket", e);
-                    keepRunning = false;
-                    if (!closeQuietly) {
-                        logger.debug("End of stream");
-                        listener.onParseError();
-                    }
-
-                }
-            }
-        });
-        thread.setName("ESPHome stream parser");
-        thread.start();
+    private void processBuffer() throws ProtocolException, IOException {
+        buffer.limit(buffer.position());
+        buffer.position(0);
+        if (buffer.remaining() > 2) {
+            byte[] headerData = readBytes(3);
+            headerReceived(headerData);
+        } else {
+            buffer.position(buffer.limit());
+            buffer.limit(buffer.capacity());
+        }
     }
 
-    public void headerReceived(byte[] headerData) throws IOException, ProtocolException {
+    public void headerReceived(byte[] headerData) throws ProtocolException {
         if (headerData[0] != PREAMBLE) {
             if (headerData[0] == ENCRYPTION_REQUIRED) {
                 handleAndClose(new RequiresEncryptionAPIError("Connection requires encryption"));
@@ -130,7 +105,9 @@ public class PlainTextPacketStreamReader {
         while ((encodedProtoPacketLenghtBuffer[encodedProtoPacketLenghtBuffer.length - 1]
                 & VAR_INT_MARKER) == VAR_INT_MARKER) {
             byte[] additionalLength = readBytes(1);
-            if (additionalLength == null) {
+            if (additionalLength.length == 0) {
+                buffer.position(buffer.limit());
+                buffer.limit(buffer.capacity());
                 return;
             }
             encodedProtoPacketLenghtBuffer = concatArrays(encodedProtoPacketLenghtBuffer, additionalLength);
@@ -140,7 +117,9 @@ public class PlainTextPacketStreamReader {
         while (encodedMessageTypeBuffer.length == 0
                 || (encodedMessageTypeBuffer[encodedMessageTypeBuffer.length - 1] & VAR_INT_MARKER) == VAR_INT_MARKER) {
             byte[] additionalencodedMessageTypeBuffer = readBytes(1);
-            if (additionalencodedMessageTypeBuffer == null) {
+            if (additionalencodedMessageTypeBuffer.length == 0) {
+                buffer.position(buffer.limit());
+                buffer.limit(buffer.capacity());
                 return;
             }
             encodedMessageTypeBuffer = concatArrays(encodedMessageTypeBuffer, additionalencodedMessageTypeBuffer);
@@ -151,16 +130,27 @@ public class PlainTextPacketStreamReader {
 
         if (protoPacketLength == 0) {
             decodeProtoMessage(messageType, new byte[0]);
+            buffer.compact();
             // If we have more data, continue processing
-            return;
-        }
 
-        byte[] packetData = readBytes(protoPacketLength);
-        decodeProtoMessage(messageType, packetData);
+        } else if (buffer.remaining() >= protoPacketLength) {
+            // We have enough data in the buffer to read the whole packet
+            byte[] packetData = readBytes(protoPacketLength);
+            decodeProtoMessage(messageType, packetData);
+            buffer.compact();
+        } else {
+            buffer.position(buffer.limit());
+            buffer.limit(buffer.capacity());
+        }
     }
 
-    private byte[] readBytes(int numBytes) throws IOException {
-        return inputStream.readNBytes(numBytes);
+    private byte[] readBytes(int numBytes) {
+        if (buffer.remaining() < numBytes) {
+            return new byte[0];
+        }
+        byte[] data = new byte[numBytes];
+        buffer.get(data);
+        return data;
     }
 
     private void decodeProtoMessage(int messageType, byte[] bytes) {
@@ -191,27 +181,42 @@ public class PlainTextPacketStreamReader {
 
     private void handleAndClose(ProtocolException connectionRequiresEncryption) throws ProtocolException {
         // close socket
-        try {
-            inputStream.close();
-        } catch (IOException e) {
-            logger.warn("Error closing stream", e);
-        }
+        listener.onParseError();
         throw connectionRequiresEncryption;
     }
 
-    public void close(boolean closeQuietly) {
-        this.closeQuietly = closeQuietly;
-        keepRunning = false;
+    public void processReceivedData(ByteBuffer buffer) throws ProtocolException, IOException {
+        // Copy new data into buffer
+        byte[] newData = new byte[buffer.position()];
+        buffer.flip();
+        buffer.get(newData);
+        this.buffer.put(newData, 0, newData.length);
 
-        if (thread != null) {
-            thread.interrupt();
-        }
-        if (inputStream != null) {
-            try {
-                inputStream.close();
-            } catch (IOException e) {
-                logger.warn("Error closing stream", e);
-            }
-        }
+        processBuffer();
+    }
+
+    public byte[] encodeFrame(GeneratedMessageV3 message) {
+        byte[] protoBytes = message.toByteArray();
+        byte[] idVarUint = VarIntConverter
+                .intToBytes(message.getDescriptorForType().getOptions().getExtension(io.esphome.api.ApiOptions.id));
+        byte[] protoBytesLengthVarUint = VarIntConverter.intToBytes(protoBytes.length);
+
+        byte[] frame = new byte[1 + idVarUint.length + protoBytesLengthVarUint.length + protoBytes.length];
+        System.arraycopy(protoBytesLengthVarUint, 0, frame, 1, protoBytesLengthVarUint.length);
+        System.arraycopy(idVarUint, 0, frame, idVarUint.length + 1, protoBytesLengthVarUint.length);
+        System.arraycopy(protoBytes, 0, frame, idVarUint.length + protoBytesLengthVarUint.length + 1,
+                protoBytes.length);
+        return frame;
+    }
+
+    @Override
+    public void endOfStream() {
+        listener.onEndOfStream();
+    }
+
+    @Override
+    public void onParseError(ProtocolException e) {
+        logger.error("Error parsing packet", e);
+        listener.onParseError();
     }
 }

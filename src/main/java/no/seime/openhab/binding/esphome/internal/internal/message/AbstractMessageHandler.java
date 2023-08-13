@@ -24,6 +24,7 @@ import org.openhab.core.types.State;
 import org.openhab.core.types.StateDescriptionFragmentBuilder;
 import org.openhab.core.types.StateOption;
 import org.openhab.core.types.UnDefType;
+import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,6 @@ import com.google.protobuf.GeneratedMessageV3;
 import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
-import tech.units.indriya.unit.Units;
 
 public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T extends GeneratedMessageV3> {
 
@@ -113,12 +113,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
                                 // TODO PercentType does not seem to work well
                                 return new DecimalType(state);
                             }
-                            Unit<?> unit = Units.getInstance().getUnit(unitString);
+                            Unit<?> unit = UnitUtils.parseUnit(unitString);
                             if (unit != null) {
                                 return new QuantityType<>(state, unit);
                             } else {
                                 logger.warn("Unit '{}' unknown to openHAB, returning DecimalType for state '{}'",
-                                        unitString);
+                                        unitString, state);
                                 return new DecimalType(state);
 
                             }

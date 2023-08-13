@@ -12,6 +12,7 @@
  */
 package no.seime.openhab.binding.esphome.internal.internal.handler;
 
+import java.io.IOException;
 import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -21,9 +22,11 @@ import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
+import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Component;
 
 import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.internal.comm.ConnectionSelector;
 
 /**
  * The {@link ESPHomeHandlerFactory} is responsible for creating things and thing
@@ -42,14 +45,33 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
     }
 
+    private ConnectionSelector connectionSelector;
+
+    public ESPHomeHandlerFactory() throws IOException {
+        connectionSelector = new ConnectionSelector();
+    }
+
     @Override
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing);
+            return new ESPHomeHandler(thing, connectionSelector);
         }
 
         return null;
+    }
+
+    @Override
+    protected void activate(ComponentContext componentContext) {
+        super.activate(componentContext);
+        connectionSelector.start();
+    }
+
+    @Override
+    protected void deactivate(ComponentContext componentContext) {
+        connectionSelector.stop();
+
+        super.deactivate(componentContext);
     }
 }
