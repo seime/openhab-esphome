@@ -63,7 +63,7 @@ public class PlainTextStreamHandler implements StreamHandler {
         });
     }
 
-    private void processBuffer() throws ProtocolException, IOException {
+    private void processBuffer() throws ProtocolException {
         buffer.limit(buffer.position());
         buffer.position(0);
         if (buffer.remaining() > 2) {
@@ -132,12 +132,14 @@ public class PlainTextStreamHandler implements StreamHandler {
             decodeProtoMessage(messageType, new byte[0]);
             buffer.compact();
             // If we have more data, continue processing
+            processBuffer();
 
         } else if (buffer.remaining() >= protoPacketLength) {
             // We have enough data in the buffer to read the whole packet
             byte[] packetData = readBytes(protoPacketLength);
             decodeProtoMessage(messageType, packetData);
             buffer.compact();
+            processBuffer();
         } else {
             buffer.position(buffer.limit());
             buffer.limit(buffer.capacity());
@@ -215,7 +217,7 @@ public class PlainTextStreamHandler implements StreamHandler {
     }
 
     @Override
-    public void onParseError(ProtocolException e) {
+    public void onParseError(Exception e) {
         logger.error("Error parsing packet", e);
         listener.onParseError();
     }

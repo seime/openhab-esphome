@@ -126,10 +126,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     private State toNumericState(Configuration configuration, float state) {
         String unitString = (String) configuration.get("unit");
         if (unitString != null) {
-            if ("%".equals(unitString)) {
-                // TODO PercentType does not seem to work well
-                return new DecimalType(state);
-            }
+            /*
+             * if ("%".equals(unitString)) {
+             * // TODO PercentType does not seem to work well
+             * return new DecimalType(state);
+             * }
+             */
             Unit<?> unit = UnitUtils.parseUnit(unitString);
             if (unit != null) {
                 return new QuantityType<>(state, unit);
@@ -160,7 +162,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         if (message.getClass().getSimpleName().startsWith("ListEntities")) {
             buildChannels((S) message);
         } else {
-            handleState((T) message);
+
+            try {
+                handleState((T) message);
+            } catch (Exception e) {
+                logger.warn("Error updating OH state", e);
+            }
         }
     }
 }

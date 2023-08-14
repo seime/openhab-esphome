@@ -44,6 +44,7 @@ public class ESPHomeConnection {
             byte[] serializedMessage = streamHandler.encodeFrame(message);
             ByteBuffer buffer = ByteBuffer.wrap(serializedMessage);
             while (buffer.hasRemaining()) {
+                logger.trace("Writing data");
                 socketChannel.write(buffer);
             }
         } catch (IOException e) {
@@ -67,7 +68,7 @@ public class ESPHomeConnection {
         }
     }
 
-    public void close(boolean quietly) {
+    public void close() {
         logger.info("[{}] Disconnecting socket.", hostname);
         try {
             if (socketChannel != null) {

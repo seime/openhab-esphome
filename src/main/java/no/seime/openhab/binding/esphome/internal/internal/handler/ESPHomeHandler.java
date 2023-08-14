@@ -148,7 +148,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
 
     @Override
     public void initialize() {
-
+        logger.debug("[{}] Initializing ESPHome handler", thing.getUID());
         config = getConfigAs(ESPHomeConfiguration.class);
 
         if (config.hostname != null && !config.hostname.isEmpty()) {
@@ -199,7 +199,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
                     // Quietly ignore
                 }
             } else {
-                connection.close(true);
+                connection.close();
             }
         }
         super.dispose();
@@ -266,7 +266,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     @Override
     public void onEndOfStream() {
         updateStatus(ThingStatus.OFFLINE);
-        connection.close(true);
+        connection.close();
         pingWatchdog.cancel(true);
         connectionState = ConnectionState.UNINITIALIZED;
         reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
@@ -276,7 +276,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     public void onParseError() {
         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                 "Parse error. This could be due to api encryption being used by ESPHome device. Update your ESPHome device to use plaintext password until this is implemented in the binding.");
-        connection.close(true);
+        connection.close();
         pingWatchdog.cancel(true);
         connectionState = ConnectionState.UNINITIALIZED;
         reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
@@ -308,7 +308,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
             connection.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
-            connection.close(true);
+            connection.close();
         } else {
             // Regular messages handled by message handlers
             AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
@@ -323,7 +323,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     }
 
     private void remoteDisconnect() {
-        connection.close(true);
+        connection.close();
         connectionState = ConnectionState.UNINITIALIZED;
         long reconnectDelay = CONNECT_TIMEOUT;
         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
@@ -340,7 +340,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
 
             if (connectResponse.getInvalidPassword()) {
                 logger.error("[{}] Invalid password", config.hostname);
-                connection.close(true);
+                connection.close();
                 connectionState = ConnectionState.UNINITIALIZED;
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
                 return;
@@ -360,7 +360,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
                             config.hostname, NUM_MISSED_PINGS_BEFORE_DISCONNECT, PING_INTERVAL_SECONDS,
                             NUM_MISSED_PINGS_BEFORE_DISCONNECT * PING_INTERVAL_SECONDS);
                     pingWatchdog.cancel(false);
-                    connection.close(true);
+                    connection.close();
                     connectionState = ConnectionState.UNINITIALIZED;
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",

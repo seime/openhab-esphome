@@ -12,5 +12,5 @@ public interface StreamHandler {
 
     void endOfStream();
 
-    void onParseError(ProtocolException e);
+    void onParseError(Exception e);
 }

@@ -37,12 +37,14 @@ public class ConnectionSelector {
             logger.debug("Starting selector thread");
             while (keepRunning) {
                 try {
-                    selector.select();
+                    selector.select(1000);
                     // token representing the registration of a SelectableChannel with a Selector
                     Set<SelectionKey> keys = selector.selectedKeys();
+                    logger.trace("Selected keys: {}", keys.size());
                     Iterator<SelectionKey> keyIterator = keys.iterator();
                     while (keyIterator.hasNext()) {
                         SelectionKey readyKey = keyIterator.next();
+                        logger.trace("Processing key {}", readyKey);
                         // Tests whether this key's channel is ready to accept a new socket connection
                         if (readyKey.isReadable()) {
                             SocketChannel channel = (SocketChannel) readyKey.channel();
@@ -53,27 +55,30 @@ public class ConnectionSelector {
                                 streamHandler.endOfStream();
                             } else {
                                 try {
+                                    logger.trace("Received data");
                                     streamHandler.processReceivedData(buffer);
-                                } catch (ProtocolException e) {
+                                } catch (Exception e) {
                                     channel.close();
                                     streamHandler.onParseError(e);
                                 }
                             }
 
+                        } else {
+                            logger.trace("Key not readable");
                         }
                         keyIterator.remove();
                     }
                 } catch (ClosedSelectorException e) {
                     logger.debug("Selector closed");
                     keepRunning = false;
-                } catch (IOException e) {
+                } catch (Exception e) {
                     logger.warn("Error while selecting", e);
                     keepRunning = false;
                 }
             }
             logger.debug("Selector thread stopped");
         });
-        selectorThread.setName("ESPHome connection handler");
+        selectorThread.setName("ESPHome Reader");
         selectorThread.start();
     }
 
@@ -105,8 +110,6 @@ public class ConnectionSelector {
         connectionMap.remove(socketChannel);
 
         try {
-            socketChannel.shutdownInput();
-            socketChannel.shutdownOutput();
             socketChannel.close();
         } catch (IOException e) {
             logger.warn("Error while closing channel", e);
