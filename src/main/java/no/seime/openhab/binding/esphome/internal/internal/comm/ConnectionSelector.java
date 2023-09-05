@@ -44,27 +44,32 @@ public class ConnectionSelector {
                     Iterator<SelectionKey> keyIterator = keys.iterator();
                     while (keyIterator.hasNext()) {
                         SelectionKey readyKey = keyIterator.next();
+                        StreamHandler streamHandler = (StreamHandler) readyKey.attachment();
                         logger.trace("Processing key {}", readyKey);
                         // Tests whether this key's channel is ready to accept a new socket connection
-                        if (readyKey.isReadable()) {
-                            SocketChannel channel = (SocketChannel) readyKey.channel();
-                            ByteBuffer buffer = ByteBuffer.allocate(128);
-                            int read = channel.read(buffer);
-                            StreamHandler streamHandler = (StreamHandler) readyKey.attachment();
-                            if (read == -1) {
-                                streamHandler.endOfStream();
-                            } else {
-                                try {
-                                    logger.trace("Received data");
-                                    streamHandler.processReceivedData(buffer);
-                                } catch (Exception e) {
-                                    channel.close();
-                                    streamHandler.onParseError(e);
+                        try {
+                            if (readyKey.isReadable()) {
+                                SocketChannel channel = (SocketChannel) readyKey.channel();
+                                ByteBuffer buffer = ByteBuffer.allocate(128);
+                                int read = channel.read(buffer);
+                                if (read == -1) {
+                                    streamHandler.endOfStream();
+                                } else {
+                                    try {
+                                        logger.trace("Received data");
+                                        streamHandler.processReceivedData(buffer);
+                                    } catch (Exception e) {
+                                        channel.close();
+                                        streamHandler.onParseError(e);
+                                    }
                                 }
-                            }
 
-                        } else {
-                            logger.trace("Key not readable");
+                            } else {
+                                logger.trace("Key not readable");
+                            }
+                        } catch (IOException e) {
+                            logger.debug("Socket exception", e);
+                            streamHandler.endOfStream();
                         }
                         keyIterator.remove();
                     }
@@ -76,7 +81,8 @@ public class ConnectionSelector {
                     keepRunning = false;
                 }
             }
-            logger.debug("Selector thread stopped");
+            logger.debug(
+                    "Selector thread stopped. This should only happen on bundle stop, not during regular operation. See previous log statements for more information.");
         });
         selectorThread.setName("ESPHome Reader");
         selectorThread.start();
