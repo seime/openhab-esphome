@@ -98,16 +98,17 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         handler.addChannel(channel);
     }
 
-    protected State toNumericState(Configuration configuration, float state, boolean missingState) {
+    protected State toNumericState(Channel channel, float state, boolean missingState) {
         if (missingState) {
             return UnDefType.UNDEF;
         } else {
+            Configuration configuration = channel.getConfiguration();
             String deviceClass = (String) configuration.get("deviceClass");
             if (deviceClass != null) {
                 SensorDeviceClass sensorDeviceClass = SensorDeviceClass.fromDeviceClass(deviceClass);
                 if (sensorDeviceClass != null) {
                     if (sensorDeviceClass.getItemType().startsWith("Number")) {
-                        return toNumericState(configuration, state);
+                        return toNumericState(channel, state);
                     } else {
                         logger.warn(
                                 "Expected SensorDeviceClass '{}' to be of item type Number[:Dimension]. Returning undef",
@@ -115,15 +116,17 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
                         return UnDefType.UNDEF;
                     }
                 } else {
-                    return toNumericState(configuration, state);
+                    return toNumericState(channel, state);
                 }
             } else {
-                return toNumericState(configuration, state);
+                return toNumericState(channel, state);
             }
         }
     }
 
-    private State toNumericState(Configuration configuration, float state) {
+    private State toNumericState(Channel channel, float state) {
+
+        Configuration configuration = channel.getConfiguration();
         String unitString = (String) configuration.get("unit");
         if (unitString != null) {
             /*
@@ -136,7 +139,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
             if (unit != null) {
                 return new QuantityType<>(state, unit);
             } else {
-                logger.warn("Unit '{}' unknown to openHAB, returning DecimalType for state '{}'", unitString, state);
+                logger.warn("Unit '{}' unknown to openHAB, returning DecimalType for state '{}' on channel '{}'",
+                        unitString, state, channel.getUID());
                 return new DecimalType(state);
 
             }

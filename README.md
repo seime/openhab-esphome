@@ -42,7 +42,7 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 
   > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
   > type in openHAB.
-  > Solution: Specify a `device_class` to your ESPHome configuration. Eexample: <br/>
+  > Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
   > ![img.png](esphomeconfig_deviceclass.png)
   > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
   device_class values (**use lowercase values**)

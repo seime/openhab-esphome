@@ -39,8 +39,9 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
     public void buildChannels(ListEntitiesSensorResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, null);
-        if (!"None".equals(rsp.getUnitOfMeasurement()) && !"".equals(rsp.getUnitOfMeasurement())) {
-            configuration.put("unit", rsp.getUnitOfMeasurement());
+        String unitOfMeasurement = rsp.getUnitOfMeasurement();
+        if (!"None".equals(unitOfMeasurement) && !"".equals(unitOfMeasurement)) {
+            configuration.put("unit", unitOfMeasurement);
         }
         String deviceClass = rsp.getDeviceClass();
         if (deviceClass != null && !"".equals(deviceClass)) {
@@ -59,10 +60,12 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
         // TOOD state pattern should be moved to SensorDeviceClass enum as current impl does not handle
         // strings/enums/timestamps
+
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
-                itemType(rsp.getUnitOfMeasurement(), rsp.getName(), sensorDeviceClass), Collections.emptyList(),
-                "%." + rsp.getAccuracyDecimals() + "f " + rsp.getUnitOfMeasurement(), tags, true,
-                sensorDeviceClass != null ? sensorDeviceClass.getCategory() : null);
+                itemType(unitOfMeasurement, rsp.getName(), sensorDeviceClass), Collections.emptyList(),
+                "%." + rsp.getAccuracyDecimals() + "f "
+                        + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement),
+                tags, true, sensorDeviceClass != null ? sensorDeviceClass.getCategory() : null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
@@ -93,7 +96,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         } else if (itemTypeFromUnit != null) {
             itemTypeToUse = itemTypeFromUnit;
             logger.debug(
-                    "Using item type '{}' based on unit '{}' since device_class is either missing from ESPHome device or openhab mapping is incomplete",
+                    "Using item type '{}' based on unit '{}' since device_class is either missing from ESPHome device configuration or openhab mapping is incomplete",
                     itemTypeToUse, unitOfMeasurement);
         } else if (deviceClass != null) {
             itemTypeToUse = deviceClass.getItemType();
@@ -121,6 +124,6 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
     public void handleState(SensorStateResponse rsp) {
         findChannelByKey(rsp.getKey()).ifPresent(channel -> handler.updateState(channel.getUID(),
-                toNumericState(channel.getConfiguration(), rsp.getState(), rsp.getMissingState())));
+                toNumericState(channel, rsp.getState(), rsp.getMissingState())));
     }
 }
