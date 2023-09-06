@@ -90,7 +90,7 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
             String serviceName = service.getName();
             logger.debug("Found ESPHome devices via mDNS:{} v4:{} v6:{}", serviceName, service.getInet4Addresses(),
                     service.getInet6Addresses());
-            return new ThingUID(BindingConstants.THING_TYPE_DEVICE, "REMOVEMEWHENADDING" + serviceName);
+            return new ThingUID(BindingConstants.THING_TYPE_DEVICE, serviceName);
         }
         return null;
     }
