@@ -62,7 +62,7 @@ public class ESPHomeConnection {
 
             logger.info("[{}] Opening socket to {} at port {}.", hostname, address.getHostName(), address.getPort());
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new ProtocolAPIError("Failed to connect to '" + address.getHostName() + "' port " + address.getPort(),
                     e);
         }
