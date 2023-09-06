@@ -61,15 +61,15 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         // TOOD state pattern should be moved to SensorDeviceClass enum as current impl does not handle
         // strings/enums/timestamps
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
-                itemType(unitOfMeasurement, rsp.getName(), sensorDeviceClass), Collections.emptyList(),
+        String itemType = itemType(unitOfMeasurement, rsp.getName(), sensorDeviceClass);
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptyList(),
                 "%." + rsp.getAccuracyDecimals() + "f "
                         + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement),
                 tags, true, sensorDeviceClass != null ? sensorDeviceClass.getCategory() : null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withConfiguration(configuration).build();
+                .withAcceptedItemType(itemType).withConfiguration(configuration).build();
         super.registerChannel(channel, channelType);
     }
 

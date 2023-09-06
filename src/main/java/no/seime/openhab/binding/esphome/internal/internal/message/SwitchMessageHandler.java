@@ -37,7 +37,7 @@ public class SwitchMessageHandler extends AbstractMessageHandler<ListEntitiesSwi
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withConfiguration(configuration).build();
+                .withAcceptedItemType("Switch").withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType);
     }

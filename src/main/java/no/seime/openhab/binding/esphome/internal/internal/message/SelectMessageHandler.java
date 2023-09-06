@@ -30,12 +30,13 @@ public class SelectMessageHandler extends AbstractMessageHandler<ListEntitiesSel
     }
 
     public void buildChannels(ListEntitiesSelectResponse rsp) {
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "String",
+        String itemType = "String";
+        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType,
                 new ArrayList<>(rsp.getOptionsList()), "%s", Set.of("Setpoint"), false, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withConfiguration(configuration(rsp.getKey(), null, "Select")).build();
+                .withAcceptedItemType(itemType).withConfiguration(configuration(rsp.getKey(), null, "Select")).build();
 
         super.registerChannel(channel, channelType);
     }
