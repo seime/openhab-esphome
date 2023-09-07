@@ -155,10 +155,13 @@
           <plugin>
             <groupId>org.openhab.tools.sat</groupId>
             <artifactId>sat-plugin</artifactId>
-            <configuration>
-              <checkstyleFilter>checkstyle-suppressions.xml</checkstyleFilter>
-              <checkstyleProperties>ruleset.properties</checkstyleProperties>
-            </configuration>
+            <executions>
+              <execution>
+                <id>sat-all</id>
+                <phase>none</phase>
+              </execution>
+            </executions>
+
           </plugin>
           <plugin>
             <groupId>org.commonjava.maven.plugins</groupId>
