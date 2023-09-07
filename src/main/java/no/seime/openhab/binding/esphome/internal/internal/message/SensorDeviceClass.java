@@ -16,7 +16,7 @@ public enum SensorDeviceClass {
     DATA_RATE("data_rate", "Number:DataTransferRate", null, null),
     DATA_SIZE("data_size", "Number:DataAmount", null, null),
     DISTANCE("distance", "Number:Length", null, null),
-    DURATION("duration", "Time", null, null),
+    DURATION("duration", "Number:Time", null, null),
     ENERGY("energy", "Number:Energy", "energy", "Energy"),
     ENERGY_STORAGE("energy_storage", "Number:Energy", "energy", "Energy"),
     FREQUENCY("frequency", "Number:Frequency", null, "Frequency"),
@@ -42,7 +42,7 @@ public enum SensorDeviceClass {
     PRECIPITATION_RATE("precipitation_rate", "Number:Speed", "rain", "Rain"),
     PRESSURE("pressure", "Number:Pressure", "pressure", "Pressure"),
     REACTIVE_POWER("reactive_power", "Number:Power", "energy", "Power"),
-    SIGNAL_STRENGTH("signal_strength", "Number:Dimensionless", "qualityofservice", null),
+    SIGNAL_STRENGTH("signal_strength", "Number:Power", "qualityofservice", null),
 
     SOUND_PRESSURE("sound_pressure", "Number:Dimensionless", "soundvolume", "SoundVolume"),
     SPEED("speed", "Number:Speed", "motion", null),
