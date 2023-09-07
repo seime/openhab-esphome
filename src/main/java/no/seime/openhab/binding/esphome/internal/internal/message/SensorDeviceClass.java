@@ -16,7 +16,7 @@ public enum SensorDeviceClass {
     DATA_RATE("data_rate", "Number:DataTransferRate", null, null),
     DATA_SIZE("data_size", "Number:DataAmount", null, null),
     DISTANCE("distance", "Number:Length", null, null),
-    DURATION("duration", "Number:Time", null, null),
+    DURATION("duration", "Number:Time", "time", null),
     ENERGY("energy", "Number:Energy", "energy", "Energy"),
     ENERGY_STORAGE("energy_storage", "Number:Energy", "energy", "Energy"),
     FREQUENCY("frequency", "Number:Frequency", null, "Frequency"),
