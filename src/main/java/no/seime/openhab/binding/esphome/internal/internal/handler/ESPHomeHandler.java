@@ -179,7 +179,9 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         } catch (ProtocolException e) {
             logger.warn("[{}] Error initial connection", config.hostname, e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-            reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
+            if (reconnectFuture != null) { // Don't reconnect if we've been disposed
+                reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
+            }
         }
     }
 
@@ -187,6 +189,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     public void dispose() {
         if (reconnectFuture != null) {
             reconnectFuture.cancel(true);
+            reconnectFuture = null;
         }
         if (connection != null) {
             if (pingWatchdog != null) {
