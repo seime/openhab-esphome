@@ -16,11 +16,8 @@ import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
@@ -35,10 +32,7 @@ import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseThingHandler;
-import org.openhab.core.thing.binding.ThingHandlerService;
 import org.openhab.core.thing.type.ChannelType;
-import org.openhab.core.thing.type.ChannelTypeProvider;
-import org.openhab.core.thing.type.ChannelTypeUID;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.State;
@@ -95,7 +89,7 @@ import no.seime.openhab.binding.esphome.internal.internal.message.TextSensorMess
  * @author Arne Seime - Initial contribution
  */
 @NonNullByDefault
-public class ESPHomeHandler extends BaseThingHandler implements PacketListener, ChannelTypeProvider {
+public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     public static final int NUM_MISSED_PINGS_BEFORE_DISCONNECT = 4;
     public static final int CONNECT_TIMEOUT = 20;
@@ -104,8 +98,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     private static final int API_VERSION_MINOR = 7;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
-    private final Map<ChannelTypeUID, ChannelType> generatedChannelTypes = new HashMap<>();
     private final ConnectionSelector connectionSelector;
+    private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable ESPHomeConnection connection;
     @Nullable
@@ -118,9 +112,11 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private final List<Channel> dynamicChannels = new ArrayList<>();
 
-    public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector) {
+    public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
+            ESPChannelTypeProvider dynamicChannelTypeProvider) {
         super(thing);
         this.connectionSelector = connectionSelector;
+        this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -158,10 +154,15 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         }
     }
 
+    @Override
+    public void handleRemoval() {
+        dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
+        super.handleRemoval();
+    }
+
     private void connect() {
         try {
             dynamicChannels.clear();
-            generatedChannelTypes.clear();
 
             logger.info("[{}] Trying to connect to {}:{}", config.hostname, config.hostname, config.port);
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
@@ -409,23 +410,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener, 
         // Check if
     }
 
-    @Override
-    public Collection<Class<? extends ThingHandlerService>> getServices() {
-        return Collections.singleton(CallbackChannelsTypeProvider.class);
-    }
-
     public void addChannelType(ChannelType channelType) {
-        generatedChannelTypes.put(channelType.getUID(), channelType);
-    }
-
-    @Override
-    public Collection<ChannelType> getChannelTypes(@Nullable final Locale locale) {
-        return generatedChannelTypes.values();
-    }
-
-    @Override
-    public @Nullable ChannelType getChannelType(final ChannelTypeUID channelTypeUID, @Nullable final Locale locale) {
-        return generatedChannelTypes.get(channelTypeUID);
+        dynamicChannelTypeProvider.putChannelType(channelType);
     }
 
     public void addChannel(Channel channel) {

@@ -23,7 +23,9 @@ import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 
 import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ConnectionSelector;
@@ -47,7 +49,11 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private ConnectionSelector connectionSelector;
 
-    public ESPHomeHandlerFactory() throws IOException {
+    private final ESPChannelTypeProvider dynamicChannelTypeProvider;
+
+    @Activate
+    public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider) throws IOException {
+        this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         connectionSelector = new ConnectionSelector();
     }
 
@@ -56,7 +62,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing, connectionSelector);
+            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider);
         }
 
         return null;
