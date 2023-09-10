@@ -104,7 +104,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     private @Nullable ESPHomeConfiguration config;
     private @Nullable ESPHomeConnection connection;
     @Nullable
-    private ScheduledFuture<?> pingWatchdog;
+    private ScheduledFuture<?> pingWatchdogFuture;
     private Instant lastPong = Instant.now();
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
@@ -189,14 +189,9 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     @Override
     public void dispose() {
         setUndefToAllChannels();
-        if (reconnectFuture != null) {
-            reconnectFuture.cancel(true);
-            reconnectFuture = null;
-        }
+        cancelReconnectFuture();
         if (connection != null) {
-            if (pingWatchdog != null) {
-                pingWatchdog.cancel(true);
-            }
+            cancelPingWatchdog();
 
             if (connectionState == ConnectionState.CONNECTED) {
                 try {
@@ -279,7 +274,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         updateStatus(ThingStatus.OFFLINE);
         setUndefToAllChannels();
         connection.close();
-        pingWatchdog.cancel(true);
+        cancelPingWatchdog();
         connectionState = ConnectionState.UNINITIALIZED;
         reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
     }
@@ -289,8 +284,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                 "Parse error. This could be due to api encryption being used by ESPHome device. Update your ESPHome device to use plaintext password until this is implemented in the binding.");
         setUndefToAllChannels();
+        cancelPingWatchdog();
         connection.close();
-        pingWatchdog.cancel(true);
         connectionState = ConnectionState.UNINITIALIZED;
         reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
     }
@@ -342,9 +337,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         long reconnectDelay = CONNECT_TIMEOUT;
         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
                 String.format("ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelay));
-        if (pingWatchdog != null) {
-            pingWatchdog.cancel(true);
-        }
+        cancelPingWatchdog();
         reconnectFuture = scheduler.schedule(this::connect, reconnectDelay, TimeUnit.SECONDS);
     }
 
@@ -365,7 +358,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             // Reset last pong
             lastPong = Instant.now();
 
-            pingWatchdog = scheduler.scheduleAtFixedRate(() -> {
+            pingWatchdogFuture = scheduler.scheduleAtFixedRate(() -> {
 
                 if (lastPong.plusSeconds(NUM_MISSED_PINGS_BEFORE_DISCONNECT * PING_INTERVAL_SECONDS)
                         .isBefore(Instant.now())) {
@@ -373,7 +366,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
                             "[{}] Ping responses lacking Waited {} times {} seconds, total of {}. Assuming connection lost and disconnecting",
                             config.hostname, NUM_MISSED_PINGS_BEFORE_DISCONNECT, PING_INTERVAL_SECONDS,
                             NUM_MISSED_PINGS_BEFORE_DISCONNECT * PING_INTERVAL_SECONDS);
-                    pingWatchdog.cancel(false);
+                    pingWatchdogFuture.cancel(false);
                     connection.close();
                     connectionState = ConnectionState.UNINITIALIZED;
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
@@ -443,5 +436,19 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         // Connection established
         CONNECTED
 
+    }
+
+    private void cancelPingWatchdog() {
+        if (pingWatchdogFuture != null) {
+            pingWatchdogFuture.cancel(true);
+            pingWatchdogFuture = null;
+        }
+    }
+
+    private void cancelReconnectFuture() {
+        if (reconnectFuture != null) {
+            reconnectFuture.cancel(true);
+            reconnectFuture = null;
+        }
     }
 }
