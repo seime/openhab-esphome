@@ -17,7 +17,7 @@ public abstract class ProtocolException extends Exception {
         super(message);
     }
 
-    public ProtocolException(String message, Throwable e) {
+    protected ProtocolException(String message, Throwable e) {
         super(message, e);
     }
 }

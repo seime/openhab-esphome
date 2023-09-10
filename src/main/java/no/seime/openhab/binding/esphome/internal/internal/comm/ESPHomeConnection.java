@@ -48,7 +48,7 @@ public class ESPHomeConnection {
                 socketChannel.write(buffer);
             }
         } catch (IOException e) {
-            throw new ProtocolAPIError(String.format("[%s] Error sending message " + e, hostname));
+            throw new ProtocolAPIError(String.format("[%s] Error sending message: %s ", hostname, e));
         }
     }
 
