@@ -46,6 +46,7 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
   > ![img.png](esphomeconfig_deviceclass.png)
   > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
   device_class values (**use lowercase values**)
+  > Also note that you may override `device_class: ""` to remove any device class from the sensor.
 
 Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
 
@@ -58,9 +59,14 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 - **Only plaintext connections with password** are supported, not encrypted. This is insecure and should not be used on
   untrusted
   networks, but is your only option at this time. I *intend* to add encryption.
-- Only `sensor`, `binary_sensor`, `text_sensor` `switch`, `climate` and `select` is supported. Plans to add more, but
-  not yet
-  implemented. I need _your_ help.
+- Only
+    - `sensor`,
+    - `binary_sensor`,
+    - `text_sensor`
+    - `switch`,
+    - `climate` and
+    - `select` is supported.
+      Plans to add more, but not yet implemented. I need _your_ help.
 
 ## Discovery
 

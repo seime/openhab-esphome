@@ -40,7 +40,8 @@
 			<parameter name="maxPingTimeouts" type="integer" min="1" max="600" required="false">
 				<label>Number of missed ping requests before deeming device unresponsive</label>
 				<default>4</default>
-				<description>Ie if pingInterval=10 and this value is 4, the binding will wait a total of 10*4 = 40 seconds before connection is assumed broken, and reconnect starts</description>
+				<description>Ie if pingInterval=10 and this value is 4, the binding will wait a total of 10*4 = 40 seconds before
+					connection is assumed broken, and reconnect starts</description>
 				<advanced>true</advanced>
 			</parameter>
 		</config-description>
