@@ -36,6 +36,7 @@ import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.State;
+import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -187,6 +188,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     @Override
     public void dispose() {
+        setUndefToAllChannels();
         if (reconnectFuture != null) {
             reconnectFuture.cancel(true);
             reconnectFuture = null;
@@ -211,6 +213,11 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     public void sendMessage(GeneratedMessageV3 message) throws ProtocolAPIError {
         connection.send(message);
+    }
+
+    private void setUndefToAllChannels() {
+        // Update all channels to UNDEF to avoid stale values
+        getThing().getChannels().forEach(channel -> updateState(channel.getUID(), UnDefType.UNDEF));
     }
 
     @Override
@@ -270,6 +277,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     @Override
     public void onEndOfStream() {
         updateStatus(ThingStatus.OFFLINE);
+        setUndefToAllChannels();
         connection.close();
         pingWatchdog.cancel(true);
         connectionState = ConnectionState.UNINITIALIZED;
@@ -280,6 +288,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     public void onParseError() {
         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                 "Parse error. This could be due to api encryption being used by ESPHome device. Update your ESPHome device to use plaintext password until this is implemented in the binding.");
+        setUndefToAllChannels();
         connection.close();
         pingWatchdog.cancel(true);
         connectionState = ConnectionState.UNINITIALIZED;
@@ -328,6 +337,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     private void remoteDisconnect() {
         connection.close();
+        setUndefToAllChannels();
         connectionState = ConnectionState.UNINITIALIZED;
         long reconnectDelay = CONNECT_TIMEOUT;
         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
