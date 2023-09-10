@@ -21,10 +21,10 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 
 ## Getting started for non ESPHome users
 
-1. Install ESPHome
+1. [Install ESPHome](https://esphome.io/guides/installing_esphome)
 2. Create an ESPHome configuration for your device
 3. Flash the device with the ESPHome firmware
-4. Install the ESPHome binding in openHAB
+4. Install the ESPHome binding in openHAB https://github.com/seime/openhab-esphome/releases/tag/latest_oh4
 5. Wait for discovery to find your device - or add manually in a thing file.
 
 > **Note:** At the current state of the binding, it is highly recommended to use file based configuration for things and
