@@ -92,9 +92,7 @@ import no.seime.openhab.binding.esphome.internal.internal.message.TextSensorMess
 @NonNullByDefault
 public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
-    public static final int NUM_MISSED_PINGS_BEFORE_DISCONNECT = 4;
     public static final int CONNECT_TIMEOUT = 20;
-    private static final long PING_INTERVAL_SECONDS = 10;
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 7;
 
@@ -360,18 +358,17 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
             pingWatchdogFuture = scheduler.scheduleAtFixedRate(() -> {
 
-                if (lastPong.plusSeconds(NUM_MISSED_PINGS_BEFORE_DISCONNECT * PING_INTERVAL_SECONDS)
-                        .isBefore(Instant.now())) {
+                if (lastPong.plusSeconds(config.maxPingTimeouts * config.pingInterval).isBefore(Instant.now())) {
                     logger.warn(
                             "[{}] Ping responses lacking Waited {} times {} seconds, total of {}. Assuming connection lost and disconnecting",
-                            config.hostname, NUM_MISSED_PINGS_BEFORE_DISCONNECT, PING_INTERVAL_SECONDS,
-                            NUM_MISSED_PINGS_BEFORE_DISCONNECT * PING_INTERVAL_SECONDS);
+                            config.hostname, config.maxPingTimeouts, config.pingInterval,
+                            config.maxPingTimeouts * config.pingInterval);
                     pingWatchdogFuture.cancel(false);
                     connection.close();
                     connectionState = ConnectionState.UNINITIALIZED;
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
-                                    NUM_MISSED_PINGS_BEFORE_DISCONNECT, PING_INTERVAL_SECONDS));
+                                    config.maxPingTimeouts, config.pingInterval));
                     reconnectFuture = scheduler.schedule(this::connect, 10, TimeUnit.SECONDS);
 
                 } else {
@@ -383,7 +380,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
                         logger.warn("[{}] Error sending ping request", config.hostname, e);
                     }
                 }
-            }, PING_INTERVAL_SECONDS, PING_INTERVAL_SECONDS, TimeUnit.SECONDS);
+            }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS);
 
             connection.send(DeviceInfoRequest.getDefaultInstance());
             connection.send(ListEntitiesRequest.getDefaultInstance());

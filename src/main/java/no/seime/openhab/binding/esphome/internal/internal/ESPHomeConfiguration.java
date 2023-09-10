@@ -27,4 +27,8 @@ public class ESPHomeConfiguration {
     public String password;
 
     public int port = 6053;
+
+    public int pingInterval = 10;
+
+    public int maxPingTimeouts = 4;
 }
