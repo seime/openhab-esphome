@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.measure.Unit;
+import javax.validation.constraints.NotNull;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.core.Configuration;
@@ -65,10 +66,13 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         if (category != null) {
             channelTypeBuilder.withCategory(category);
         }
+        ChannelType channelType = channelTypeBuilder.build();
+
+        logger.trace("Created new channel type {}", channelType.getUID());
 
         channelTypeBuilder.withAutoUpdatePolicy(AutoUpdatePolicy.VETO);
 
-        return channelTypeBuilder.build();
+        return channelType;
     }
 
     protected Configuration configuration(int key, String subCommand, String commandClass) {
@@ -91,10 +95,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
 
     public abstract void handleState(T rsp);
 
-    protected void registerChannel(Channel channel, ChannelType channelType) {
-        if (channelType != null) {
-            handler.addChannelType(channelType);
-        }
+    protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType) {
+        logger.trace("Registering channel {} with channel type {}", channel.getUID(), channelType.getUID());
+        handler.addChannelType(channelType);
         handler.addChannel(channel);
     }
 
