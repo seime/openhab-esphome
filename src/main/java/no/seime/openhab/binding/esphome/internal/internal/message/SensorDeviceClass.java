@@ -50,7 +50,7 @@ public enum SensorDeviceClass {
     SULPHUR_DIOXIDE("sulphur_dioxide", "Number", "smoke", null),
     TEMPERATURE("temperature", "Number:Temperature", "temperature", "Temperature"),
     VOLATILE_ORGANIC_COMPOUNDS("volatile_organic_compounds", "Number", "smoke", null),
-    VOLATILE_ORGANIC_COMPOUNDS_PARTS("volatile_organic_compounds_parts", "Number:DimensionLess", "smoke", null),
+    VOLATILE_ORGANIC_COMPOUNDS_PARTS("volatile_organic_compounds_parts", "Number:Dimensionless", "smoke", null),
     VOLTAGE("voltage", "Number:ElectricPotential", "energy", "Voltage"),
     VOLUME("volume", "Number:Volume", null, null),
     VOLUME_STORAGE("volume_storage", "Number:Volume", null, null),
