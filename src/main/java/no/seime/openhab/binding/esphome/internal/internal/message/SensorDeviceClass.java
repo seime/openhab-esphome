@@ -27,6 +27,7 @@ public enum SensorDeviceClass {
     IRRADIANCE("irradiance", "Number:Itensity", null, null),
     MOISTURE("moisture", "Number:Dimensionless", "water", "Humidity"),
     MONETARY("monetary", "Number", null, null), // TODO: Add Monetary type
+                                                // https://github.com/openhab/openhab-core/issues/3408
     NITROGEN_DIOXIDE("nitrogen_dioxide", "Number:Dimensionless", "smoke", "null"),
     NITROGEN_MONOXIDE("nitrogen_monoxide", "Number", "smoke", null),
     NITROUS_OXIDE("nitrous_oxide", "Number", "smoke", null),
@@ -49,7 +50,7 @@ public enum SensorDeviceClass {
     SULPHUR_DIOXIDE("sulphur_dioxide", "Number", "smoke", null),
     TEMPERATURE("temperature", "Number:Temperature", "temperature", "Temperature"),
     VOLATILE_ORGANIC_COMPOUNDS("volatile_organic_compounds", "Number", "smoke", null),
-    VOLATILE_ORGANIC_COMPOUNDS_PARTS("volatile_organic_compounds_parts", "Number", "smoke", null),
+    VOLATILE_ORGANIC_COMPOUNDS_PARTS("volatile_organic_compounds_parts", "Number:DimensionLess", "smoke", null),
     VOLTAGE("voltage", "Number:ElectricPotential", "energy", "Voltage"),
     VOLUME("volume", "Number:Volume", null, null),
     VOLUME_STORAGE("volume_storage", "Number:Volume", null, null),
@@ -93,15 +94,6 @@ public enum SensorDeviceClass {
 
     public String getCategory() {
         return category;
-    }
-
-    public static String getItemTypeForDeviceClass(String deviceClass) {
-        for (SensorDeviceClass sensorDeviceClass : SensorDeviceClass.values()) {
-            if (sensorDeviceClass.getDeviceClass().equals(deviceClass)) {
-                return sensorDeviceClass.getItemType();
-            }
-        }
-        return null;
     }
 
     @Override
