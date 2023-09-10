@@ -76,11 +76,13 @@ The binding uses mDNS to automatically discover devices on the network.
 
 ### `device` Thing Configuration
 
-| Name       | Type      | Description                                                                    | Default | Required | Advanced |
-|------------|-----------|--------------------------------------------------------------------------------|---------|----------|----------|
-| `hostname` | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local' | N/A     | yes      | no       |
-| `password` | `text`    | Password to access the device if password protected                            | N/A     | no       | no       |
-| `port`     | `integer` | IP Port of the device                                                          | 6053    | no       | no       |
+| Name              | Type      | Description                                                                    | Default | Required | Advanced |
+|-------------------|-----------|--------------------------------------------------------------------------------|---------|----------|----------|
+| `hostname`        | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local' | N/A     | yes      | no       |
+| `password`        | `text`    | Password to access the device if password protected                            | N/A     | no       | no       |
+| `port`            | `integer` | IP Port of the device                                                          | 6053    | no       | no       |
+| `pingInterval`    | `integer` | Seconds between sending ping requests to device to check if alive              | 10      | no       | yes      |
+| `maxPingTimeouts` | `integer` | Number of missed ping requests before deeming device unresponsive.             | 4       | no       | yes      |
 
 ## Channels
 
@@ -91,7 +93,7 @@ Channels are auto-generated based on actual device configuration.
 ### Thing Configuration
 
 ```
-esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", password="MyPassword" ]
+esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", password="MyPassword", pingInterval=10, maxPingTimeouts=4]
 ```
 
 ### Item Configuration
