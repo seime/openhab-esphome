@@ -33,9 +33,11 @@ public class ESPHomeConnection {
 
     private String hostname;
 
-    public ESPHomeConnection(ConnectionSelector connectionSelector, PlainTextStreamHandler streamHandler) {
+    public ESPHomeConnection(ConnectionSelector connectionSelector, PlainTextStreamHandler streamHandler,
+            String hostname) {
         this.streamHandler = streamHandler;
         this.connectionSelector = connectionSelector;
+        this.hostname = hostname;
     }
 
     public synchronized void send(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -53,18 +55,16 @@ public class ESPHomeConnection {
     }
 
     public void connect(InetSocketAddress address) throws ProtocolAPIError {
-        hostname = address.getHostName();
         try {
 
             socketChannel = SocketChannel.open(address);
             socketChannel.configureBlocking(false);
             connectionSelector.register(socketChannel, streamHandler);
 
-            logger.info("[{}] Opening socket to {} at port {}.", hostname, address.getHostName(), address.getPort());
+            logger.info("[{}] Opening socket to {} at port {}.", hostname, hostname, address.getPort());
 
         } catch (Exception e) {
-            throw new ProtocolAPIError("Failed to connect to '" + address.getHostName() + "' port " + address.getPort(),
-                    e);
+            throw new ProtocolAPIError("Failed to connect to '" + hostname + "' port " + address.getPort(), e);
         }
     }
 

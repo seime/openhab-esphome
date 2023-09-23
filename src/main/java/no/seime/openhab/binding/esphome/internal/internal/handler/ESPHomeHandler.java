@@ -169,7 +169,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
-            connection = new ESPHomeConnection(connectionSelector, new PlainTextStreamHandler(this));
+            connection = new ESPHomeConnection(connectionSelector, new PlainTextStreamHandler(this), config.hostname);
             connection.connect(new InetSocketAddress(config.hostname, config.port));
 
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
@@ -400,7 +400,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     private void handleHelloResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
             logger.debug("[{}] Received hello response {}", config.hostname, helloResponse);
-            logger.info("[{}] Connected. Device {} running {} on protocol version {}.{}", config.hostname,
+            logger.info("[{}] Connected. Device '{}' running '{}' on protocol version '{}.{}'", config.hostname,
                     helloResponse.getName(), helloResponse.getServerInfo(), helloResponse.getApiVersionMajor(),
                     helloResponse.getApiVersionMinor());
             connectionState = ConnectionState.LOGIN_SENT;

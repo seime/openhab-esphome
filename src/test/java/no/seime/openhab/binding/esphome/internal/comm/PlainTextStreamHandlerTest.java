@@ -97,7 +97,7 @@ public class PlainTextStreamHandlerTest {
                         public void onParseError() {
                             fail();
                         }
-                    }));
+                    }), "localhost");
 
             clientConnection.connect(serverAddress);
 
