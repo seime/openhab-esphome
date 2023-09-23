@@ -111,6 +111,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private final List<Channel> dynamicChannels = new ArrayList<>();
 
+    private boolean disposed = false;
+
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider) {
         super(thing);
@@ -178,7 +180,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         } catch (ProtocolException e) {
             logger.warn("[{}] Error initial connection", config.hostname, e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-            if (reconnectFuture != null) { // Don't reconnect if we've been disposed
+            if (!disposed) { // Don't reconnect if we've been disposed
                 reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
             }
         }
@@ -201,6 +203,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
                 connection.close();
             }
         }
+        disposed = true;
         super.dispose();
     }
 
@@ -301,7 +304,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             updateThing(editThing().withProperties(props).build());
         } else if (message instanceof ListEntitiesDoneResponse) {
             updateThing(editThing().withChannels(dynamicChannels).build());
-            logger.debug("[{}] Done updating channels", config.hostname);
+            logger.debug("[{}] Device interrogation complete, done updating thing channels", config.hostname);
             connection.send(SubscribeStatesRequest.getDefaultInstance());
         } else if (message instanceof PingRequest) {
             logger.debug("[{}] Responding to ping request", config.hostname);
@@ -352,6 +355,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             }
             connectionState = ConnectionState.CONNECTED;
             updateStatus(ThingStatus.ONLINE);
+            logger.debug("[{}] Device login complete, starting device interrogation", config.hostname);
 
             // Reset last pong
             lastPong = Instant.now();
@@ -396,8 +400,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     private void handleHelloResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
             logger.debug("[{}] Received hello response {}", config.hostname, helloResponse);
-            logger.info("[{}] Server {} running {} on protocol version {}.{}", config.hostname, helloResponse.getName(),
-                    helloResponse.getServerInfo(), helloResponse.getApiVersionMajor(),
+            logger.info("[{}] Connected. Device {} running {} on protocol version {}.{}", config.hostname,
+                    helloResponse.getName(), helloResponse.getServerInfo(), helloResponse.getApiVersionMajor(),
                     helloResponse.getApiVersionMinor());
             connectionState = ConnectionState.LOGIN_SENT;
 
