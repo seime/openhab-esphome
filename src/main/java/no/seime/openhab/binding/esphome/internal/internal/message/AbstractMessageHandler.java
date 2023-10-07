@@ -46,7 +46,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
 
     protected ChannelType addChannelType(final String channelTypePrefix, final String label, final String itemType,
             final Collection<?> options, @Nullable final String pattern, @Nullable final Set<String> tags,
-            boolean readOnly, String category) {
+            boolean readOnly, String category, BigDecimal stateDescriptionStep, BigDecimal stateDescriptionMin,
+            BigDecimal stateDescriptionMax) {
         final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
                 channelTypePrefix + handler.getThing().getUID().getId());
         final List<StateOption> stateOptions = options.stream().map(e -> new StateOption(e.toString(), e.toString()))
@@ -57,6 +58,19 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         if (pattern != null) {
             stateDescription = stateDescription.withPattern(pattern);
         }
+
+        if (stateDescriptionStep != null) {
+            stateDescription = stateDescription.withStep(stateDescriptionStep);
+        }
+
+        if (stateDescriptionMin != null) {
+            stateDescription = stateDescription.withMinimum(stateDescriptionMin);
+        }
+
+        if (stateDescriptionMax != null) {
+            stateDescription = stateDescription.withMaximum(stateDescriptionMax);
+        }
+
         final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID, label, itemType)
                 .withStateDescriptionFragment(stateDescription.build());
         if (tags != null && !tags.isEmpty()) {
@@ -93,6 +107,56 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
 
     public abstract void buildChannels(S rsp);
 
+    protected String resolveNumericItemType(String unitOfMeasurement, String name,
+            SensorNumberDeviceClass deviceClass) {
+
+        String itemTypeFromUnit = getItemTypeBaseOnUnit(unitOfMeasurement);
+
+        String itemTypeToUse;
+
+        if (itemTypeFromUnit != null && deviceClass != null) {
+            if (!deviceClass.getItemType().equals(itemTypeFromUnit)) {
+                // Verify that unit matches device_class as well
+                itemTypeToUse = itemTypeFromUnit;
+                logger.warn(
+                        "Unexpected combination of device_class '{}' and unit '{}'. Returning item type '{}' based on unit",
+                        deviceClass.getDeviceClass(), unitOfMeasurement, itemTypeToUse);
+
+            } else {
+                itemTypeToUse = deviceClass.getItemType();
+                logger.debug("Using item type '{}' based on device_class '{}' and unit '{}'", itemTypeToUse,
+                        deviceClass.getDeviceClass(), unitOfMeasurement);
+            }
+
+        } else if (itemTypeFromUnit != null) {
+            itemTypeToUse = itemTypeFromUnit;
+            logger.debug(
+                    "Using item type '{}' based on unit '{}' since device_class is either missing from ESPHome device configuration or openhab mapping is incomplete",
+                    itemTypeToUse, unitOfMeasurement);
+        } else if (deviceClass != null) {
+            itemTypeToUse = deviceClass.getItemType();
+            logger.debug("Using item type '{}' based on device_class '{}' ", itemTypeToUse,
+                    deviceClass.getDeviceClass());
+        } else {
+            logger.warn(
+                    "Could not determine item type for sensor '{}' as neither device_class nor unit_of_measurement is present. Consider augmenting your ESPHome configuration. Using default 'Number'",
+                    name);
+            itemTypeToUse = "Number";
+        }
+        return itemTypeToUse;
+    }
+
+    private String getItemTypeBaseOnUnit(String unitOfMeasurement) {
+        Unit<?> unit = UnitUtils.parseUnit(unitOfMeasurement);
+        if (unit != null) {
+            String dimensionName = UnitUtils.getDimensionName(unit);
+            if (dimensionName != null) {
+                return "Number:" + dimensionName;
+            }
+        }
+        return null;
+    }
+
     public abstract void handleState(T rsp);
 
     protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType) {
@@ -108,13 +172,13 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
             Configuration configuration = channel.getConfiguration();
             String deviceClass = (String) configuration.get("deviceClass");
             if (deviceClass != null) {
-                SensorDeviceClass sensorDeviceClass = SensorDeviceClass.fromDeviceClass(deviceClass);
+                SensorNumberDeviceClass sensorDeviceClass = SensorNumberDeviceClass.fromDeviceClass(deviceClass);
                 if (sensorDeviceClass != null) {
                     if (sensorDeviceClass.getItemType().startsWith("Number")) {
                         return toNumericState(channel, state);
                     } else {
                         logger.warn(
-                                "Expected SensorDeviceClass '{}' to be of item type Number[:Dimension]. Returning undef",
+                                "Expected SensorNumberDeviceClass '{}' to be of item type Number[:Dimension]. Returning undef",
                                 deviceClass);
                         return UnDefType.UNDEF;
                     }

@@ -37,7 +37,7 @@ public class BinarySensorMessageHandler
         Configuration configuration = configuration(rsp.getKey(), null, null);
 
         ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "Contact", Collections.emptySet(),
-                null, Set.of("OpenState"), true, "door");
+                null, Set.of("OpenState"), true, "door", null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

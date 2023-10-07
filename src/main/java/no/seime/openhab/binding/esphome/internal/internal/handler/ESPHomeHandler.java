@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 import com.google.protobuf.GeneratedMessageV3;
 
 import io.esphome.api.BinarySensorStateResponse;
+import io.esphome.api.ButtonCommandRequest;
 import io.esphome.api.ClimateStateResponse;
 import io.esphome.api.ConnectRequest;
 import io.esphome.api.ConnectResponse;
@@ -52,14 +53,19 @@ import io.esphome.api.DisconnectRequest;
 import io.esphome.api.DisconnectResponse;
 import io.esphome.api.HelloRequest;
 import io.esphome.api.HelloResponse;
+import io.esphome.api.LightStateResponse;
 import io.esphome.api.ListEntitiesBinarySensorResponse;
+import io.esphome.api.ListEntitiesButtonResponse;
 import io.esphome.api.ListEntitiesClimateResponse;
 import io.esphome.api.ListEntitiesDoneResponse;
+import io.esphome.api.ListEntitiesLightResponse;
+import io.esphome.api.ListEntitiesNumberResponse;
 import io.esphome.api.ListEntitiesRequest;
 import io.esphome.api.ListEntitiesSelectResponse;
 import io.esphome.api.ListEntitiesSensorResponse;
 import io.esphome.api.ListEntitiesSwitchResponse;
 import io.esphome.api.ListEntitiesTextSensorResponse;
+import io.esphome.api.NumberStateResponse;
 import io.esphome.api.PingRequest;
 import io.esphome.api.PingResponse;
 import io.esphome.api.SelectStateResponse;
@@ -77,7 +83,10 @@ import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolException;
 import no.seime.openhab.binding.esphome.internal.internal.message.AbstractMessageHandler;
 import no.seime.openhab.binding.esphome.internal.internal.message.BinarySensorMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.ButtonMessageHandler;
 import no.seime.openhab.binding.esphome.internal.internal.message.ClimateMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.LightMessageHandler;
+import no.seime.openhab.binding.esphome.internal.internal.message.NumberMessageHandler;
 import no.seime.openhab.binding.esphome.internal.internal.message.SelectMessageHandler;
 import no.seime.openhab.binding.esphome.internal.internal.message.SensorMessageHandler;
 import no.seime.openhab.binding.esphome.internal.internal.message.SwitchMessageHandler;
@@ -109,9 +118,11 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     private final Map<String, AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3>> commandTypeToHandlerMap = new HashMap<>();
     private final Map<Class<? extends GeneratedMessageV3>, AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3>> classToHandlerMap = new HashMap<>();
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
+
     private final List<Channel> dynamicChannels = new ArrayList<>();
 
     private boolean disposed = false;
+    private boolean interrogated;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider) {
@@ -132,6 +143,12 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
                 SwitchStateResponse.class);
         registerMessageHandler("Climate", new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,
                 ClimateStateResponse.class);
+        registerMessageHandler("Number", new NumberMessageHandler(this), ListEntitiesNumberResponse.class,
+                NumberStateResponse.class);
+        registerMessageHandler("Light", new LightMessageHandler(this), ListEntitiesLightResponse.class,
+                LightStateResponse.class);
+        registerMessageHandler("Button", new ButtonMessageHandler(this), ListEntitiesButtonResponse.class,
+                ButtonCommandRequest.class);
     }
 
     private void registerMessageHandler(String select,
@@ -305,6 +322,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         } else if (message instanceof ListEntitiesDoneResponse) {
             updateThing(editThing().withChannels(dynamicChannels).build());
             logger.debug("[{}] Device interrogation complete, done updating thing channels", config.hostname);
+            interrogated = true;
             connection.send(SubscribeStatesRequest.getDefaultInstance());
         } else if (message instanceof PingRequest) {
             logger.debug("[{}] Responding to ping request", config.hostname);
@@ -451,5 +469,13 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             reconnectFuture.cancel(true);
             reconnectFuture = null;
         }
+    }
+
+    public boolean isInterrogated() {
+        return interrogated;
+    }
+
+    public List<Channel> getDynamicChannels() {
+        return dynamicChannels;
     }
 }

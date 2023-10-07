@@ -11,25 +11,37 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import io.esphome.api.ListEntitiesSwitchResponse;
-import io.esphome.api.SwitchCommandRequest;
-import io.esphome.api.SwitchStateResponse;
+import io.esphome.api.ButtonCommandRequest;
+import io.esphome.api.ListEntitiesButtonResponse;
 import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
 
-public class SwitchMessageHandler extends AbstractMessageHandler<ListEntitiesSwitchResponse, SwitchStateResponse> {
+/**
+ * Note the second parameter to AbstractMessageHandler is a type that will never be used. Just here to fit the existing
+ * code pattern
+ */
+public class ButtonMessageHandler extends AbstractMessageHandler<ListEntitiesButtonResponse, ButtonCommandRequest> {
 
-    public SwitchMessageHandler(ESPHomeHandler handler) {
+    private final Logger logger = LoggerFactory.getLogger(ButtonMessageHandler.class);
+
+    public ButtonMessageHandler(ESPHomeHandler handler) {
         super(handler);
     }
 
     @Override
     public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
-        handler.sendMessage(SwitchCommandRequest.newBuilder().setKey(key).setState(command == OnOffType.ON).build());
+        if (command instanceof OnOffType) {
+            handler.sendMessage(ButtonCommandRequest.newBuilder().setKey(key).build());
+            handler.updateState(channel.getUID(), OnOffType.OFF);
+        } else {
+            logger.warn("Unsupported command type: {}, use OnOffType instead", command);
+        }
     }
 
-    public void buildChannels(ListEntitiesSwitchResponse rsp) {
+    public void buildChannels(ListEntitiesButtonResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, "Switch");
 
         ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "Switch", Collections.emptySet(),
@@ -42,8 +54,7 @@ public class SwitchMessageHandler extends AbstractMessageHandler<ListEntitiesSwi
         super.registerChannel(channel, channelType);
     }
 
-    public void handleState(SwitchStateResponse rsp) {
-        findChannelByKey(rsp.getKey()).ifPresent(
-                channel -> handler.updateState(channel.getUID(), rsp.getState() ? OnOffType.ON : OnOffType.OFF));
+    public void handleState(ButtonCommandRequest rsp) {
+        // NOOP
     }
 }

@@ -87,6 +87,8 @@ public class ESPHomeEmulator {
                                     channel.close();
                                     streamHandler.onParseError(e);
                                 }
+                            } else {
+                                logger.debug("No data");
                             }
 
                         }
@@ -111,7 +113,11 @@ public class ESPHomeEmulator {
 
     public void sendPacket(GeneratedMessageV3 message) throws IOException {
         ByteBuffer buffer = ByteBuffer.wrap(streamHandler.encodeFrame(message));
-        channel.write(buffer);
+
+        while (buffer.hasRemaining()) {
+            logger.trace("Writing data");
+            channel.write(buffer);
+        }
     }
 
     public void setPacketListener(PacketListener packetListener) {

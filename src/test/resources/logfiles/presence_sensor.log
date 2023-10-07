@@ -1,0 +1,943 @@
+14:07:32.810 [INFO ] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Opening socket to xx.xx.xx.xx at port 6053.
+14:07:32.816 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: HelloRequest
+14:07:32.821 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:07:32.904 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:32.908 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:32.913 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:32.918 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 2 with data [8, 1, 16, 9, 26, 50, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 32, 40, 101, 115, 112, 104, 111, 109, 101, 32, 118, 50, 48, 50, 51, 46, 56, 46, 51, 41, 34, 30, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48]
+14:07:32.927 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received hello response api_version_major: 1
+api_version_minor: 9
+server_info: “everything-presence-one-d75360 (esphome v2023.8.3)”
+name: “everything-presence-one-d75360”
+
+14:07:32.932 [INFO ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Connected. Device ‘everything-presence-one-d75360’ running ‘everything-presence-one-d75360 (esphome v2023.8.3)’ on protocol version ‘1.9’
+14:07:32.936 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: ConnectRequest
+14:07:32.940 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:07:33.004 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.008 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.012 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.015 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 4 with data []
+14:07:33.020 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received login response
+14:07:33.025 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Device login complete, starting device interrogation
+14:07:33.025 [INFO ] [hab.event.ThingStatusInfoChangedEvent] - Thing ‘esphome:device:2f6d2a26a0’ changed from UNKNOWN: Connecting to xx.xx.xx.xx:6053 to ONLINE
+14:07:33.029 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: DeviceInfoRequest
+14:07:33.033 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:07:33.036 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: ListEntitiesRequest
+14:07:33.040 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:07:33.107 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.110 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.114 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.118 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.121 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.125 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.128 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 10 with data [18, 30, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 26, 17, 69, 48, 58, 53, 65, 58, 49, 66, 58, 68, 55, 58, 53, 51, 58, 54, 48, 34, 8, 50, 48, 50, 51, 46, 56, 46, 51, 42, 21, 83, 101, 112, 32, 49, 57, 32, 50, 48, 50, 51, 44, 32, 50, 48, 58, 51, 55, 58, 51, 49, 50, 8, 101, 115, 112, 51, 50, 100, 101, 118, 66, 51, 69, 118, 101, 114, 121, 116, 104, 105, 110, 103, 95, 83, 109, 97, 114, 116, 95, 84, 101, 99, 104, 110, 111, 108, 111, 103, 121, 46, 69, 118, 101, 114, 121, 116, 104, 105, 110, 103, 95, 80, 114, 101, 115, 101, 110, 99, 101, 95, 79, 110, 101, 74, 5, 49, 46, 49, 46, 54, 98, 9, 69, 115, 112, 114, 101, 115, 115, 105, 102, 106, 30, 69, 118, 101, 114, 121, 116, 104, 105, 110, 103, 32, 80, 114, 101, 115, 101, 110, 99, 101, 32, 79, 110, 101, 32, 100, 55, 53, 51, 54, 48]
+14:07:33.139 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message name: “everything-presence-one-d75360”
+mac_address: “xx:MAC:xx”
+esphome_version: “2023.8.3”
+compilation_time: “Sep 19 2023, 20:37:31”
+model: “esp32dev”
+project_name: “Everything_Smart_Technology.Everything_Presence_One”
+project_version: “1.1.6”
+manufacturer: “Espressif”
+friendly_name: “Everything Presence One d75360”
+
+14:07:33.161 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.164 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.168 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.172 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 12 with data [10, 6, 109, 109, 119, 97, 118, 101, 21, -40, 6, 29, 99, 26, 6, 109, 109, 87, 97, 118, 101, 34, 49, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 98, 105, 110, 97, 114, 121, 95, 115, 101, 110, 115, 111, 114, 109, 109, 119, 97, 118, 101, 42, 9, 111, 99, 99, 117, 112, 97, 110, 99, 121]
+14:07:33.179 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “mmwave”
+key: 1662846680
+name: “mmWave”
+unique_id: “everything-presence-one-d75360binary_sensormmwave”
+device_class: “occupancy”
+
+14:07:33.183 [TRACE] [ternal.message.AbstractMessageHandler] - Created new channel type esphome:mmwave2f6d2a26a0
+14:07:33.187 [TRACE] [ternal.message.AbstractMessageHandler] - Registering channel esphome:device:2f6d2a26a0:mmwave with channel type esphome:mmwave2f6d2a26a0
+14:07:33.224 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.227 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.233 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.236 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 12 with data [10, 3, 112, 105, 114, 21, -50, 92, 119, 66, 26, 3, 80, 73, 82, 34, 46, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 98, 105, 110, 97, 114, 121, 95, 115, 101, 110, 115, 111, 114, 112, 105, 114, 42, 6, 109, 111, 116, 105, 111, 110]
+14:07:33.240 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “pir”
+key: 1115118798
+name: “PIR”
+unique_id: “everything-presence-one-d75360binary_sensorpir”
+device_class: “motion”
+
+14:07:33.243 [TRACE] [ternal.message.AbstractMessageHandler] - Created new channel type esphome:pir2f6d2a26a0
+14:07:33.246 [TRACE] [ternal.message.AbstractMessageHandler] - Registering channel esphome:device:2f6d2a26a0:pir with channel type esphome:pir2f6d2a26a0
+14:07:33.250 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.253 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.256 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.260 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 12 with data [10, 9, 111, 99, 99, 117, 112, 97, 110, 99, 121, 21, -56, 114, 72, 75, 26, 9, 79, 99, 99, 117, 112, 97, 110, 99, 121, 34, 52, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 98, 105, 110, 97, 114, 121, 95, 115, 101, 110, 115, 111, 114, 111, 99, 99, 117, 112, 97, 110, 99, 121, 42, 9, 111, 99, 99, 117, 112, 97, 110, 99, 121]
+14:07:33.265 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “occupancy”
+key: 1263039176
+name: “Occupancy”
+unique_id: “everything-presence-one-d75360binary_sensoroccupancy”
+device_class: “occupancy”
+
+14:07:33.268 [TRACE] [ternal.message.AbstractMessageHandler] - Created new channel type esphome:occupancy2f6d2a26a0
+14:07:33.272 [TRACE] [ternal.message.AbstractMessageHandler] - Registering channel esphome:device:2f6d2a26a0:occupancy with channel type esphome:occupancy2f6d2a26a0
+14:07:33.282 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.285 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.288 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.292 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 15 with data [10, 16, 101, 115, 112, 51, 50, 95, 115, 116, 97, 116, 117, 115, 95, 108, 101, 100, 21, -97, 126, 38, -2, 26, 16, 69, 83, 80, 51, 50, 32, 115, 116, 97, 116, 117, 115, 32, 76, 69, 68, 34, 51, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 108, 105, 103, 104, 116, 101, 115, 112, 51, 50, 95, 115, 116, 97, 116, 117, 115, 95, 108, 101, 100, 96, 1, 104, 1, 120, 1]
+14:07:33.296 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “esp32_status_led”
+key: 4263935647
+name: “ESP32 status LED”
+unique_id: “everything-presence-one-d75360lightesp32_status_led”
+supported_color_modes: 1
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+
+14:07:33.301 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesLightResponse. This is lack of support in the binding. Content: 'object_id: “esp32_status_led”
+key: 4263935647
+name: “ESP32 status LED”
+unique_id: “everything-presence-one-d75360lightesp32_status_led”
+supported_color_modes: 1
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+'.
+14:07:33.305 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 15 with data [10, 10, 109, 109, 119, 97, 118, 101, 95, 108, 101, 100, 21, 126, -59, 9, 10, 26, 10, 109, 109, 87, 97, 118, 101, 32, 76, 69, 68, 34, 45, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 108, 105, 103, 104, 116, 109, 109, 119, 97, 118, 101, 95, 108, 101, 100, 96, 1, 104, 1, 120, 1]
+14:07:33.309 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “mmwave_led”
+key: 168412542
+name: “mmWave LED”
+unique_id: “everything-presence-one-d75360lightmmwave_led”
+supported_color_modes: 1
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+
+14:07:33.313 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesLightResponse. This is lack of support in the binding. Content: 'object_id: “mmwave_led”
+key: 168412542
+name: “mmWave LED”
+unique_id: “everything-presence-one-d75360lightmmwave_led”
+supported_color_modes: 1
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+'.
+14:07:33.317 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.320 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.323 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.326 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 16 with data [10, 11, 116, 101, 109, 112, 101, 114, 97, 116, 117, 114, 101, 21, -7, 35, -95, 53, 26, 11, 84, 101, 109, 112, 101, 114, 97, 116, 117, 114, 101, 34, 47, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 115, 101, 110, 115, 111, 114, 116, 101, 109, 112, 101, 114, 97, 116, 117, 114, 101, 50, 3, -62, -80, 67, 56, 1, 74, 11, 116, 101, 109, 112, 101, 114, 97, 116, 117, 114, 101, 80, 1]
+14:07:33.334 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “temperature”
+key: 899752953
+name: “Temperature”
+unique_id: “everything-presence-one-d75360sensortemperature”
+unit_of_measurement: “\302\260C”
+accuracy_decimals: 1
+device_class: “temperature”
+state_class: STATE_CLASS_MEASUREMENT
+
+14:07:33.339 [DEBUG] [internal.message.SensorMessageHandler] - Using item type ‘Number:Temperature’ based on device_class ‘temperature’ and unit ‘°C’
+14:07:33.342 [TRACE] [ternal.message.AbstractMessageHandler] - Created new channel type esphome:everything-presence-one-d75360sensortemperature2f6d2a26a0
+14:07:33.346 [TRACE] [ternal.message.AbstractMessageHandler] - Registering channel esphome:device:2f6d2a26a0:temperature with channel type esphome:everything-presence-one-d75360sensortemperature2f6d2a26a0
+14:07:33.398 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.402 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.406 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.409 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 16 with data [10, 11, 105, 108, 108, 117, 109, 105, 110, 97, 110, 99, 101, 21, -128, 89, 28, 107, 26, 11, 73, 108, 108, 117, 109, 105, 110, 97, 110, 99, 101, 34, 47, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 115, 101, 110, 115, 111, 114, 105, 108, 108, 117, 109, 105, 110, 97, 110, 99, 101, 50, 2, 108, 120, 56, 1, 74, 11, 105, 108, 108, 117, 109, 105, 110, 97, 110, 99, 101, 80, 1]
+14:07:33.414 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “illuminance”
+key: 1797020032
+name: “Illuminance”
+unique_id: “everything-presence-one-d75360sensorilluminance”
+unit_of_measurement: “lx”
+accuracy_decimals: 1
+device_class: “illuminance”
+state_class: STATE_CLASS_MEASUREMENT
+
+14:07:33.426 [DEBUG] [internal.message.SensorMessageHandler] - Using item type ‘Number:Illuminance’ based on device_class ‘illuminance’ and unit ‘lx’
+14:07:33.429 [TRACE] [ternal.message.AbstractMessageHandler] - Created new channel type esphome:everything-presence-one-d75360sensorilluminance2f6d2a26a0
+14:07:33.433 [TRACE] [ternal.message.AbstractMessageHandler] - Registering channel esphome:device:2f6d2a26a0:illuminance with channel type esphome:everything-presence-one-d75360sensorilluminance2f6d2a26a0
+14:07:33.437 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.440 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.443 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.447 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 16 with data [10, 8, 104, 117, 109, 105, 100, 105, 116, 121, 21, -34, 94, 64, -43, 26, 8, 72, 117, 109, 105, 100, 105, 116, 121, 34, 44, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 115, 101, 110, 115, 111, 114, 104, 117, 109, 105, 100, 105, 116, 121, 50, 1, 37, 56, 1, 74, 8, 104, 117, 109, 105, 100, 105, 116, 121, 80, 1]
+14:07:33.451 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “humidity”
+key: 3577765598
+name: “Humidity”
+unique_id: “everything-presence-one-d75360sensorhumidity”
+unit_of_measurement: “%”
+accuracy_decimals: 1
+device_class: “humidity”
+state_class: STATE_CLASS_MEASUREMENT
+
+14:07:33.457 [DEBUG] [internal.message.SensorMessageHandler] - Using item type ‘Number:Dimensionless’ based on device_class ‘humidity’ and unit ‘%’
+14:07:33.460 [TRACE] [ternal.message.AbstractMessageHandler] - Created new channel type esphome:everything-presence-one-d75360sensorhumidity2f6d2a26a0
+14:07:33.464 [TRACE] [ternal.message.AbstractMessageHandler] - Registering channel esphome:device:2f6d2a26a0:humidity with channel type esphome:everything-presence-one-d75360sensorhumidity2f6d2a26a0
+14:07:33.473 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.476 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.479 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.483 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 17 with data [10, 13, 109, 109, 119, 97, 118, 101, 95, 115, 101, 110, 115, 111, 114, 21, 105, -5, 1, -67, 26, 13, 109, 109, 87, 97, 118, 101, 32, 115, 101, 110, 115, 111, 114, 34, 49, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 115, 119, 105, 116, 99, 104, 109, 109, 119, 97, 118, 101, 95, 115, 101, 110, 115, 111, 114, 56, 1, 64, 1]
+14:07:33.489 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “mmwave_sensor”
+key: 3171023721
+name: “mmWave sensor”
+unique_id: “everything-presence-one-d75360switchmmwave_sensor”
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+
+14:07:33.493 [TRACE] [ternal.message.AbstractMessageHandler] - Created new channel type esphome:mmwave_sensor2f6d2a26a0
+14:07:33.497 [TRACE] [ternal.message.AbstractMessageHandler] - Registering channel esphome:device:2f6d2a26a0:mmwave_sensor with channel type esphome:mmwave_sensor2f6d2a26a0
+14:07:33.501 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 61 with data [10, 7, 114, 101, 115, 116, 97, 114, 116, 21, 82, 112, -70, 71, 26, 7, 82, 101, 115, 116, 97, 114, 116, 34, 43, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 98, 117, 116, 116, 111, 110, 114, 101, 115, 116, 97, 114, 116, 42, 11, 109, 100, 105, 58, 114, 101, 115, 116, 97, 114, 116, 48, 1, 56, 1]
+14:07:33.505 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “restart”
+key: 1203400786
+name: “Restart”
+unique_id: “everything-presence-one-d75360buttonrestart”
+icon: “mdi:restart”
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+
+14:07:33.509 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesButtonResponse. This is lack of support in the binding. Content: 'object_id: “restart”
+key: 1203400786
+name: “Restart”
+unique_id: “everything-presence-one-d75360buttonrestart”
+icon: “mdi:restart”
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+'.
+14:07:33.516 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.519 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.522 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.526 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 61 with data [10, 9, 115, 97, 102, 101, 95, 109, 111, 100, 101, 21, -56, -128, -89, 25, 26, 9, 83, 97, 102, 101, 32, 109, 111, 100, 101, 34, 45, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 98, 117, 116, 116, 111, 110, 115, 97, 102, 101, 95, 109, 111, 100, 101, 42, 17, 109, 100, 105, 58, 114, 101, 115, 116, 97, 114, 116, 45, 97, 108, 101, 114, 116, 48, 1, 56, 1, 66, 7, 114, 101, 115, 116, 97, 114, 116]
+14:07:33.531 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “safe_mode”
+key: 430407880
+name: “Safe mode”
+unique_id: “everything-presence-one-d75360buttonsafe_mode”
+icon: “mdi:restart-alert”
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+device_class: “restart”
+
+14:07:33.535 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesButtonResponse. This is lack of support in the binding. Content: 'object_id: “safe_mode”
+key: 430407880
+name: “Safe mode”
+unique_id: “everything-presence-one-d75360buttonsafe_mode”
+icon: “mdi:restart-alert”
+disabled_by_default: true
+entity_category: ENTITY_CATEGORY_CONFIG
+device_class: “restart”
+'.
+14:07:33.541 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.545 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.548 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.552 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.555 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.558 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.561 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 49 with data [10, 15, 109, 109, 119, 97, 118, 101, 95, 100, 105, 115, 116, 97, 110, 99, 101, 21, -26, -101, 13, 108, 26, 15, 109, 109, 87, 97, 118, 101, 32, 100, 105, 115, 116, 97, 110, 99, 101, 34, 51, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 110, 117, 109, 98, 101, 114, 109, 109, 119, 97, 118, 101, 95, 100, 105, 115, 116, 97, 110, 99, 101, 42, 20, 109, 100, 105, 58, 97, 114, 114, 111, 119, 45, 108, 101, 102, 116, 45, 114, 105, 103, 104, 116, 61, 0, 0, 72, 68, 69, 0, 0, 112, 65, 80, 1, 90, 2, 99, 109, 96, 2]
+14:07:33.567 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “mmwave_distance”
+key: 1812831206
+name: “mmWave distance”
+unique_id: “everything-presence-one-d75360numbermmwave_distance”
+icon: “mdi:arrow-left-right”
+max_value: 800.0
+step: 15.0
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “cm”
+mode: NUMBER_MODE_SLIDER
+
+14:07:33.571 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesNumberResponse. This is lack of support in the binding. Content: 'object_id: “mmwave_distance”
+key: 1812831206
+name: “mmWave distance”
+unique_id: “everything-presence-one-d75360numbermmwave_distance”
+icon: “mdi:arrow-left-right”
+max_value: 800.0
+step: 15.0
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “cm”
+mode: NUMBER_MODE_SLIDER
+'.
+14:07:33.575 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.578 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.581 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.585 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.588 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.591 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.595 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 49 with data [10, 18, 109, 109, 119, 97, 118, 101, 95, 111, 102, 102, 95, 108, 97, 116, 101, 110, 99, 121, 21, -43, 119, 75, -75, 26, 18, 109, 109, 87, 97, 118, 101, 32, 111, 102, 102, 32, 108, 97, 116, 101, 110, 99, 121, 34, 54, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 110, 117, 109, 98, 101, 114, 109, 109, 119, 97, 118, 101, 95, 111, 102, 102, 95, 108, 97, 116, 101, 110, 99, 121, 42, 13, 109, 100, 105, 58, 99, 108, 111, 99, 107, 45, 101, 110, 100, 53, 0, 0, -128, 63, 61, 0, 0, 112, 66, 69, 0, 0, -128, 63, 80, 1, 90, 7, 115, 101, 99, 111, 110, 100, 115, 96, 2]
+14:07:33.600 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “mmwave_off_latency”
+key: 3041621973
+name: “mmWave off latency”
+unique_id: “everything-presence-one-d75360numbermmwave_off_latency”
+icon: “mdi:clock-end”
+min_value: 1.0
+max_value: 60.0
+step: 1.0
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “seconds”
+mode: NUMBER_MODE_SLIDER
+
+14:07:33.605 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesNumberResponse. This is lack of support in the binding. Content: 'object_id: “mmwave_off_latency”
+key: 3041621973
+name: “mmWave off latency”
+unique_id: “everything-presence-one-d75360numbermmwave_off_latency”
+icon: “mdi:clock-end”
+min_value: 1.0
+max_value: 60.0
+step: 1.0
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “seconds”
+mode: NUMBER_MODE_SLIDER
+'.
+14:07:33.626 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.629 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.633 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.636 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.639 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.643 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.646 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 49 with data [10, 17, 109, 109, 119, 97, 118, 101, 95, 111, 110, 95, 108, 97, 116, 101, 110, 99, 121, 21, 123, -57, 42, 121, 26, 17, 109, 109, 87, 97, 118, 101, 32, 111, 110, 32, 108, 97, 116, 101, 110, 99, 121, 34, 53, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 110, 117, 109, 98, 101, 114, 109, 109, 119, 97, 118, 101, 95, 111, 110, 95, 108, 97, 116, 101, 110, 99, 121, 42, 15, 109, 100, 105, 58, 99, 108, 111, 99, 107, 45, 115, 116, 97, 114, 116, 61, 0, 0, 112, 66, 69, 0, 0, 0, 63, 80, 1, 90, 7, 115, 101, 99, 111, 110, 100, 115, 96, 2]
+14:07:33.651 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “mmwave_on_latency”
+key: 2032846715
+name: “mmWave on latency”
+unique_id: “everything-presence-one-d75360numbermmwave_on_latency”
+icon: “mdi:clock-start”
+max_value: 60.0
+step: 0.5
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “seconds”
+mode: NUMBER_MODE_SLIDER
+
+14:07:33.655 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesNumberResponse. This is lack of support in the binding. Content: 'object_id: “mmwave_on_latency”
+key: 2032846715
+name: “mmWave on latency”
+unique_id: “everything-presence-one-d75360numbermmwave_on_latency”
+icon: “mdi:clock-start”
+max_value: 60.0
+step: 0.5
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “seconds”
+mode: NUMBER_MODE_SLIDER
+'.
+14:07:33.659 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.662 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.665 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.668 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 49 with data [10, 18, 109, 109, 119, 97, 118, 101, 95, 115, 101, 110, 115, 105, 116, 105, 118, 105, 116, 121, 21, 116, -31, -78, -112, 26, 18, 109, 109, 87, 97, 118, 101, 32, 115, 101, 110, 115, 105, 116, 105, 118, 105, 116, 121, 34, 54, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 110, 117, 109, 98, 101, 114, 109, 109, 119, 97, 118, 101, 95, 115, 101, 110, 115, 105, 116, 105, 118, 105, 116, 121, 42, 18, 109, 100, 105, 58, 116, 97, 114, 103, 101, 116, 45, 118, 97, 114, 105, 97, 110, 116, 61, 0, 0, 16, 65, 69, 0, 0, -128, 63, 80, 1]
+14:07:33.673 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “mmwave_sensitivity”
+key: 2427642228
+name: “mmWave sensitivity”
+unique_id: “everything-presence-one-d75360numbermmwave_sensitivity”
+icon: “mdi:target-variant”
+max_value: 9.0
+step: 1.0
+entity_category: ENTITY_CATEGORY_CONFIG
+
+14:07:33.677 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesNumberResponse. This is lack of support in the binding. Content: 'object_id: “mmwave_sensitivity”
+key: 2427642228
+name: “mmWave sensitivity”
+unique_id: “everything-presence-one-d75360numbermmwave_sensitivity”
+icon: “mdi:target-variant”
+max_value: 9.0
+step: 1.0
+entity_category: ENTITY_CATEGORY_CONFIG
+'.
+14:07:33.680 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.684 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.687 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.691 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 49 with data [10, 18, 116, 101, 109, 112, 101, 114, 97, 116, 117, 114, 101, 95, 111, 102, 102, 115, 101, 116, 21, 77, 119, 96, 52, 26, 18, 84, 101, 109, 112, 101, 114, 97, 116, 117, 114, 101, 32, 79, 102, 102, 115, 101, 116, 34, 54, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 110, 117, 109, 98, 101, 114, 116, 101, 109, 112, 101, 114, 97, 116, 117, 114, 101, 95, 111, 102, 102, 115, 101, 116, 42, 15, 109, 100, 105, 58, 116, 104, 101, 114, 109, 111, 109, 101, 116, 101, 114, 53, 0, 0, -96, -63, 61, 0, 0, -96, 65, 69, -51, -52, -52, 61, 80, 1, 90, 3, -62, -80, 67, 96, 1]
+14:07:33.697 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “temperature_offset”
+key: 878737229
+name: “Temperature Offset”
+unique_id: “everything-presence-one-d75360numbertemperature_offset”
+icon: “mdi:thermometer”
+min_value: -20.0
+max_value: 20.0
+step: 0.1
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “\302\260C”
+mode: NUMBER_MODE_BOX
+
+14:07:33.703 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesNumberResponse. This is lack of support in the binding. Content: 'object_id: “temperature_offset”
+key: 878737229
+name: “Temperature Offset”
+unique_id: “everything-presence-one-d75360numbertemperature_offset”
+icon: “mdi:thermometer”
+min_value: -20.0
+max_value: 20.0
+step: 0.1
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “\302\260C”
+mode: NUMBER_MODE_BOX
+'.
+14:07:33.708 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.711 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.715 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.718 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 49 with data [10, 15, 104, 117, 109, 105, 100, 105, 116, 121, 95, 111, 102, 102, 115, 101, 116, 21, 108, 60, -83, -111, 26, 15, 72, 117, 109, 105, 100, 105, 116, 121, 32, 79, 102, 102, 115, 101, 116, 34, 51, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 110, 117, 109, 98, 101, 114, 104, 117, 109, 105, 100, 105, 116, 121, 95, 111, 102, 102, 115, 101, 116, 42, 17, 109, 100, 105, 58, 119, 97, 116, 101, 114, 45, 112, 101, 114, 99, 101, 110, 116, 53, 0, 0, 72, -62, 61, 0, 0, 72, 66, 69, -51, -52, -52, 61, 80, 1, 90, 1, 37, 96, 1]
+14:07:33.723 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “humidity_offset”
+key: 2444049516
+name: “Humidity Offset”
+unique_id: “everything-presence-one-d75360numberhumidity_offset”
+icon: “mdi:water-percent”
+min_value: -50.0
+max_value: 50.0
+step: 0.1
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “%”
+mode: NUMBER_MODE_BOX
+
+14:07:33.728 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesNumberResponse. This is lack of support in the binding. Content: 'object_id: “humidity_offset”
+key: 2444049516
+name: “Humidity Offset”
+unique_id: “everything-presence-one-d75360numberhumidity_offset”
+icon: “mdi:water-percent”
+min_value: -50.0
+max_value: 50.0
+step: 0.1
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “%”
+mode: NUMBER_MODE_BOX
+'.
+14:07:33.732 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.735 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.738 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.742 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 49 with data [10, 18, 105, 108, 108, 117, 109, 105, 110, 97, 110, 99, 101, 95, 111, 102, 102, 115, 101, 116, 21, 54, -56, 35, -98, 26, 18, 73, 108, 108, 117, 109, 105, 110, 97, 110, 99, 101, 32, 79, 102, 102, 115, 101, 116, 34, 54, 101, 118, 101, 114, 121, 116, 104, 105, 110, 103, 45, 112, 114, 101, 115, 101, 110, 99, 101, 45, 111, 110, 101, 45, 100, 55, 53, 51, 54, 48, 110, 117, 109, 98, 101, 114, 105, 108, 108, 117, 109, 105, 110, 97, 110, 99, 101, 95, 111, 102, 102, 115, 101, 116, 42, 16, 109, 100, 105, 58, 98, 114, 105, 103, 104, 116, 110, 101, 115, 115, 45, 53, 53, 0, 0, 72, -62, 61, 0, 0, 72, 66, 69, 0, 0, -128, 63, 80, 1, 90, 2, 108, 120, 96, 1]
+14:07:33.747 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message object_id: “illuminance_offset”
+key: 2653145142
+name: “Illuminance Offset”
+unique_id: “everything-presence-one-d75360numberilluminance_offset”
+icon: “mdi:brightness-5”
+min_value: -50.0
+max_value: 50.0
+step: 1.0
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “lx”
+mode: NUMBER_MODE_BOX
+
+14:07:33.752 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.ListEntitiesNumberResponse. This is lack of support in the binding. Content: 'object_id: “illuminance_offset”
+key: 2653145142
+name: “Illuminance Offset”
+unique_id: “everything-presence-one-d75360numberilluminance_offset”
+icon: “mdi:brightness-5”
+min_value: -50.0
+max_value: 50.0
+step: 1.0
+entity_category: ENTITY_CATEGORY_CONFIG
+unit_of_measurement: “lx”
+mode: NUMBER_MODE_BOX
+'.
+14:07:33.755 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 19 with data
+14:07:33.759 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:07:33.779 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Device interrogation complete, done updating thing channels
+14:07:33.782 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: SubscribeStatesRequest
+14:07:33.786 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:07:33.852 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.855 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.859 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.862 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 21 with data [13, -40, 6, 29, 99, 16, 1]
+14:07:33.865 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1662846680
+state: true
+
+14:07:33.927 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.930 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.933 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.936 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 21 with data [13, -50, 92, 119, 66]
+14:07:33.940 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1115118798
+
+14:07:33.944 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 21 with data [13, -56, 114, 72, 75, 16, 1]
+14:07:33.948 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1263039176
+state: true
+
+14:07:33.951 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 24 with data [13, -97, 126, 38, -2, 29, 0, 0, -128, 63, 88, 1, 85, 0, 0, -128, 63, 37, 0, 0, -128, 63, 45, 0, 0, -128, 63, 53, 0, 0, -128, 63, 61, 0, 0, -128, 63, 101, 0, 0, -128, 63, 109, 0, 0, -128, 63]
+14:07:33.959 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 4263935647
+brightness: 1.0
+red: 1.0
+green: 1.0
+blue: 1.0
+white: 1.0
+color_brightness: 1.0
+color_mode: 1
+cold_white: 1.0
+warm_white: 1.0
+
+14:07:33.963 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.LightStateResponse. This is lack of support in the binding. Content: 'key: 4263935647
+brightness: 1.0
+red: 1.0
+green: 1.0
+blue: 1.0
+white: 1.0
+color_brightness: 1.0
+color_mode: 1
+cold_white: 1.0
+warm_white: 1.0
+'.
+14:07:33.966 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:33.969 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:33.973 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:33.976 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 24 with data [13, 126, -59, 9, 10, 29, 0, 0, -128, 63, 88, 1, 85, 0, 0, -128, 63, 37, 0, 0, -128, 63, 45, 0, 0, -128, 63, 53, 0, 0, -128, 63, 61, 0, 0, -128, 63, 101, 0, 0, -128, 63, 109, 0, 0, -128, 63]
+14:07:33.980 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 168412542
+brightness: 1.0
+red: 1.0
+green: 1.0
+blue: 1.0
+white: 1.0
+color_brightness: 1.0
+color_mode: 1
+cold_white: 1.0
+warm_white: 1.0
+
+14:07:33.984 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.LightStateResponse. This is lack of support in the binding. Content: 'key: 168412542
+brightness: 1.0
+red: 1.0
+green: 1.0
+blue: 1.0
+white: 1.0
+color_brightness: 1.0
+color_mode: 1
+cold_white: 1.0
+warm_white: 1.0
+'.
+14:07:34.029 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:34.033 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:34.036 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:34.039 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -7, 35, -95, 53, 21, -56, -117, -59, 65]
+14:07:34.043 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 899752953
+state: 24.693253
+
+14:07:34.049 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -128, 89, 28, 107, 21, 118, -69, 123, 65]
+14:07:34.052 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Temperature’ changed from 24.47696 °C to 24.693253 °C
+14:07:34.058 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1797020032
+state: 15.733267
+
+14:07:34.063 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -34, 94, 64, -43, 21, 48, 25, 74, 66]
+14:07:34.064 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Illuminance’ changed from 12.111219 to 15.733267
+14:07:34.067 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 3577765598
+state: 50.524597
+
+14:07:34.072 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:34.074 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Humidity’ changed from 51.0495 to 50.524597
+14:07:34.077 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:34.081 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:34.084 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 26 with data [13, 105, -5, 1, -67, 16, 1]
+14:07:34.088 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 3171023721
+state: true
+
+14:07:34.243 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:34.246 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:34.248 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:34.251 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 50 with data [13, -26, -101, 13, 108, 21, 0, -128, -99, 67]
+14:07:34.255 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1812831206
+state: 315.0
+
+14:07:34.258 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.NumberStateResponse. This is lack of support in the binding. Content: 'key: 1812831206
+state: 315.0
+'.
+14:07:34.264 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:34.267 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:34.270 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:34.273 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 50 with data [13, -43, 119, 75, -75, 21, 0, 0, 112, 65]
+14:07:34.276 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 3041621973
+state: 15.0
+
+14:07:34.279 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.NumberStateResponse. This is lack of support in the binding. Content: 'key: 3041621973
+state: 15.0
+'.
+14:07:34.336 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:34.338 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:34.341 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:34.344 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 50 with data [13, 123, -57, 42, 121]
+14:07:34.347 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 2032846715
+
+14:07:34.350 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.NumberStateResponse. This is lack of support in the binding. Content: 'key: 2032846715
+'.
+14:07:34.352 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 50 with data [13, 116, -31, -78, -112, 21, 0, 0, -32, 64]
+14:07:34.356 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 2427642228
+state: 7.0
+
+14:07:34.359 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.NumberStateResponse. This is lack of support in the binding. Content: 'key: 2427642228
+state: 7.0
+'.
+14:07:34.363 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 50 with data [13, 77, 119, 96, 52]
+14:07:34.366 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 878737229
+
+14:07:34.369 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.NumberStateResponse. This is lack of support in the binding. Content: 'key: 878737229
+'.
+14:07:34.372 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 50 with data [13, 108, 60, -83, -111]
+14:07:34.376 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 2444049516
+
+14:07:34.379 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.NumberStateResponse. This is lack of support in the binding. Content: 'key: 2444049516
+'.
+14:07:34.382 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:34.385 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:34.388 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:34.390 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 50 with data [13, 54, -56, 35, -98]
+14:07:34.393 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 2653145142
+
+14:07:34.396 [WARN ] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Unhandled message of type io.esphome.api.NumberStateResponse. This is lack of support in the binding. Content: 'key: 2653145142
+'.
+14:07:35.400 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:36.405 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:37.410 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:38.415 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:38.951 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:38.955 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:38.960 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:38.964 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 21 with data [13, -40, 6, 29, 99]
+14:07:38.969 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1662846680
+
+14:07:39.975 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:40.980 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:41.985 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:42.991 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:43.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:07:43.034 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:07:43.038 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:07:43.154 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:43.158 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:43.163 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:43.167 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:07:43.171 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:07:43.175 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:07:44.180 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:44.779 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:44.783 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:44.788 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:44.792 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -7, 35, -95, 53, 21, -80, 0, -56, 65]
+14:07:44.797 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 899752953
+state: 25.000336
+
+14:07:44.804 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -34, 94, 64, -43, 21, 64, 82, 71, 66]
+14:07:44.810 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Temperature’ changed from 24.693253 °C to 25.000336 °C
+14:07:44.810 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 3577765598
+state: 49.830322
+
+14:07:44.821 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Humidity’ changed from 50.524597 to 49.830322
+14:07:45.820 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:46.825 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:47.830 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:48.835 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:49.840 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:50.845 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:51.851 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:52.860 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:53.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:07:53.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:07:53.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:07:53.095 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:53.099 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:53.103 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:53.107 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:07:53.111 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:07:53.114 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:07:54.004 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:54.007 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:54.012 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:54.016 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 21 with data [13, -56, 114, 72, 75]
+14:07:54.021 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1263039176
+
+14:07:55.026 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:56.032 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:56.566 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:07:56.571 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:07:56.575 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:07:56.579 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -128, 89, 28, 107, 21, 21, -117, -118, 65]
+14:07:56.584 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1797020032
+state: 17.317911
+
+14:07:56.591 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Illuminance’ changed from 15.733267 to 17.317911
+14:07:57.591 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:58.596 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:07:59.601 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:00.606 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:01.611 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:02.617 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:03.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:08:03.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:08:03.038 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:08:03.251 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:03.255 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:03.260 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:03.264 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:08:03.268 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:08:03.272 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:08:04.277 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:05.282 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:06.286 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:07.291 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:08.296 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:09.301 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:10.306 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:11.311 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:12.317 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:13.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:08:13.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:08:13.038 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:08:13.164 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:13.168 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:13.171 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:13.175 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:08:13.178 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:08:13.182 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:08:14.186 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:15.191 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:16.195 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:17.200 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:18.206 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:19.210 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:20.215 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:21.220 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:22.225 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:23.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:08:23.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:08:23.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:08:23.099 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:23.102 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:23.106 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:23.109 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:08:23.113 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:08:23.116 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:08:24.121 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:25.126 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:26.131 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:26.569 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:26.573 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:26.578 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:26.582 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -128, 89, 28, 107, 21, -115, 70, -96, 65]
+14:08:26.586 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1797020032
+state: 20.034449
+
+14:08:26.593 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Illuminance’ changed from 17.317911 to 20.034449
+14:08:27.593 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:28.597 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:29.602 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:30.607 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:31.611 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:32.616 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:33.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:08:33.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:08:33.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:08:33.149 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:33.153 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:33.157 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:33.160 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:08:33.164 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:08:33.168 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:08:34.176 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:35.180 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:36.185 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:37.190 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:38.195 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:39.200 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:40.205 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:41.211 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:42.216 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:43.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:08:43.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:08:43.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:08:43.177 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:43.181 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:43.185 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:43.189 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:08:43.194 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:08:43.203 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:08:44.208 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:44.700 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:44.704 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:44.709 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:44.713 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -7, 35, -95, 53, 21, -8, 51, -54, 65]
+14:08:44.719 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 899752953
+state: 25.275375
+
+14:08:44.729 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:44.732 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Temperature’ changed from 25.000336 °C to 25.275375 °C
+14:08:44.735 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:44.741 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:44.745 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -34, 94, 64, -43, 21, -64, 56, 69, 66]
+14:08:44.751 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 3577765598
+state: 49.30542
+
+14:08:44.759 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Humidity’ changed from 49.830322 to 49.30542
+14:08:45.757 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:46.762 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:47.768 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:48.773 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:49.783 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:50.788 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:51.794 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:52.798 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:53.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:08:53.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:08:53.038 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:08:53.105 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:53.109 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:53.113 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:53.117 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:08:53.122 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:08:53.125 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:08:54.131 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:55.139 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:56.145 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:56.570 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:08:56.574 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:08:56.578 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:08:56.583 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -128, 89, 28, 107, 21, -61, -31, -112, 65]
+14:08:56.590 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1797020032
+state: 18.110235
+
+14:08:56.598 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Illuminance’ changed from 20.034449 to 18.110235
+14:08:57.597 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:58.602 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:08:59.607 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:00.613 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:01.617 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:02.622 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:03.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:09:03.034 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:09:03.038 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:09:03.133 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:03.137 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:03.142 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:03.145 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:09:03.150 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:09:03.153 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:09:04.158 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:05.163 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:06.168 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:07.172 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:08.176 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:09.181 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:10.186 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:11.191 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:12.196 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:13.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:09:13.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:09:13.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:09:13.080 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:13.083 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:13.087 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:13.091 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:09:13.095 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:09:13.098 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:09:14.103 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:15.108 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:16.116 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:17.120 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:18.125 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:19.130 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:20.135 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:21.139 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:22.144 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:23.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:09:23.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:09:23.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:09:23.110 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:23.114 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:23.118 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:23.121 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:09:23.125 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:09:23.128 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:09:24.133 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:25.138 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:26.143 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:26.572 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:26.576 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:26.580 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:26.584 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -128, 89, 28, 107, 21, -95, 80, -106, 65]
+14:09:26.588 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1797020032
+state: 18.78937
+
+14:09:26.596 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Illuminance’ changed from 18.110235 to 18.78937
+14:09:27.595 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:28.600 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:29.605 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:30.610 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:31.615 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:32.620 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:33.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:09:33.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:09:33.036 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:09:33.061 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:33.064 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:33.067 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:33.071 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:09:33.074 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:09:33.077 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:09:34.081 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:35.086 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:36.090 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:37.095 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:38.100 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:39.105 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:40.110 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:41.115 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:42.120 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:43.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:09:43.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:09:43.038 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:09:43.072 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:43.076 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:43.080 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:43.084 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:09:43.088 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:09:43.091 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:09:44.096 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:44.704 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:44.708 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:44.712 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:44.716 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -7, 35, -95, 53, 21, 40, 113, -53, 65]
+14:09:44.721 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 899752953
+state: 25.430252
+
+14:09:44.728 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -34, 94, 64, -43, 21, -48, 57, 67, 66]
+14:09:44.733 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Temperature’ changed from 25.275375 °C to 25.430252 °C
+14:09:44.737 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 3577765598
+state: 48.806458
+
+14:09:44.745 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Humidity’ changed from 49.30542 to 48.806458
+14:09:45.744 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:46.749 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:47.754 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:48.759 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:49.764 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:50.768 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:51.773 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:52.777 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:53.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:09:53.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:09:53.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:09:53.123 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:53.126 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:53.130 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:53.133 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:09:53.137 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:09:53.140 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:09:54.144 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:55.149 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:56.153 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:56.571 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:09:56.575 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:09:56.580 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:09:56.583 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 25 with data [13, -128, 89, 28, 107, 21, 126, -65, -101, 65]
+14:09:56.588 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message key: 1797020032
+state: 19.468502
+
+14:09:56.595 [INFO ] [openhab.event.ItemStateChangedEvent ] - Item ‘ESPHome_Device_Illuminance’ changed from 18.78937 to 19.468502
+14:09:57.594 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:58.599 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:09:59.603 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:00.609 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:01.614 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:02.619 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:03.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:10:03.033 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:10:03.037 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:10:03.147 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:10:03.151 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:10:03.155 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:10:03.158 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:10:03.162 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:10:03.165 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:10:04.170 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:05.175 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:06.179 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:07.184 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:08.189 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:09.194 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:10.199 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:11.203 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:12.208 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:13.029 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Sending ping
+14:10:13.034 [DEBUG] [ernal.internal.comm.ESPHomeConnection] - [xx.xx.xx.xx] Sending message: PingRequest
+14:10:13.038 [TRACE] [ernal.internal.comm.ESPHomeConnection] - Writing data
+14:10:13.082 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 1
+14:10:13.085 [TRACE] [rnal.internal.comm.ConnectionSelector] - Processing key channel=java.nio.channels.SocketChannel[connected local=/xx.HOST.xx:34750 remote=/xx.xx.xx.xx:6053], selector=sun.nio.ch.EPollSelectorImpl@1a20c2, interestOps=1, readyOps=1
+14:10:13.089 [TRACE] [rnal.internal.comm.ConnectionSelector] - Received data
+14:10:13.093 [DEBUG] [.internal.comm.PlainTextStreamHandler] - Received packet of type 8 with data
+14:10:13.097 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received message
+14:10:13.101 [DEBUG] [ernal.internal.handler.ESPHomeHandler] - [xx.xx.xx.xx] Received ping response
+14:10:14.105 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:15.111 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0
+14:10:16.116 [TRACE] [rnal.internal.comm.ConnectionSelector] - Selected keys: 0

@@ -19,15 +19,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import io.esphome.api.Api;
 import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
 
 public class PlainTextStreamHandler implements StreamHandler {
@@ -41,26 +38,10 @@ public class PlainTextStreamHandler implements StreamHandler {
 
     private ByteBuffer buffer = ByteBuffer.allocate(1024);
 
-    private final Map<Integer, Method> messageTypeToMessageClass = new HashMap<>();
+    private MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
 
     public PlainTextStreamHandler(PacketListener listener) {
         this.listener = listener;
-
-        // Build a cache of message id to message class
-        Api.getDescriptor().getMessageTypes().forEach(messageDescriptor -> {
-            try {
-                int id = messageDescriptor.getOptions().getExtension(io.esphome.api.ApiOptions.id);
-                if (id > 0) {
-                    Class<? extends GeneratedMessageV3> subclass = Class.forName(messageDescriptor.getFullName())
-                            .asSubclass(GeneratedMessageV3.class);
-                    Method parseMethod = subclass.getDeclaredMethod("parseFrom", byte[].class);
-
-                    messageTypeToMessageClass.put(id, parseMethod);
-                }
-            } catch (ClassNotFoundException | NoSuchMethodException e) {
-                throw new RuntimeException(e);
-            }
-        });
     }
 
     private void processBuffer() throws ProtocolException {
@@ -159,7 +140,7 @@ public class PlainTextStreamHandler implements StreamHandler {
         logger.debug("Received packet of type {} with data {}", messageType, bytes);
 
         try {
-            Method parseMethod = messageTypeToMessageClass.get(messageType);
+            Method parseMethod = messageTypeToClassConverter.getMethod(messageType);
             if (parseMethod != null) {
                 GeneratedMessageV3 invoke = (GeneratedMessageV3) parseMethod.invoke(null, bytes);
                 if (invoke != null) {
@@ -205,7 +186,7 @@ public class PlainTextStreamHandler implements StreamHandler {
 
         byte[] frame = new byte[1 + idVarUint.length + protoBytesLengthVarUint.length + protoBytes.length];
         System.arraycopy(protoBytesLengthVarUint, 0, frame, 1, protoBytesLengthVarUint.length);
-        System.arraycopy(idVarUint, 0, frame, idVarUint.length + 1, protoBytesLengthVarUint.length);
+        System.arraycopy(idVarUint, 0, frame, protoBytesLengthVarUint.length + 1, idVarUint.length);
         System.arraycopy(protoBytes, 0, frame, idVarUint.length + protoBytesLengthVarUint.length + 1,
                 protoBytes.length);
         return frame;

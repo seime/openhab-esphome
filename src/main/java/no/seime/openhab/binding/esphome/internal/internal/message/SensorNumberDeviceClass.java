@@ -1,6 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.internal.message;
 
-public enum SensorDeviceClass {
+public enum SensorNumberDeviceClass {
 
     GENERIC_NUMBER("generic_number", "Number", "zoom", null),
     ENUM("enum", "String", "text", null),
@@ -62,10 +62,10 @@ public enum SensorDeviceClass {
 
     private final String itemType;
     private final String category;
-    private final String measurementType;
+    private final String semanticType;
 
-    public static SensorDeviceClass fromDeviceClass(String deviceClass) {
-        for (SensorDeviceClass sensorDeviceClass : SensorDeviceClass.values()) {
+    public static SensorNumberDeviceClass fromDeviceClass(String deviceClass) {
+        for (SensorNumberDeviceClass sensorDeviceClass : SensorNumberDeviceClass.values()) {
             if (sensorDeviceClass.getDeviceClass().equals(deviceClass)) {
                 return sensorDeviceClass;
             }
@@ -77,15 +77,15 @@ public enum SensorDeviceClass {
         return deviceClass;
     }
 
-    SensorDeviceClass(String deviceClass, String itemType, String category, String measurementType) {
+    SensorNumberDeviceClass(String deviceClass, String itemType, String category, String semanticType) {
         this.deviceClass = deviceClass;
         this.itemType = itemType;
         this.category = category;
-        this.measurementType = measurementType;
+        this.semanticType = semanticType;
     }
 
-    public String getMeasurementType() {
-        return measurementType;
+    public String getSemanticType() {
+        return semanticType;
     }
 
     public String getItemType() {
@@ -98,7 +98,7 @@ public enum SensorDeviceClass {
 
     @Override
     public String toString() {
-        return "SensorDeviceClass{" + "deviceClass='" + deviceClass + '\'' + ", itemType='" + itemType + '\''
-                + ", category='" + category + '\'' + ", measurementType='" + measurementType + '\'' + '}';
+        return "SensorNumberDeviceClass{" + "deviceClass='" + deviceClass + '\'' + ", itemType='" + itemType + '\''
+                + ", category='" + category + '\'' + ", measurementType='" + semanticType + '\'' + '}';
     }
 }
