@@ -138,7 +138,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
             logger.debug("Using item type '{}' based on device_class '{}' ", itemTypeToUse,
                     deviceClass.getDeviceClass());
         } else {
-            logger.warn(
+            logger.info(
                     "Could not determine item type for sensor '{}' as neither device_class nor unit_of_measurement is present. Consider augmenting your ESPHome configuration. Using default 'Number'",
                     name);
             itemTypeToUse = "Number";
@@ -147,6 +147,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     }
 
     private String getItemTypeBaseOnUnit(String unitOfMeasurement) {
+
+        unitOfMeasurement = transformUnit(unitOfMeasurement);
+
         Unit<?> unit = UnitUtils.parseUnit(unitOfMeasurement);
         if (unit != null) {
             String dimensionName = UnitUtils.getDimensionName(unit);
@@ -155,6 +158,13 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
             }
         }
         return null;
+    }
+
+    private String transformUnit(String unitOfMeasurement) {
+        return switch (unitOfMeasurement) {
+            case "seconds" -> "s";
+            default -> unitOfMeasurement;
+        };
     }
 
     public abstract void handleState(T rsp);
@@ -202,6 +212,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
              * return new DecimalType(state);
              * }
              */
+            unitString = transformUnit(unitString);
             Unit<?> unit = UnitUtils.parseUnit(unitString);
             if (unit != null) {
                 return new QuantityType<>(state, unit);
