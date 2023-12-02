@@ -13,6 +13,8 @@ import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
 import org.openhab.core.types.UnDefType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.esphome.api.BinarySensorStateResponse;
 import io.esphome.api.ListEntitiesBinarySensorResponse;
@@ -22,6 +24,7 @@ import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler
 
 public class BinarySensorMessageHandler
         extends AbstractMessageHandler<ListEntitiesBinarySensorResponse, BinarySensorStateResponse> {
+    private final Logger logger = LoggerFactory.getLogger(BinarySensorMessageHandler.class);
 
     public BinarySensorMessageHandler(ESPHomeHandler handler) {
         super(handler);
@@ -45,6 +48,9 @@ public class BinarySensorMessageHandler
 
         BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
         if (binarySensorDeviceClass == null) {
+            logger.warn(
+                    "ESPHome Binary Sensor Device class `{}` not know to the ESPHome Native API Binding using GENERIC for {}",
+                    deviceClass, rsp.getUniqueId());
             binarySensorDeviceClass = BinarySensorDeviceClass.GENERIC;
         }
 
@@ -54,9 +60,8 @@ public class BinarySensorMessageHandler
         }
 
         ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(),
-                binarySensorDeviceClass.getItemType(), tags, null,
-                Set.of("OpenState") /* TODO: Is this always constant?! */, true, binarySensorDeviceClass.getCategory(),
-                null, null, null);
+                binarySensorDeviceClass.getItemType(), Set.of("OpenState") /* TODO: Is this always constant?! */, null,
+                tags, true, binarySensorDeviceClass.getCategory(), null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
