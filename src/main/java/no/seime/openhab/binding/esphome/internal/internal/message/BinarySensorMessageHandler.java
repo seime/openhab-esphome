@@ -1,5 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.internal.message;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -57,10 +58,12 @@ public class BinarySensorMessageHandler
         Set<String> tags = new HashSet<>();
         if (binarySensorDeviceClass.getSemanticType() != null) {
             tags.add(binarySensorDeviceClass.getSemanticType());
+        } else {
+            tags.add("Status"); // default
         }
 
         ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(),
-                binarySensorDeviceClass.getItemType(), Set.of("OpenState") /* TODO: Is this always constant?! */, null,
+                binarySensorDeviceClass.getItemType(), Collections.emptySet(), null,
                 tags, true, binarySensorDeviceClass.getCategory(), null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
