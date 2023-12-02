@@ -1,6 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.internal.message;
 
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
@@ -36,8 +36,27 @@ public class BinarySensorMessageHandler
     public void buildChannels(ListEntitiesBinarySensorResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, null);
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "Contact", Collections.emptySet(),
-                null, Set.of("OpenState"), true, "door", null, null, null);
+        String deviceClass = rsp.getDeviceClass();
+        if (!deviceClass.isEmpty()) {
+            configuration.put("deviceClass", deviceClass);
+        } else {
+            configuration.put("deviceClass", "generic");
+        }
+
+        BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
+        if (binarySensorDeviceClass == null) {
+            binarySensorDeviceClass = BinarySensorDeviceClass.GENERIC;
+        }
+
+        Set<String> tags = new HashSet<>();
+        if (binarySensorDeviceClass.getSemanticType() != null) {
+            tags.add(binarySensorDeviceClass.getSemanticType());
+        }
+
+        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(),
+                binarySensorDeviceClass.getItemType(), tags, null,
+                Set.of("OpenState") /* TODO: Is this always constant?! */, true, binarySensorDeviceClass.getCategory(),
+                null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
