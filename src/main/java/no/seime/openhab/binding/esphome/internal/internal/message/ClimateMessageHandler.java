@@ -1,5 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.internal.message;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Set;
@@ -136,7 +137,12 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         String itemTypeTemperature = "Number:Temperature";
         ChannelType channelTypeTargetTemperature = addChannelType(rsp.getUniqueId() + CHANNEL_TARGET_TEMPERATURE,
                 "Target temperature", itemTypeTemperature, Collections.emptyList(), "%.1f %unit%",
-                Set.of(SEMANTIC_TYPE_SETPOINT, "Temperature"), false, "temperature", null, null, null);
+                Set.of(SEMANTIC_TYPE_SETPOINT, "Temperature"), false, "temperature",
+                rsp.getVisualTargetTemperatureStep() == 0f ? null
+                        : new BigDecimal(rsp.getVisualTargetTemperatureStep()),
+                rsp.getVisualMinTemperature() == 0f ? null
+                        : rsp.getVisualMaxTemperature() == 0f ? null : new BigDecimal(rsp.getVisualMinTemperature()),
+                new BigDecimal(rsp.getVisualMaxTemperature()));
 
         Channel channelTargetTemperature = ChannelBuilder
                 .create(new ChannelUID(handler.getThing().getUID(), CHANNEL_TARGET_TEMPERATURE))
@@ -149,7 +155,13 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportsCurrentTemperature()) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_TEMPERATURE,
                     "Current temperature", itemTypeTemperature, Collections.emptyList(), "%.1f %unit%",
-                    Set.of("Measurement", "Temperature"), true, "temperature", null, null, null);
+                    Set.of("Measurement", "Temperature"), true, "temperature",
+                    rsp.getVisualCurrentTemperatureStep() == 0f ? null
+                            : new BigDecimal(rsp.getVisualCurrentTemperatureStep()),
+                    rsp.getVisualMinTemperature() == 0f ? null
+                            : rsp.getVisualMaxTemperature() == 0f ? null
+                                    : new BigDecimal(rsp.getVisualMinTemperature()),
+                    new BigDecimal(rsp.getVisualMaxTemperature()));
 
             Channel channel = ChannelBuilder
                     .create(new ChannelUID(handler.getThing().getUID(), CHANNEL_CURRENT_TEMPERATURE))
