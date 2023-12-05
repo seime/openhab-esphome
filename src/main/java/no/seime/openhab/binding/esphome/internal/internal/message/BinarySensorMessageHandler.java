@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.OpenClosedType;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
@@ -68,22 +69,40 @@ public class BinarySensorMessageHandler
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withConfiguration(configuration).build();
+                .withAcceptedItemType(binarySensorDeviceClass.getItemType()).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType);
     }
 
     public void handleState(BinarySensorStateResponse rsp) {
-
         findChannelByKey(rsp.getKey()).ifPresent(channel -> handler.updateState(channel.getUID(),
-                toContactState(rsp.getState(), rsp.getMissingState())));
+                toBinaryState(channel, rsp.getState(), rsp.getMissingState())));
     }
 
-    protected State toContactState(boolean state, boolean missingState) {
+    protected State toBinaryState(Channel channel, boolean state, boolean missingState) {
         if (missingState) {
             return UnDefType.UNDEF;
-        } else {
-            return state ? OpenClosedType.OPEN : OpenClosedType.CLOSED;
         }
+        return convertStateBasedOnDeviceClass((String) channel.getConfiguration().get("deviceClass"), state);
+    }
+
+    private State convertStateBasedOnDeviceClass(String deviceClass, boolean state) {
+        return isDeviceClassContact(deviceClass) ? toOpenClosedType(state) : toOnOffType(state);
+    }
+
+    private static boolean isDeviceClassContact(String deviceClass) {
+        if (deviceClass != null) {
+            BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
+            return binarySensorDeviceClass != null && "Contact".equals(binarySensorDeviceClass.getItemType());
+        }
+        return false;
+    }
+
+    private static State toOpenClosedType(boolean state) {
+        return state ? OpenClosedType.OPEN : OpenClosedType.CLOSED;
+    }
+
+    private static State toOnOffType(boolean state) {
+        return state ? OnOffType.ON : OnOffType.OFF;
     }
 }
