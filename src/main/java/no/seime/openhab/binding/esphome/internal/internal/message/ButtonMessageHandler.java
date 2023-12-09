@@ -44,7 +44,7 @@ public class ButtonMessageHandler extends AbstractMessageHandler<ListEntitiesBut
     public void buildChannels(ListEntitiesButtonResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, "Switch");
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), "Switch", Collections.emptySet(),
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "Switch", Collections.emptySet(),
                 null, Set.of("Switch"), false, "switch", null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))

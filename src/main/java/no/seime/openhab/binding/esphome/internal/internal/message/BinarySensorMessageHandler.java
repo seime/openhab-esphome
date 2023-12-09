@@ -63,7 +63,7 @@ public class BinarySensorMessageHandler
             tags.add("Status"); // default
         }
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(),
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
                 binarySensorDeviceClass.getItemType(), Collections.emptySet(), null, tags, true,
                 binarySensorDeviceClass.getCategory(), null, null, null);
 

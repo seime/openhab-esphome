@@ -170,7 +170,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     public abstract void handleState(T rsp);
 
     protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType) {
-        logger.trace("Registering channel {} with channel type {}", channel.getUID(), channelType.getUID());
+        logger.debug("Registering channel {} with channel type {}", channel.getUID(), channelType.getUID());
         handler.addChannelType(channelType);
         handler.addChannel(channel);
     }
