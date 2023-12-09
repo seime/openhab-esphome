@@ -54,7 +54,7 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 
 - `device`: A device flashed with https://esphome.io/ firmware.
 
-## Limitations as of 2023-08-12
+## Limitations as of 2023-12-09
 
 - **Only plaintext connections with password** are supported, not encrypted. This is insecure and should not be used on
   untrusted
@@ -102,7 +102,7 @@ esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", passwor
 ### Item Configuration
 
 ```
-Number:Temperature ESP1_Temperature "Temperature [%.1f %unit%]" <temperature>   {channel="esphome:device:esp1:temperature"}
-Number:Dimensionless ESP1_Humidity "Humidity [%.1f %unit%]"     <humidity>      {channel="esphome:device:esp1:humidity"}
-Switch ESP1_Switch "Relay"                                      <switch>        {channel="esphome:device:esp1:relay_4"}
+Number:Temperature ESP1_Temperature "Temperature" <temperature>   {channel="esphome:device:esp1:temperature"}
+Number:Dimensionless ESP1_Humidity "Humidity"     <humidity>      {channel="esphome:device:esp1:humidity"}
+Switch ESP1_Switch "Relay"                        <switch>        {channel="esphome:device:esp1:relay_4"}
 ```
