@@ -30,7 +30,7 @@ import io.esphome.api.ClimateCommandRequest;
 import io.esphome.api.ClimateStateResponse;
 import io.esphome.api.ListEntitiesClimateResponse;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.EnumHelper;
+import no.seime.openhab.binding.esphome.internal.ClimateEnumHelper;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -83,7 +83,8 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             ClimateCommandRequest.Builder builder = commands.get(key);
             String subCommand = (String) channel.getConfiguration().get(BindingConstants.COMMAND_FIELD);
             switch (subCommand) {
-                case CHANNEL_MODE -> builder.setMode(EnumHelper.toClimateMode(command.toString())).setHasMode(true);
+                case CHANNEL_MODE ->
+                    builder.setMode(ClimateEnumHelper.toClimateMode(command.toString())).setHasMode(true);
                 case CHANNEL_TARGET_TEMPERATURE -> {
                     if (command instanceof QuantityType<?> qt) {
                         builder.setTargetTemperature(qt.floatValue());
@@ -93,13 +94,13 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     builder.setHasTargetTemperature(true);
                 }
                 case CHANNEL_FAN_MODE ->
-                    builder.setFanMode(EnumHelper.toFanMode(command.toString())).setHasFanMode(true);
+                    builder.setFanMode(ClimateEnumHelper.toFanMode(command.toString())).setHasFanMode(true);
                 case CHANNEL_CUSTOM_FAN_MODE -> builder.setCustomFanMode(command.toString()).setHasCustomFanMode(true);
                 case CHANNEL_PRESET ->
-                    builder.setPreset(EnumHelper.toClimatePreset(command.toString())).setHasPreset(true);
+                    builder.setPreset(ClimateEnumHelper.toClimatePreset(command.toString())).setHasPreset(true);
                 case CHANNEL_CUSTOM_PRESET -> builder.setCustomPreset(command.toString()).setHasCustomPreset(true);
-                case CHANNEL_SWING_MODE ->
-                    builder.setSwingMode(EnumHelper.toClimateSwingMode(command.toString())).setHasSwingMode(true);
+                case CHANNEL_SWING_MODE -> builder
+                        .setSwingMode(ClimateEnumHelper.toClimateSwingMode(command.toString())).setHasSwingMode(true);
                 default -> logger.warn("Unknown climate subcommand {}", subCommand);
             }
             // Start a thread that will clean up the cache (send the pending messages)
@@ -181,8 +182,9 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
 
         String itemTypeString = "String";
         if (rsp.getSupportedModesCount() > 0) {
-            ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_MODE, "Mode", itemTypeString,
-                    rsp.getSupportedModesList().stream().map(EnumHelper::stripEnumPrefix).collect(Collectors.toList()),
+            ChannelType channelType = addChannelType(
+                    rsp.getUniqueId() + CHANNEL_MODE, "Mode", itemTypeString, rsp.getSupportedModesList().stream()
+                            .map(ClimateEnumHelper::stripEnumPrefix).collect(Collectors.toList()),
                     "%s", null, false, "climate", null, null, null);
 
             Channel channel = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_MODE))
@@ -193,7 +195,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         }
         if (rsp.getSupportedFanModesCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_FAN_MODE, "Fan Mode", itemTypeString,
-                    rsp.getSupportedFanModesList().stream().map(EnumHelper::stripEnumPrefix)
+                    rsp.getSupportedFanModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
                     "%s", Set.of(SEMANTIC_TYPE_SETPOINT, "Wind"), false, "fan", null, null, null);
 
@@ -217,7 +219,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         }
         if (rsp.getSupportedPresetsCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_PRESET, "Preset", itemTypeString,
-                    rsp.getSupportedPresetsList().stream().map(EnumHelper::stripEnumPrefix)
+                    rsp.getSupportedPresetsList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
                     "%s", Set.of(SEMANTIC_TYPE_SETPOINT), false, "climate", null, null, null);
             Channel channel = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_PRESET))
@@ -240,7 +242,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportedSwingModesCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_SWING_MODE, "Swing Mode",
                     itemTypeString,
-                    rsp.getSupportedSwingModesList().stream().map(EnumHelper::stripEnumPrefix)
+                    rsp.getSupportedSwingModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
                     "%s", Set.of(SEMANTIC_TYPE_SETPOINT, "Wind"), false, "fan", null, null, null);
             Channel channel = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_SWING_MODE))
@@ -259,17 +261,17 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 channel.getUID(),
                 toNumericState(channel, rsp.getCurrentTemperature(), Float.isNaN(rsp.getCurrentTemperature()))));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_MODE).ifPresent(channel -> handler.updateState(channel.getUID(),
-                new StringType(EnumHelper.stripEnumPrefix(rsp.getMode()))));
+                new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getMode()))));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_FAN_MODE).ifPresent(channel -> handler
-                .updateState(channel.getUID(), new StringType(EnumHelper.stripEnumPrefix(rsp.getFanMode()))));
+                .updateState(channel.getUID(), new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getFanMode()))));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_CUSTOM_FAN_MODE)
                 .ifPresent(channel -> handler.updateState(channel.getUID(), new StringType(rsp.getCustomFanMode())));
 
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_PRESET).ifPresent(channel -> handler
-                .updateState(channel.getUID(), new StringType(EnumHelper.stripEnumPrefix(rsp.getPreset()))));
+                .updateState(channel.getUID(), new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getPreset()))));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_CUSTOM_PRESET)
                 .ifPresent(channel -> handler.updateState(channel.getUID(), new StringType(rsp.getCustomPreset())));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_SWING_MODE).ifPresent(channel -> handler
-                .updateState(channel.getUID(), new StringType(EnumHelper.stripEnumPrefix(rsp.getSwingMode()))));
+                .updateState(channel.getUID(), new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getSwingMode()))));
     }
 }

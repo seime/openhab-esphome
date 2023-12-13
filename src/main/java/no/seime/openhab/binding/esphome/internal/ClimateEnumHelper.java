@@ -5,7 +5,7 @@ import io.esphome.api.ClimateMode;
 import io.esphome.api.ClimatePreset;
 import io.esphome.api.ClimateSwingMode;
 
-public class EnumHelper {
+public class ClimateEnumHelper {
     public static String stripEnumPrefix(ClimateSwingMode mode) {
         String toRemove = "CLIMATE_SWING";
         return mode.toString().substring(toRemove.length() + 1);

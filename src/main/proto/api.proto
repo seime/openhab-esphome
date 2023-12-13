@@ -1,7 +1,6 @@
 syntax = "proto3";
 package io.esphome.api;
 option java_multiple_files = true;
-
 import "api_options.proto";
 
 service APIConnection {
@@ -417,10 +416,10 @@ message ListEntitiesLightResponse {
 
   repeated int32 supported_color_modes = 12;
   // next four supports_* are for legacy clients, newer clients should use color modes
-  bool legacy_supports_brightness = 5 [deprecated=true];
-  bool legacy_supports_rgb = 6 [deprecated=true];
-  bool legacy_supports_white_value = 7 [deprecated=true];
-  bool legacy_supports_color_temperature = 8 [deprecated=true];
+  bool legacy_supports_brightness = 5 [deprecated = true];
+  bool legacy_supports_rgb = 6 [deprecated = true];
+  bool legacy_supports_white_value = 7 [deprecated = true];
+  bool legacy_supports_color_temperature = 8 [deprecated = true];
   float min_mireds = 9;
   float max_mireds = 10;
   repeated string effects = 11;
@@ -715,9 +714,9 @@ message ExecuteServiceArgument {
   string string_ = 4;
   // ESPHome 1.14 (api v1.3) make int a signed value
   sint32 int_ = 5;
-  repeated bool bool_array = 6 [packed=false];
-  repeated sint32 int_array = 7 [packed=false];
-  repeated float float_array = 8 [packed=false];
+  repeated bool bool_array = 6 [packed = false];
+  repeated sint32 int_array = 7 [packed = false];
+  repeated float float_array = 8 [packed = false];
   repeated string string_array = 9;
 }
 message ExecuteServiceRequest {
@@ -1164,7 +1163,7 @@ message SubscribeBluetoothLEAdvertisementsRequest {
 
 message BluetoothServiceData {
   string uuid = 1;
-  repeated uint32 legacy_data = 2 [packed=true];  // Removed in api version 1.7
+  repeated uint32 legacy_data = 2 [packed = true];  // Removed in api version 1.7
   bytes data = 3;  // Added in api version 1.7
 }
 message BluetoothLEAdvertisementResponse {

@@ -66,6 +66,7 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
     - `switch`,
     - `number`,
     - `button`,
+    - `cover`
     - `light` (will only show channels, but not control nor see the status of the light)
     - `climate` and
     - `select` is supported.
