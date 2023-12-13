@@ -166,7 +166,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         config = getConfigAs(ESPHomeConfiguration.class);
 
         if (config.hostname != null && !config.hostname.isEmpty()) {
-            scheduler.submit(this::connect);
+            scheduleReconnect(0);
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No hostname configured");
         }
@@ -198,7 +198,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             logger.warn("[{}] Error initial connection", config.hostname, e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
             if (!disposed) { // Don't reconnect if we've been disposed
-                reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
+                scheduleReconnect(CONNECT_TIMEOUT * 2);
             }
         }
     }
@@ -294,7 +294,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         connection.close();
         cancelPingWatchdog();
         connectionState = ConnectionState.UNINITIALIZED;
-        reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
+        scheduleReconnect(CONNECT_TIMEOUT * 2);
     }
 
     @Override
@@ -305,7 +305,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         cancelPingWatchdog();
         connection.close();
         connectionState = ConnectionState.UNINITIALIZED;
-        reconnectFuture = scheduler.schedule(this::connect, CONNECT_TIMEOUT * 2L, TimeUnit.SECONDS);
+        scheduleReconnect(CONNECT_TIMEOUT * 2);
     }
 
     private void handleConnected(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -353,11 +353,11 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         connection.close();
         setUndefToAllChannels();
         connectionState = ConnectionState.UNINITIALIZED;
-        long reconnectDelay = CONNECT_TIMEOUT;
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
-                String.format("ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelay));
+        int reconnectDelaySeconds = CONNECT_TIMEOUT;
+        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String
+                .format("ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelaySeconds));
         cancelPingWatchdog();
-        reconnectFuture = scheduler.schedule(this::connect, reconnectDelay, TimeUnit.SECONDS);
+        scheduleReconnect(reconnectDelaySeconds);
     }
 
     private void handleLoginResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -391,7 +391,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
                                     config.maxPingTimeouts, config.pingInterval));
-                    reconnectFuture = scheduler.schedule(this::connect, 10, TimeUnit.SECONDS);
+                    scheduleReconnect(10);
 
                 } else {
 
@@ -469,6 +469,11 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             reconnectFuture.cancel(true);
             reconnectFuture = null;
         }
+    }
+
+    private void scheduleReconnect(int delaySeconds) {
+        cancelReconnectFuture();
+        reconnectFuture = scheduler.schedule(this::connect, delaySeconds, TimeUnit.SECONDS);
     }
 
     public boolean isInterrogated() {
