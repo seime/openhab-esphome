@@ -423,7 +423,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
                     helloResponse.getApiVersionMinor());
             connectionState = ConnectionState.LOGIN_SENT;
 
-            if (config.password != null) {
+            if (config.password != null && !config.password.isEmpty()) {
                 connection.send(ConnectRequest.newBuilder().setPassword(config.password).build());
             } else {
                 connection.send(ConnectRequest.getDefaultInstance());
