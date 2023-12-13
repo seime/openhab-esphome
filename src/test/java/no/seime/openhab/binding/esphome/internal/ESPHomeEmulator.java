@@ -15,9 +15,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
-import no.seime.openhab.binding.esphome.internal.internal.comm.PlainTextStreamHandler;
-import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolException;
+import no.seime.openhab.binding.esphome.internal.comm.PlainTextStreamHandler;
+import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
 
 public class ESPHomeEmulator {
 

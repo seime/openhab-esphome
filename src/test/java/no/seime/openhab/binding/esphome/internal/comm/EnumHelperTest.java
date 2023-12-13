@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import io.esphome.api.ClimateMode;
-import no.seime.openhab.binding.esphome.internal.internal.EnumHelper;
+import no.seime.openhab.binding.esphome.internal.EnumHelper;
 
 public class EnumHelperTest {
 

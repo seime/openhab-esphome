@@ -15,10 +15,9 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
-import no.seime.openhab.binding.esphome.internal.internal.message.ClimateMessageHandler;
+import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 @ExtendWith(MockitoExtension.class)
 public class ClimateMessageHandlerTest {

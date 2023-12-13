@@ -13,8 +13,6 @@ import java.util.regex.Pattern;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.internal.comm.MessageTypeToClassConverter;
-
 public class LogParser {
 
     private MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();

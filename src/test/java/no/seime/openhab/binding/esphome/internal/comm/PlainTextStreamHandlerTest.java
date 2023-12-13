@@ -27,10 +27,7 @@ import com.google.protobuf.GeneratedMessageV3;
 import io.esphome.api.HelloRequest;
 import io.esphome.api.HelloResponse;
 import no.seime.openhab.binding.esphome.internal.ESPHomeEmulator;
-import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
-import no.seime.openhab.binding.esphome.internal.internal.comm.ConnectionSelector;
-import no.seime.openhab.binding.esphome.internal.internal.comm.ESPHomeConnection;
-import no.seime.openhab.binding.esphome.internal.internal.comm.PlainTextStreamHandler;
+import no.seime.openhab.binding.esphome.internal.PacketListener;
 
 public class PlainTextStreamHandlerTest {
 

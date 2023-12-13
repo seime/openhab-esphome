@@ -24,7 +24,7 @@ import io.esphome.api.PingRequest;
 import io.esphome.api.PingResponse;
 import io.esphome.api.SubscribeStatesRequest;
 import no.seime.openhab.binding.esphome.internal.ESPHomeEmulator;
-import no.seime.openhab.binding.esphome.internal.internal.PacketListener;
+import no.seime.openhab.binding.esphome.internal.PacketListener;
 
 public class LogReadingPacketListener implements PacketListener {
 

@@ -21,12 +21,10 @@ import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 
+import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.LogReadingPacketListener;
-import no.seime.openhab.binding.esphome.internal.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.internal.ESPHomeConfiguration;
-import no.seime.openhab.binding.esphome.internal.internal.comm.ConnectionSelector;
-import no.seime.openhab.binding.esphome.internal.internal.handler.ESPChannelTypeProvider;
-import no.seime.openhab.binding.esphome.internal.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 /**
  *
