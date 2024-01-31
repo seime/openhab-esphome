@@ -49,7 +49,7 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
 
     @Override
     public void buildChannels(ListEntitiesNumberResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, null);
+        Configuration configuration = configuration(rsp.getKey(), null, "Number");
         String unitOfMeasurement = rsp.getUnitOfMeasurement();
         if (!"None".equals(unitOfMeasurement) && !"".equals(unitOfMeasurement)) {
             configuration.put("unit", unitOfMeasurement);
