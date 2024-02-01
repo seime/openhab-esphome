@@ -34,6 +34,7 @@ import com.google.protobuf.GeneratedMessageV3;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.util.Debug;
 
 public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T extends GeneratedMessageV3> {
 
@@ -170,7 +171,13 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     public abstract void handleState(T rsp);
 
     protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType) {
-        logger.debug("Registering channel {} with channel type {}", channel.getUID(), channelType.getUID());
+        if (logger.isDebugEnabled()) {
+            logger.debug("Registering channel {} with channel type {}", channel.getUID(), channelType.getUID());
+        }
+        if (logger.isTraceEnabled()) {
+            logger.trace("Registering channel: {}", Debug.channelToString(channel));
+            logger.trace("Channel type:        {}", Debug.channelTypeToString(channelType));
+        }
         handler.addChannelType(channelType);
         handler.addChannel(channel);
     }
