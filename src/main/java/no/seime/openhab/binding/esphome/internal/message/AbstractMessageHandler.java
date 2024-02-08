@@ -81,11 +81,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         if (category != null) {
             channelTypeBuilder.withCategory(category);
         }
+
+        channelTypeBuilder.withAutoUpdatePolicy(AutoUpdatePolicy.VETO);
+
         ChannelType channelType = channelTypeBuilder.build();
 
         logger.trace("Created new channel type {}", channelType.getUID());
-
-        channelTypeBuilder.withAutoUpdatePolicy(AutoUpdatePolicy.VETO);
 
         return channelType;
     }
