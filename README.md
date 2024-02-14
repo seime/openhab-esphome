@@ -54,11 +54,10 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 
 - `device`: A device flashed with https://esphome.io/ firmware.
 
-## Limitations as of 2023-12-09
+## Limitations as of 2024-02-14
 
 - **Only plaintext connections with password** are supported, not encrypted. This is insecure and should not be used on
-  untrusted
-  networks, but is your only option at this time. I *intend* to add encryption.
+  untrusted networks, but is your only option at this time. I *intend* to add encryption.
 - Only
     - `sensor`,
     - `binary_sensor`,
@@ -66,8 +65,8 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
     - `switch`,
     - `number`,
     - `button`,
-    - `cover`
-    - `light` (will only show channels, but not control nor see the status of the light)
+    - `cover`,
+    - `light` (will only show channels, but not control nor see the status of the light),
     - `climate` and
     - `select` is supported.
       Plans to add more, but not yet implemented. I need _your_ help.

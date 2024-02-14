@@ -42,39 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import io.esphome.api.BinarySensorStateResponse;
-import io.esphome.api.ButtonCommandRequest;
-import io.esphome.api.ClimateStateResponse;
-import io.esphome.api.ConnectRequest;
-import io.esphome.api.ConnectResponse;
-import io.esphome.api.CoverCommandRequest;
-import io.esphome.api.DeviceInfoRequest;
-import io.esphome.api.DeviceInfoResponse;
-import io.esphome.api.DisconnectRequest;
-import io.esphome.api.DisconnectResponse;
-import io.esphome.api.HelloRequest;
-import io.esphome.api.HelloResponse;
-import io.esphome.api.LightStateResponse;
-import io.esphome.api.ListEntitiesBinarySensorResponse;
-import io.esphome.api.ListEntitiesButtonResponse;
-import io.esphome.api.ListEntitiesClimateResponse;
-import io.esphome.api.ListEntitiesCoverResponse;
-import io.esphome.api.ListEntitiesDoneResponse;
-import io.esphome.api.ListEntitiesLightResponse;
-import io.esphome.api.ListEntitiesNumberResponse;
-import io.esphome.api.ListEntitiesRequest;
-import io.esphome.api.ListEntitiesSelectResponse;
-import io.esphome.api.ListEntitiesSensorResponse;
-import io.esphome.api.ListEntitiesSwitchResponse;
-import io.esphome.api.ListEntitiesTextSensorResponse;
-import io.esphome.api.NumberStateResponse;
-import io.esphome.api.PingRequest;
-import io.esphome.api.PingResponse;
-import io.esphome.api.SelectStateResponse;
-import io.esphome.api.SensorStateResponse;
-import io.esphome.api.SubscribeStatesRequest;
-import io.esphome.api.SwitchStateResponse;
-import io.esphome.api.TextSensorStateResponse;
+import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.PacketListener;
@@ -153,7 +121,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         registerMessageHandler("Button", new ButtonMessageHandler(this), ListEntitiesButtonResponse.class,
                 ButtonCommandRequest.class);
         registerMessageHandler("Cover", new CoverMessageHandler(this), ListEntitiesCoverResponse.class,
-                CoverCommandRequest.class);
+                CoverStateResponse.class);
     }
 
     private void registerMessageHandler(String select,

@@ -38,7 +38,7 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCoverResponse, CoverStateResponse> {
 
     public static final String CHANNEL_POSITION = "position";
-    public static final String CHANNEL_STATE = "state";
+    public static final String LEGACY_CHANNEL_STATE = "state";
     public static final String CHANNEL_TILT = "tilt";
     public static final String CHANNEL_CURRENT_OPERATION = "current_operation";
     public static final String COMMAND_CLASS_COVER = "Cover";
@@ -108,13 +108,13 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         } else if (command instanceof DecimalType dc) {
                             builder.setTilt(dc.floatValue());
                         } else if (command == UpDownType.UP) {
-                            builder.setPosition(100);
+                            builder.setTilt(100);
                         } else if (command == UpDownType.DOWN) {
-                            builder.setPosition(0);
+                            builder.setTilt(0);
                         }
                         builder.setHasTilt(true);
                     }
-                    case CHANNEL_STATE -> {
+                    case LEGACY_CHANNEL_STATE -> {
                         if (command instanceof QuantityType<?> || command instanceof DecimalType) {
                             logger.warn(
                                     "Ignored numeric command for state channel. Use position or tilt channel to set position or tilt, not the state channel");
@@ -171,6 +171,13 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         String cleanedComponentName = rsp.getName().replace(" ", "_").toLowerCase();
 
         CoverDeviceClass deviceClass = CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass());
+        if (deviceClass == null) {
+            logger.warn("ESPHome Cover Device class `{}` not know to the ESPHome Native API Binding using NONE for {}",
+                    deviceClass, rsp.getUniqueId());
+
+            deviceClass = CoverDeviceClass.NONE;
+
+        }
 
         if (rsp.getSupportsPosition()) {
             ChannelType channelTypePosition = addChannelType(rsp.getUniqueId() + CHANNEL_POSITION, "Position",
@@ -196,14 +203,14 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         }
 
         // Legacy state
-        ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + CHANNEL_STATE, "State",
+        ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "State",
                 deviceClass.getItemType(), Collections.emptyList(), "%s", Set.of("OpenClose"), false,
                 deviceClass.getCategory(), null, null, null);
 
-        Channel channelState = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_STATE))
+        Channel channelState = ChannelBuilder.create(createChannelUID(cleanedComponentName, LEGACY_CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "State")).withKind(ChannelKind.STATE)
                 .withType(channelTypeState.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                .withConfiguration(configuration(rsp.getKey(), CHANNEL_STATE, COMMAND_CLASS_COVER)).build();
+                .withConfiguration(configuration(rsp.getKey(), LEGACY_CHANNEL_STATE, COMMAND_CLASS_COVER)).build();
         super.registerChannel(channelState, channelTypeState);
 
         // Operation status
@@ -220,7 +227,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     }
 
     public void handleState(CoverStateResponse rsp) {
-        findChannelByKeyAndField(rsp.getKey(), CHANNEL_STATE).ifPresent(channel -> handler.updateState(channel.getUID(),
+        findChannelByKeyAndField(rsp.getKey(), LEGACY_CHANNEL_STATE).ifPresent(channel -> handler.updateState(channel.getUID(),
                 new DecimalType(rsp.getLegacyState() == LegacyCoverState.LEGACY_COVER_STATE_OPEN ? 0 : 100)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_POSITION).ifPresent(
                 channel -> handler.updateState(channel.getUID(), toNumericState(channel, rsp.getPosition(), false)));
