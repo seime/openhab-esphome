@@ -38,7 +38,7 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCoverResponse, CoverStateResponse> {
 
     public static final String CHANNEL_POSITION = "position";
-    public static final String LEGACY_CHANNEL_STATE = "state";
+    public static final String LEGACY_CHANNEL_STATE = "legacy_state";
     public static final String CHANNEL_TILT = "tilt";
     public static final String CHANNEL_CURRENT_OPERATION = "current_operation";
     public static final String COMMAND_CLASS_COVER = "Cover";
@@ -92,11 +92,11 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                 switch (subCommand) {
                     case CHANNEL_POSITION -> {
                         if (command instanceof QuantityType<?> qt) {
-                            builder.setPosition(qt.floatValue());
+                            builder.setPosition(qt.floatValue() / 100);
                         } else if (command instanceof DecimalType dc) {
-                            builder.setPosition(dc.floatValue());
+                            builder.setPosition(dc.floatValue() / 100);
                         } else if (command == UpDownType.UP) {
-                            builder.setPosition(100);
+                            builder.setPosition(1);
                         } else if (command == UpDownType.DOWN) {
                             builder.setPosition(0);
                         }
@@ -104,24 +104,35 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     }
                     case CHANNEL_TILT -> {
                         if (command instanceof QuantityType<?> qt) {
-                            builder.setTilt(qt.floatValue());
+                            builder.setTilt(qt.floatValue() / 100);
                         } else if (command instanceof DecimalType dc) {
-                            builder.setTilt(dc.floatValue());
+                            builder.setTilt(dc.floatValue() / 100);
                         } else if (command == UpDownType.UP) {
-                            builder.setTilt(100);
+                            builder.setTilt(1);
                         } else if (command == UpDownType.DOWN) {
                             builder.setTilt(0);
                         }
                         builder.setHasTilt(true);
                     }
                     case LEGACY_CHANNEL_STATE -> {
-                        if (command instanceof QuantityType<?> || command instanceof DecimalType) {
+
+                        if (command instanceof QuantityType<?> qt) {
+                            builder.setPosition(qt.floatValue() > 0 ? 1 : 0);
                             logger.warn(
-                                    "Ignored numeric command for state channel. Use position or tilt channel to set position or tilt, not the state channel");
+                                    "Use position or tilt channel to set position or tilt, not the legacy state channel");
+                        } else if (command instanceof DecimalType dc) {
+                            builder.setPosition(dc.floatValue() > 0 ? 1 : 0);
+                            logger.warn(
+                                    "Use position or tilt channel to set position or tilt, not the legacy state channel");
                         } else if (command == UpDownType.UP) {
                             builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_OPEN);
+                            builder.setHasLegacyCommand(true);
                         } else if (command == UpDownType.DOWN) {
                             builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_CLOSE);
+                            builder.setHasLegacyCommand(true);
+                        } else if (command == StopMoveType.STOP) {
+                            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_STOP);
+                            builder.setHasLegacyCommand(true);
                         }
                     }
 
@@ -203,12 +214,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         }
 
         // Legacy state
-        ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "State",
+        ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "Legacy State",
                 deviceClass.getItemType(), Collections.emptyList(), "%s", Set.of("OpenClose"), false,
                 deviceClass.getCategory(), null, null, null);
 
         Channel channelState = ChannelBuilder.create(createChannelUID(cleanedComponentName, LEGACY_CHANNEL_STATE))
-                .withLabel(createLabel(rsp.getName(), "State")).withKind(ChannelKind.STATE)
+                .withLabel(createLabel(rsp.getName(), "Legacy State")).withKind(ChannelKind.STATE)
                 .withType(channelTypeState.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(rsp.getKey(), LEGACY_CHANNEL_STATE, COMMAND_CLASS_COVER)).build();
         super.registerChannel(channelState, channelTypeState);
@@ -227,8 +238,9 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     }
 
     public void handleState(CoverStateResponse rsp) {
-        findChannelByKeyAndField(rsp.getKey(), LEGACY_CHANNEL_STATE).ifPresent(channel -> handler.updateState(channel.getUID(),
-                new DecimalType(rsp.getLegacyState() == LegacyCoverState.LEGACY_COVER_STATE_OPEN ? 0 : 100)));
+        findChannelByKeyAndField(rsp.getKey(), LEGACY_CHANNEL_STATE)
+                .ifPresent(channel -> handler.updateState(channel.getUID(),
+                        new DecimalType(rsp.getLegacyState() == LegacyCoverState.LEGACY_COVER_STATE_OPEN ? 0 : 100)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_POSITION).ifPresent(
                 channel -> handler.updateState(channel.getUID(), toNumericState(channel, rsp.getPosition(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_TILT).ifPresent(
