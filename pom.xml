@@ -23,7 +23,7 @@
     <maven.compiler.compilerVersion>${oh.java.version}</maven.compiler.compilerVersion>
     <spotless.version>2.36.0</spotless.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
-    <proto.version>3.22.1</proto.version>
+    <proto.version>3.25.2</proto.version>
     <protobuf-maven-plugin.version>0.7.1</protobuf-maven-plugin.version>
 
 
