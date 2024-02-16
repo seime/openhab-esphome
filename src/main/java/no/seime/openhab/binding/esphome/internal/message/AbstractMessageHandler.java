@@ -184,7 +184,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     }
 
     protected State toNumericState(Channel channel, float state, boolean missingState) {
-        if (missingState) {
+        if (missingState || Float.isNaN(state)) {
             return UnDefType.UNDEF;
         } else {
             Configuration configuration = channel.getConfiguration();

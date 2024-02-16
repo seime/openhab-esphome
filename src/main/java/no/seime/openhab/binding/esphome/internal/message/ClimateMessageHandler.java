@@ -256,10 +256,10 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
     public void handleState(ClimateStateResponse rsp) {
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_TARGET_TEMPERATURE)
                 .ifPresent(channel -> handler.updateState(channel.getUID(),
-                        toNumericState(channel, rsp.getTargetTemperature(), Float.isNaN(rsp.getTargetTemperature()))));
+                        toNumericState(channel, rsp.getTargetTemperature(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_CURRENT_TEMPERATURE).ifPresent(channel -> handler.updateState(
                 channel.getUID(),
-                toNumericState(channel, rsp.getCurrentTemperature(), Float.isNaN(rsp.getCurrentTemperature()))));
+                toNumericState(channel, rsp.getCurrentTemperature(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_MODE).ifPresent(channel -> handler.updateState(channel.getUID(),
                 new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getMode()))));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_FAN_MODE).ifPresent(channel -> handler
