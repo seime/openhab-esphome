@@ -36,9 +36,11 @@ public class TextSensorMessageHandler
     public void buildChannels(ListEntitiesTextSensorResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, null);
 
+        String icon = getChannelIcon(rsp.getIcon(), "text");
+
         String itemType = "String";
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptySet(),
-                null, Set.of("Status"), true, "text", null, null, null);
+                null, Set.of("Status"), true, icon, null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

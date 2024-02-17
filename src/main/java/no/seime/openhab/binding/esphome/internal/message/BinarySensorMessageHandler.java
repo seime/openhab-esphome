@@ -63,9 +63,12 @@ public class BinarySensorMessageHandler
             tags.add("Status"); // default
         }
 
+        String icon = getChannelIcon(rsp.getIcon(),
+                binarySensorDeviceClass != null ? binarySensorDeviceClass.getCategory() : null);
+
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
-                binarySensorDeviceClass.getItemType(), Collections.emptySet(), null, tags, true,
-                binarySensorDeviceClass.getCategory(), null, null, null);
+                binarySensorDeviceClass.getItemType(), Collections.emptySet(), null, tags, true, icon, null, null,
+                null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

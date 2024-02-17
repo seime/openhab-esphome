@@ -190,10 +190,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         }
 
+        String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
+
         if (rsp.getSupportsPosition()) {
             ChannelType channelTypePosition = addChannelType(rsp.getUniqueId() + CHANNEL_POSITION, "Position",
-                    deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("OpenLevel"), false,
-                    deviceClass.getCategory(), null, null, null);
+                    deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("OpenLevel"), false, icon, null,
+                    null, null);
 
             Channel channelPosition = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_POSITION))
                     .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
@@ -203,8 +205,8 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         }
         if (rsp.getSupportsTilt()) {
             ChannelType channelTypeTilt = addChannelType(rsp.getUniqueId() + CHANNEL_TILT, "Tilt",
-                    deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("Tilt"), false,
-                    deviceClass.getCategory(), null, null, null);
+                    deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("Tilt"), false, icon, null,
+                    null, null);
 
             Channel channelTilt = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_TILT))
                     .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
@@ -215,8 +217,8 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         // Legacy state
         ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "Legacy State",
-                deviceClass.getItemType(), Collections.emptyList(), "%s", Set.of("OpenClose"), false,
-                deviceClass.getCategory(), null, null, null);
+                deviceClass.getItemType(), Collections.emptyList(), "%s", Set.of("OpenClose"), false, icon, null, null,
+                null);
 
         Channel channelState = ChannelBuilder.create(createChannelUID(cleanedComponentName, LEGACY_CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "Legacy State")).withKind(ChannelKind.STATE)

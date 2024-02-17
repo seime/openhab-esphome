@@ -32,8 +32,10 @@ public class SwitchMessageHandler extends AbstractMessageHandler<ListEntitiesSwi
     public void buildChannels(ListEntitiesSwitchResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, "Switch");
 
+        String icon = getChannelIcon(rsp.getIcon(), "switch");
+
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "Switch", Collections.emptySet(),
-                null, Set.of("Switch"), false, "switch", null, null, null);
+                null, Set.of("Switch"), false, icon, null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

@@ -260,4 +260,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
             }
         }
     }
+
+    protected String getChannelIcon(String icon, String defaultCategoryIcon) {
+        if (icon.isEmpty()) {
+            return defaultCategoryIcon;
+        } else {
+            return icon.replace(":", "_"); // ie mdi:thermometer -> mdi_thermometer
+        }
+    }
 }

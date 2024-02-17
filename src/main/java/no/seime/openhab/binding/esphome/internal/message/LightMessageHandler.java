@@ -38,8 +38,10 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
     public void buildChannels(ListEntitiesLightResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, "Light");
 
+        String icon = getChannelIcon(rsp.getIcon(), "light");
+
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "Color", Collections.emptySet(),
-                null, Set.of("Light"), false, "light", null, null, null);
+                null, Set.of("Light"), false, icon, null, null, null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

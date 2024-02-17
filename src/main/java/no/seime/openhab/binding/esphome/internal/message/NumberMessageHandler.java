@@ -73,10 +73,11 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
         String step = "" + rsp.getStep();
         int accurracyDecimals = step.indexOf('.') > 0 ? step.length() - step.indexOf('.') - 1 : 0;
 
+        String icon = getChannelIcon(rsp.getIcon(), numberDeviceClass != null ? numberDeviceClass.getCategory() : null);
+
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptyList(),
                 "%." + accurracyDecimals + "f " + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), tags,
-                false, numberDeviceClass != null ? numberDeviceClass.getCategory() : null,
-                rsp.getStep() != 0f ? new BigDecimal(rsp.getStep()) : null,
+                false, icon, rsp.getStep() != 0f ? new BigDecimal(rsp.getStep()) : null,
                 rsp.getMinValue() != 0f ? new BigDecimal(rsp.getMinValue()) : null,
                 rsp.getMaxValue() != 0f ? new BigDecimal(rsp.getMaxValue()) : null);
 
