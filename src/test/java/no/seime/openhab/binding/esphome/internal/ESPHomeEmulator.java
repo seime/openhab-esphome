@@ -15,15 +15,17 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.comm.PlainTextStreamHandler;
+import no.seime.openhab.binding.esphome.internal.comm.AbstractFrameHelper;
+import no.seime.openhab.binding.esphome.internal.comm.CommunicationError;
+import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
 
 public class ESPHomeEmulator {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeEmulator.class);
 
-    private InetSocketAddress listenAddress;
-    private PacketListener packetListener;
+    private final InetSocketAddress listenAddress;
+    private final AbstractFrameHelper frameHelper;
     private boolean keepRunning = true;
 
     private boolean ready = false;
@@ -36,15 +38,12 @@ public class ESPHomeEmulator {
 
     private SocketChannel channel;
 
-    private PlainTextStreamHandler streamHandler;
-
-    public ESPHomeEmulator(InetSocketAddress listenAddress) {
+    public ESPHomeEmulator(InetSocketAddress listenAddress, AbstractFrameHelper frameHelper) {
         this.listenAddress = listenAddress;
+        this.frameHelper = frameHelper;
     }
 
     public void start() {
-
-        streamHandler = new PlainTextStreamHandler(packetListener);
 
         Thread serverThread = new Thread(() -> {
             try {
@@ -81,10 +80,10 @@ public class ESPHomeEmulator {
                             int numBytes = channel.read(buffer);
                             if (numBytes > 0) {
                                 try {
-                                    streamHandler.processReceivedData(buffer);
+                                    frameHelper.processReceivedData(buffer);
                                 } catch (ProtocolException e) {
                                     channel.close();
-                                    streamHandler.onParseError(e);
+                                    frameHelper.onParseError(CommunicationError.PACKET_ERROR);
                                 }
                             } else {
                                 logger.debug("No data");
@@ -110,8 +109,8 @@ public class ESPHomeEmulator {
         selector.close();
     }
 
-    public void sendPacket(GeneratedMessageV3 message) throws IOException {
-        ByteBuffer buffer = ByteBuffer.wrap(streamHandler.encodeFrame(message));
+    public void sendPacket(GeneratedMessageV3 message) throws IOException, ProtocolAPIError {
+        ByteBuffer buffer = frameHelper.encodeFrame(message);
 
         while (buffer.hasRemaining()) {
             logger.trace("Writing data");
@@ -119,7 +118,7 @@ public class ESPHomeEmulator {
         }
     }
 
-    public void setPacketListener(PacketListener packetListener) {
-        this.packetListener = packetListener;
+    public void setPacketListener(CommunicationListener communicationListener) {
+        frameHelper.setPacketListener(communicationListener);
     }
 }

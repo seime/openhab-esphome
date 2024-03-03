@@ -15,22 +15,14 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
-import org.openhab.core.thing.Thing;
-import org.openhab.core.thing.ThingStatus;
-import org.openhab.core.thing.ThingStatusDetail;
+import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
@@ -44,24 +36,10 @@ import com.google.protobuf.GeneratedMessageV3;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
-import no.seime.openhab.binding.esphome.internal.PacketListener;
-import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
-import no.seime.openhab.binding.esphome.internal.comm.ESPHomeConnection;
-import no.seime.openhab.binding.esphome.internal.comm.PlainTextStreamHandler;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
-import no.seime.openhab.binding.esphome.internal.message.AbstractMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.BinarySensorMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.ButtonMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.ClimateMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.CoverMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.LightMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.NumberMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.SelectMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.SensorMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.SwitchMessageHandler;
-import no.seime.openhab.binding.esphome.internal.message.TextSensorMessageHandler;
+import no.seime.openhab.binding.esphome.internal.comm.*;
+import no.seime.openhab.binding.esphome.internal.message.*;
 
 /**
  * The {@link ESPHomeHandler} is responsible for handling commands, which are
@@ -70,7 +48,7 @@ import no.seime.openhab.binding.esphome.internal.message.TextSensorMessageHandle
  * @author Arne Seime - Initial contribution
  */
 @NonNullByDefault
-public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
+public class ESPHomeHandler extends BaseThingHandler implements CommunicationListener {
 
     public static final int CONNECT_TIMEOUT = 20;
     private static final int API_VERSION_MAJOR = 1;
@@ -80,7 +58,8 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private @Nullable ESPHomeConfiguration config;
-    private @Nullable ESPHomeConnection connection;
+
+    private @Nullable AbstractFrameHelper frameHelper;
     @Nullable
     private ScheduledFuture<?> pingWatchdogFuture;
     private Instant lastPong = Instant.now();
@@ -159,13 +138,12 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
-            connection = new ESPHomeConnection(connectionSelector, new PlainTextStreamHandler(this), config.hostname);
-            connection.connect(new InetSocketAddress(config.hostname, config.port));
+            frameHelper = config.encryptionKey != null
+                    ? new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.server,
+                            config.hostname)
+                    : new PlainTextFrameHelper(connectionSelector, this, config.hostname);
 
-            HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
-                    .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
-            connectionState = ConnectionState.HELLO_SENT;
-            connection.send(helloRequest);
+            frameHelper.connect(new InetSocketAddress(config.hostname, config.port));
 
         } catch (ProtocolException e) {
             logger.warn("[{}] Error initial connection", config.hostname, e);
@@ -178,27 +156,27 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     @Override
     public void dispose() {
+        disposed = true;
         setUndefToAllChannels();
         cancelReconnectFuture();
-        if (connection != null) {
+        if (frameHelper != null) {
             cancelPingWatchdog();
 
             if (connectionState == ConnectionState.CONNECTED) {
                 try {
-                    connection.send(DisconnectRequest.getDefaultInstance());
+                    frameHelper.send(DisconnectRequest.getDefaultInstance());
                 } catch (ProtocolAPIError e) {
                     // Quietly ignore
                 }
             } else {
-                connection.close();
+                frameHelper.close();
             }
         }
-        disposed = true;
         super.dispose();
     }
 
     public void sendMessage(GeneratedMessageV3 message) throws ProtocolAPIError {
-        connection.send(message);
+        frameHelper.send(message);
     }
 
     private void setUndefToAllChannels() {
@@ -216,7 +194,7 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
         if (command == RefreshType.REFRESH) {
             try {
-                connection.send(SubscribeStatesRequest.getDefaultInstance());
+                frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
             } catch (ProtocolAPIError e) {
                 logger.error("[{}] Error sending command {} to channel {}: {}", config.hostname, command, channelUID,
                         e.getMessage());
@@ -251,6 +229,15 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
     }
 
     @Override
+    public void onConnect() throws ProtocolAPIError {
+        logger.debug("[{}] Connection established", config.hostname);
+        HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
+                .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
+        connectionState = ConnectionState.HELLO_SENT;
+        frameHelper.send(helloRequest);
+    }
+
+    @Override
     public void onPacket(@NonNull GeneratedMessageV3 message) throws ProtocolAPIError {
         switch (connectionState) {
             case UNINITIALIZED -> logger.warn("[{}] Received packet while uninitialized.", config.hostname);
@@ -262,23 +249,41 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
     @Override
     public void onEndOfStream() {
-        updateStatus(ThingStatus.OFFLINE);
-        setUndefToAllChannels();
-        connection.close();
-        cancelPingWatchdog();
-        connectionState = ConnectionState.UNINITIALIZED;
-        scheduleReconnect(CONNECT_TIMEOUT * 2);
+        if (!disposed) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
+                    "ESPHome device closed connection.");
+            setUndefToAllChannels();
+            frameHelper.close();
+            cancelPingWatchdog();
+            connectionState = ConnectionState.UNINITIALIZED;
+            scheduleReconnect(CONNECT_TIMEOUT * 2);
+        }
     }
 
     @Override
-    public void onParseError() {
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                "Parse error. This could be due to api encryption being used by ESPHome device. Update your ESPHome device to use plaintext password until this is implemented in the binding.");
-        setUndefToAllChannels();
-        cancelPingWatchdog();
-        connection.close();
-        connectionState = ConnectionState.UNINITIALIZED;
-        scheduleReconnect(CONNECT_TIMEOUT * 2);
+    public void onParseError(CommunicationError error) {
+        if (!disposed) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, error.toString());
+            setUndefToAllChannels();
+            cancelPingWatchdog();
+            frameHelper.close();
+            connectionState = ConnectionState.UNINITIALIZED;
+            scheduleReconnect(CONNECT_TIMEOUT * 2);
+        }
+    }
+
+    private void remoteDisconnect() {
+        if (!disposed) {
+            int reconnectDelaySeconds = CONNECT_TIMEOUT;
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String.format(
+                    "ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelaySeconds));
+
+            frameHelper.close();
+            setUndefToAllChannels();
+            connectionState = ConnectionState.UNINITIALIZED;
+            cancelPingWatchdog();
+            scheduleReconnect(reconnectDelaySeconds);
+        }
     }
 
     private void handleConnected(GeneratedMessageV3 message) throws ProtocolAPIError {
@@ -296,19 +301,19 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             updateThing(editThing().withChannels(dynamicChannels).build());
             logger.debug("[{}] Device interrogation complete, done updating thing channels", config.hostname);
             interrogated = true;
-            connection.send(SubscribeStatesRequest.getDefaultInstance());
+            frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
         } else if (message instanceof PingRequest) {
             logger.debug("[{}] Responding to ping request", config.hostname);
-            connection.send(PingResponse.getDefaultInstance());
+            frameHelper.send(PingResponse.getDefaultInstance());
 
         } else if (message instanceof PingResponse) {
             logger.debug("[{}] Received ping response", config.hostname);
             lastPong = Instant.now();
         } else if (message instanceof DisconnectRequest) {
-            connection.send(DisconnectResponse.getDefaultInstance());
+            frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
-            connection.close();
+            frameHelper.close();
         } else {
             // Regular messages handled by message handlers
             AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
@@ -322,24 +327,13 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
         }
     }
 
-    private void remoteDisconnect() {
-        connection.close();
-        setUndefToAllChannels();
-        connectionState = ConnectionState.UNINITIALIZED;
-        int reconnectDelaySeconds = CONNECT_TIMEOUT;
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String
-                .format("ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelaySeconds));
-        cancelPingWatchdog();
-        scheduleReconnect(reconnectDelaySeconds);
-    }
-
     private void handleLoginResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
         if (message instanceof ConnectResponse connectResponse) {
             logger.debug("[{}] Received login response {}", config.hostname, connectResponse);
 
             if (connectResponse.getInvalidPassword()) {
                 logger.error("[{}] Invalid password", config.hostname);
-                connection.close();
+                frameHelper.close();
                 connectionState = ConnectionState.UNINITIALIZED;
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
                 return;
@@ -353,13 +347,13 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
             pingWatchdogFuture = scheduler.scheduleAtFixedRate(() -> {
 
-                if (lastPong.plusSeconds(config.maxPingTimeouts * config.pingInterval).isBefore(Instant.now())) {
+                if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval).isBefore(Instant.now())) {
                     logger.warn(
                             "[{}] Ping responses lacking Waited {} times {} seconds, total of {}. Assuming connection lost and disconnecting",
                             config.hostname, config.maxPingTimeouts, config.pingInterval,
                             config.maxPingTimeouts * config.pingInterval);
                     pingWatchdogFuture.cancel(false);
-                    connection.close();
+                    frameHelper.close();
                     connectionState = ConnectionState.UNINITIALIZED;
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
@@ -370,15 +364,15 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
 
                     try {
                         logger.debug("[{}] Sending ping", config.hostname);
-                        connection.send(PingRequest.getDefaultInstance());
+                        frameHelper.send(PingRequest.getDefaultInstance());
                     } catch (ProtocolAPIError e) {
                         logger.warn("[{}] Error sending ping request", config.hostname, e);
                     }
                 }
             }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS);
 
-            connection.send(DeviceInfoRequest.getDefaultInstance());
-            connection.send(ListEntitiesRequest.getDefaultInstance());
+            frameHelper.send(DeviceInfoRequest.getDefaultInstance());
+            frameHelper.send(ListEntitiesRequest.getDefaultInstance());
 
         }
     }
@@ -397,9 +391,9 @@ public class ESPHomeHandler extends BaseThingHandler implements PacketListener {
             connectionState = ConnectionState.LOGIN_SENT;
 
             if (config.password != null && !config.password.isEmpty()) {
-                connection.send(ConnectRequest.newBuilder().setPassword(config.password).build());
+                frameHelper.send(ConnectRequest.newBuilder().setPassword(config.password).build());
             } else {
-                connection.send(ConnectRequest.getDefaultInstance());
+                frameHelper.send(ConnectRequest.getDefaultInstance());
 
             }
 

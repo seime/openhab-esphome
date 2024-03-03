@@ -31,6 +31,21 @@
 				<label>Password for plaintext connection</label>
 				<description>Password to access the device</description>
 			</parameter>
+			<!--
+				TODO disabled for now as encryption is not working
+
+				<parameter name="encryptionKey" type="text" required="false">
+				<context>password</context>
+				<label>Base64 encoded encryption key for encrypted devices</label>
+				<description>Specified in the api: -> encryption: -> key: section of the esphome device config. See
+				https://esphome.io/components/api#configuration-variables</description>
+				</parameter>
+			-->
+			<parameter name="server" type="text" required="false">
+				<label>ESPHome device server name</label>
+				<description>Used to verify that we're talking to the correct device</description>
+			</parameter>
+
 			<parameter name="pingInterval" type="integer" min="1" max="600" required="false">
 				<label>Ping interval in seconds</label>
 				<default>10</default>

@@ -47,7 +47,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
     }
 
-    private ConnectionSelector connectionSelector;
+    private final ConnectionSelector connectionSelector;
 
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
 

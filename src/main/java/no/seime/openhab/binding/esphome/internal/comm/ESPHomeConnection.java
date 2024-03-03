@@ -20,31 +20,25 @@ import java.nio.channels.SocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
-
 public class ESPHomeConnection {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeConnection.class);
 
     private SocketChannel socketChannel;
 
-    private StreamHandler streamHandler;
+    private final AbstractFrameHelper frameHelper;
     private final ConnectionSelector connectionSelector;
 
-    private String hostname;
+    private final String hostname;
 
-    public ESPHomeConnection(ConnectionSelector connectionSelector, PlainTextStreamHandler streamHandler,
-            String hostname) {
-        this.streamHandler = streamHandler;
+    public ESPHomeConnection(ConnectionSelector connectionSelector, AbstractFrameHelper frameHelper, String hostname) {
+        this.frameHelper = frameHelper;
         this.connectionSelector = connectionSelector;
         this.hostname = hostname;
     }
 
-    public synchronized void send(GeneratedMessageV3 message) throws ProtocolAPIError {
+    public synchronized void send(ByteBuffer buffer) throws ProtocolAPIError {
         try {
-            logger.debug("[{}] Sending message: {}", hostname, message.getClass().getSimpleName());
-            byte[] serializedMessage = streamHandler.encodeFrame(message);
-            ByteBuffer buffer = ByteBuffer.wrap(serializedMessage);
             while (buffer.hasRemaining()) {
                 logger.trace("Writing data");
                 socketChannel.write(buffer);
@@ -54,17 +48,17 @@ public class ESPHomeConnection {
         }
     }
 
-    public void connect(InetSocketAddress address) throws ProtocolAPIError {
+    public void connect(InetSocketAddress espDeviceAddress) throws ProtocolAPIError {
         try {
 
-            socketChannel = SocketChannel.open(address);
+            socketChannel = SocketChannel.open(espDeviceAddress);
             socketChannel.configureBlocking(false);
-            connectionSelector.register(socketChannel, streamHandler);
+            connectionSelector.register(socketChannel, frameHelper);
 
-            logger.info("[{}] Opening socket to {} at port {}.", hostname, hostname, address.getPort());
+            logger.info("[{}] Opening socket to {} at port {}.", hostname, hostname, espDeviceAddress.getPort());
 
         } catch (Exception e) {
-            throw new ProtocolAPIError("Failed to connect to '" + hostname + "' port " + address.getPort(), e);
+            throw new ProtocolAPIError("Failed to connect to '" + hostname + "' port " + espDeviceAddress.getPort(), e);
         }
     }
 

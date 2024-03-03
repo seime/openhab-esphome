@@ -31,4 +31,9 @@ public class ESPHomeConfiguration {
     public int pingInterval = 10;
 
     public int maxPingTimeouts = 4;
+
+    @Nullable
+    public String encryptionKey;
+    @Nullable
+    public String server;
 }

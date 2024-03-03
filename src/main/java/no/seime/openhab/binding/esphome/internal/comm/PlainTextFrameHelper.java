@@ -14,57 +14,39 @@ package no.seime.openhab.binding.esphome.internal.comm;
 
 import static no.seime.openhab.binding.esphome.internal.comm.VarIntConverter.bytesToInt;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.protobuf.GeneratedMessageV3;
 
-import no.seime.openhab.binding.esphome.internal.PacketListener;
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
-public class PlainTextStreamHandler implements StreamHandler {
+public class PlainTextFrameHelper extends AbstractFrameHelper {
 
-    public static final int PREAMBLE = 0x00;
-    public static final int ENCRYPTION_REQUIRED = 0x01;
-    public static final int VAR_INT_MARKER = 0x80;
-    private final Logger logger = LoggerFactory.getLogger(PlainTextStreamHandler.class);
+    private static final int VAR_INT_MARKER = 0x80;
 
-    private final PacketListener listener;
-
-    private ByteBuffer buffer = ByteBuffer.allocate(1024);
-
-    private MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
-
-    public PlainTextStreamHandler(PacketListener listener) {
+    public PlainTextFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
+            String logHostname) {
         this.listener = listener;
+        connection = new ESPHomeConnection(connectionSelector, this, logHostname);
     }
 
-    private void processBuffer() throws ProtocolException {
-        buffer.limit(buffer.position());
-        buffer.position(0);
-        if (buffer.remaining() > 2) {
-            byte[] headerData = readBytes(3);
-            headerReceived(headerData);
-        } else {
-            buffer.position(buffer.limit());
-            buffer.limit(buffer.capacity());
-        }
+    @Override
+    public void connect(InetSocketAddress espHomeAddress) throws ProtocolException {
+        connection.connect(espHomeAddress);
+        listener.onConnect();
     }
 
-    public void headerReceived(byte[] headerData) throws ProtocolException {
-        if (headerData[0] != PREAMBLE) {
-            if (headerData[0] == ENCRYPTION_REQUIRED) {
-                handleAndClose(new RequiresEncryptionAPIError("Connection requires encryption"));
+    protected void headerReceived(byte[] headerData) throws ProtocolException {
+        if (headerData[0] != PROTOCOL_PLAINTEXT) {
+            if (headerData[0] == PROTOCOL_ENCRYPTED) {
+                listener.onParseError(CommunicationError.DEVICE_REQUIRES_ENCRYPTION);
+                return;
+            } else {
+                listener.onParseError(CommunicationError.INVALID_PROTOCOL_PREAMBLE);
                 return;
             }
-
-            handleAndClose(new ProtocolAPIError(String.format("Invalid preamble %02x", headerData[0])));
-            return;
         }
 
         byte[] encodedProtoPacketLenghtBuffer;
@@ -127,58 +109,7 @@ public class PlainTextStreamHandler implements StreamHandler {
         }
     }
 
-    private byte[] readBytes(int numBytes) {
-        if (buffer.remaining() < numBytes) {
-            return new byte[0];
-        }
-        byte[] data = new byte[numBytes];
-        buffer.get(data);
-        return data;
-    }
-
-    private void decodeProtoMessage(int messageType, byte[] bytes) {
-        logger.debug("Received packet of type {} with data {}", messageType, bytes);
-
-        try {
-            Method parseMethod = messageTypeToClassConverter.getMethod(messageType);
-            if (parseMethod != null) {
-                GeneratedMessageV3 invoke = (GeneratedMessageV3) parseMethod.invoke(null, bytes);
-                if (invoke != null) {
-                    listener.onPacket(invoke);
-                } else {
-                    logger.warn("Received null packet of type {}", parseMethod);
-                }
-            }
-        } catch (ProtocolAPIError | IllegalAccessException | InvocationTargetException | IOException e) {
-            logger.warn("Error parsing packet", e);
-            listener.onParseError();
-        }
-    }
-
-    private byte[] concatArrays(byte[] length, byte[] additionalLength) {
-        byte[] result = new byte[length.length + additionalLength.length];
-        System.arraycopy(length, PREAMBLE, result, PREAMBLE, length.length);
-        System.arraycopy(additionalLength, PREAMBLE, result, length.length, additionalLength.length);
-        return result;
-    }
-
-    private void handleAndClose(ProtocolException connectionRequiresEncryption) throws ProtocolException {
-        // close socket
-        listener.onParseError();
-        throw connectionRequiresEncryption;
-    }
-
-    public void processReceivedData(ByteBuffer buffer) throws ProtocolException, IOException {
-        // Copy new data into buffer
-        byte[] newData = new byte[buffer.position()];
-        buffer.flip();
-        buffer.get(newData);
-        this.buffer.put(newData, 0, newData.length);
-
-        processBuffer();
-    }
-
-    public byte[] encodeFrame(GeneratedMessageV3 message) {
+    public ByteBuffer encodeFrame(GeneratedMessageV3 message) {
         byte[] protoBytes = message.toByteArray();
         byte[] idVarUint = VarIntConverter
                 .intToBytes(message.getDescriptorForType().getOptions().getExtension(io.esphome.api.ApiOptions.id));
@@ -189,17 +120,6 @@ public class PlainTextStreamHandler implements StreamHandler {
         System.arraycopy(idVarUint, 0, frame, protoBytesLengthVarUint.length + 1, idVarUint.length);
         System.arraycopy(protoBytes, 0, frame, idVarUint.length + protoBytesLengthVarUint.length + 1,
                 protoBytes.length);
-        return frame;
-    }
-
-    @Override
-    public void endOfStream() {
-        listener.onEndOfStream();
-    }
-
-    @Override
-    public void onParseError(Exception e) {
-        logger.error("Error parsing packet", e);
-        listener.onParseError();
+        return ByteBuffer.wrap(frame);
     }
 }

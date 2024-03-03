@@ -18,18 +18,15 @@ public class ConnectionSelector {
 
     private final Logger logger = LoggerFactory.getLogger(ConnectionSelector.class);
 
-    private Selector selector;
-
+    private final Selector selector;
+    private final Map<SocketChannel, AbstractFrameHelper> connectionMap = new ConcurrentHashMap<>();
     private boolean keepRunning = true;
-
     private boolean selectorOpen;
 
     public ConnectionSelector() throws IOException {
         selector = Selector.open();
         selectorOpen = true;
     }
-
-    private Map<SocketChannel, StreamHandler> connectionMap = new ConcurrentHashMap<>();
 
     public void start() {
 
@@ -63,7 +60,7 @@ public class ConnectionSelector {
     }
 
     private void processKey(SelectionKey readyKey) {
-        StreamHandler streamHandler = (StreamHandler) readyKey.attachment();
+        AbstractFrameHelper frameHelper = (AbstractFrameHelper) readyKey.attachment();
         logger.trace("Processing key {}", readyKey);
         // Tests whether this key's channel is ready to accept a new socket connection
         try {
@@ -72,9 +69,9 @@ public class ConnectionSelector {
                 ByteBuffer buffer = ByteBuffer.allocate(128);
                 int read = channel.read(buffer);
                 if (read == -1) {
-                    streamHandler.endOfStream();
+                    frameHelper.endOfStream();
                 } else {
-                    processReceivedData(streamHandler, buffer, channel);
+                    processReceivedData(frameHelper, buffer, channel);
                 }
 
             } else {
@@ -82,18 +79,18 @@ public class ConnectionSelector {
             }
         } catch (IOException e) {
             logger.debug("Socket exception", e);
-            streamHandler.endOfStream();
+            frameHelper.endOfStream();
         }
     }
 
-    private void processReceivedData(StreamHandler streamHandler, ByteBuffer buffer, SocketChannel channel)
+    private void processReceivedData(AbstractFrameHelper frameHelper, ByteBuffer buffer, SocketChannel channel)
             throws IOException {
         try {
             logger.trace("Received data");
-            streamHandler.processReceivedData(buffer);
+            frameHelper.processReceivedData(buffer);
         } catch (Exception e) {
             channel.close();
-            streamHandler.onParseError(e);
+            frameHelper.onParseError(CommunicationError.PACKET_ERROR);
         }
     }
 
@@ -110,11 +107,11 @@ public class ConnectionSelector {
         }
     }
 
-    public void register(SocketChannel socketChannel, StreamHandler packetStreamReader) {
-        connectionMap.put(socketChannel, packetStreamReader);
+    public void register(SocketChannel socketChannel, AbstractFrameHelper frameHelper) {
+        connectionMap.put(socketChannel, frameHelper);
         try {
             SelectionKey key = socketChannel.register(selector, SelectionKey.OP_READ);
-            key.attach(packetStreamReader);
+            key.attach(frameHelper);
             selector.wakeup();
         } catch (IOException e) {
             logger.warn("Error while registering channel", e);

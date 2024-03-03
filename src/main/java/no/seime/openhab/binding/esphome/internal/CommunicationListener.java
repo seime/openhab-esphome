@@ -18,14 +18,17 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 
 import com.google.protobuf.GeneratedMessageV3;
 
+import no.seime.openhab.binding.esphome.internal.comm.CommunicationError;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 
 @NonNullByDefault
-public interface PacketListener {
+public interface CommunicationListener {
 
     void onPacket(GeneratedMessageV3 message) throws ProtocolAPIError, IOException;
 
     void onEndOfStream();
 
-    void onParseError();
+    void onParseError(CommunicationError error);
+
+    void onConnect() throws ProtocolAPIError;
 }

@@ -22,7 +22,8 @@ import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
-import no.seime.openhab.binding.esphome.internal.comm.LogReadingPacketListener;
+import no.seime.openhab.binding.esphome.internal.comm.LogReadingCommunicationListener;
+import no.seime.openhab.binding.esphome.internal.comm.PlainTextFrameHelper;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -74,9 +75,11 @@ class ESPHomeHandlerTest {
     void testInitializeEverythingPresenceSensor()
             throws IOException, InvocationTargetException, IllegalAccessException {
 
-        ESPHomeEmulator emulator = new ESPHomeEmulator(new InetSocketAddress("localhost", 10000));
-        emulator.setPacketListener(
-                new LogReadingPacketListener(emulator, new File("src/test/resources/logfiles/presence_sensor.log")));
+        ESPHomeEmulator emulator = new ESPHomeEmulator(new InetSocketAddress("localhost", 10000),
+                new PlainTextFrameHelper(null, null, "emulator"));
+
+        emulator.setPacketListener(new LogReadingCommunicationListener(emulator,
+                new File("src/test/resources/logfiles/presence_sensor.log")));
         emulator.start();
 
         deviceHandler.initialize();
