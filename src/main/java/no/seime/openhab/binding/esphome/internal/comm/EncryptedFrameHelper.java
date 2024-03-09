@@ -41,12 +41,12 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
     private NoiseState state;
 
     public EncryptedFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
-            String encryptionKeyBase64, @Nullable String expectedServername, String logHostname) {
+            String encryptionKeyBase64, @Nullable String expectedServername, String logPrefix) {
         this.encryptionKeyBase64 = encryptionKeyBase64;
         this.expectedServername = expectedServername;
         this.listener = listener;
 
-        connection = new ESPHomeConnection(connectionSelector, this, logHostname);
+        connection = new ESPHomeConnection(connectionSelector, this, logPrefix);
     }
 
     @Override

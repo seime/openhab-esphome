@@ -29,22 +29,23 @@ public class ESPHomeConnection {
     private final AbstractFrameHelper frameHelper;
     private final ConnectionSelector connectionSelector;
 
-    private final String hostname;
+    private final String logPrefix;
 
-    public ESPHomeConnection(ConnectionSelector connectionSelector, AbstractFrameHelper frameHelper, String hostname) {
+    public ESPHomeConnection(ConnectionSelector connectionSelector, AbstractFrameHelper frameHelper, String logPrefix) {
         this.frameHelper = frameHelper;
         this.connectionSelector = connectionSelector;
-        this.hostname = hostname;
+        this.logPrefix = logPrefix;
     }
 
     public synchronized void send(ByteBuffer buffer) throws ProtocolAPIError {
         try {
             while (buffer.hasRemaining()) {
-                logger.trace("Writing data");
+                logger.trace("[{}] Writing data", logPrefix);
                 socketChannel.write(buffer);
             }
+
         } catch (IOException e) {
-            throw new ProtocolAPIError(String.format("[%s] Error sending message: %s ", hostname, e));
+            throw new ProtocolAPIError(String.format("[%s] Error sending message: %s ", logPrefix, e));
         }
     }
 
@@ -55,15 +56,18 @@ public class ESPHomeConnection {
             socketChannel.configureBlocking(false);
             connectionSelector.register(socketChannel, frameHelper);
 
-            logger.info("[{}] Opening socket to {} at port {}.", hostname, hostname, espDeviceAddress.getPort());
+            logger.info("[{}] Opening socket to {} at port {}.", logPrefix, espDeviceAddress.getHostName(),
+                    espDeviceAddress.getPort());
 
         } catch (Exception e) {
-            throw new ProtocolAPIError("Failed to connect to '" + hostname + "' port " + espDeviceAddress.getPort(), e);
+            throw new ProtocolAPIError(
+                    "Failed to connect to '" + espDeviceAddress.getHostName() + "' port " + espDeviceAddress.getPort(),
+                    e);
         }
     }
 
     public void close() {
-        logger.info("[{}] Disconnecting socket.", hostname);
+        logger.info("[{}] Disconnecting socket.", logPrefix);
         try {
             if (socketChannel != null) {
                 connectionSelector.unregister(socketChannel);
@@ -71,7 +75,7 @@ public class ESPHomeConnection {
                 socketChannel = null;
             }
         } catch (IOException e) {
-            logger.debug("[{}] Error closing connection", hostname, e);
+            logger.debug("[{}] Error closing connection", logPrefix, e);
         }
     }
 }

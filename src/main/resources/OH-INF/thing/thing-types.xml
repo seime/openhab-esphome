@@ -59,6 +59,12 @@
 					connection is assumed broken, and reconnect starts</description>
 				<advanced>true</advanced>
 			</parameter>
+			<parameter name="logPrefix" type="text" required="false">
+				<label>Prefix to use in logging for this particular device. Defaults to Thing ID</label>
+				<description>Useful when debugging commnunication with a particular device (and you have many)</description>
+				<advanced>true</advanced>
+			</parameter>
+
 		</config-description>
 	</thing-type>
 

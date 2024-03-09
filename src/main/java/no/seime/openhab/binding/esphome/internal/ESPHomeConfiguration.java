@@ -36,4 +36,7 @@ public class ESPHomeConfiguration {
     public String encryptionKey;
     @Nullable
     public String server;
+
+    @Nullable
+    public String logPrefix;
 }

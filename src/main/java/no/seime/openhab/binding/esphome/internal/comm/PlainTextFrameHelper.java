@@ -27,9 +27,9 @@ public class PlainTextFrameHelper extends AbstractFrameHelper {
     private static final int VAR_INT_MARKER = 0x80;
 
     public PlainTextFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
-            String logHostname) {
+            String logPrefix) {
         this.listener = listener;
-        connection = new ESPHomeConnection(connectionSelector, this, logHostname);
+        connection = new ESPHomeConnection(connectionSelector, this, logPrefix);
     }
 
     @Override
