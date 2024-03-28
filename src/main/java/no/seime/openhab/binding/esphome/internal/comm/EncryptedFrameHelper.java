@@ -32,14 +32,12 @@ import io.esphome.api.ApiOptions;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
 public class EncryptedFrameHelper extends AbstractFrameHelper {
-
-    // TODO not entirely clear whether this is identical to Noise_NNpsk0_25519_ChaChaPoly_SHA256
     private final static String NOISE_PROTOCOL = "Noise_NNpsk0_25519_ChaChaPoly_SHA256";
     private final String encryptionKeyBase64;
     private final String expectedServername;
     private HandshakeState client;
     private CipherStatePair cipherStatePair;
-    private NoiseState state;
+    private NoiseProtocolState state;
 
     public EncryptedFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
             String encryptionKeyBase64, @Nullable String expectedServername, String logPrefix) {
@@ -62,14 +60,14 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
 
             // Set prologue
             byte[] prologue = "NoiseAPIInit".getBytes(StandardCharsets.US_ASCII);
-            byte[] prologuePadded = new byte[prologue.length + 2]; // 2 nulls at the end - necessary at all?
+            byte[] prologuePadded = new byte[prologue.length + 2]; // 2 nulls at the end
             System.arraycopy(prologue, 0, prologuePadded, 0, prologue.length);
             client.setPrologue(prologuePadded, 0, prologuePadded.length);
 
             client.start();
 
             connection.connect(espHomeAddress);
-            state = NoiseState.HELLO;
+            state = NoiseProtocolState.HELLO;
 
             connection.send(createFrame(new byte[0]));
 
@@ -142,7 +140,7 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
             System.arraycopy(noiseHandshakeBuffer, 0, payload, 1, noiseHandshakeLength);
 
             ByteBuffer frame = createFrame(payload);
-            state = NoiseState.HANDSHAKE;
+            state = NoiseProtocolState.HANDSHAKE;
             connection.send(frame);
         }
     }
@@ -160,19 +158,17 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
 
     private void handleHandshake(byte[] packetData) throws ProtocolException {
         if (packetData[0] != 0) {
-            // TODO always fails here with "Handshake MAC failure" indicating wrong preshared key / and or prologue
             byte[] explanation = Arrays.copyOfRange(packetData, 1, packetData.length);
             listener.onParseError(CommunicationError.ENCRYPTION_KEY_INVALID);
             return;
         } else {
             try {
-                // TODO untested branch
                 byte[] handshakeRsp = Arrays.copyOfRange(packetData, 1, packetData.length);
                 byte[] payload = new byte[64];
                 client.readMessage(handshakeRsp, 0, handshakeRsp.length, payload, 0);
 
                 cipherStatePair = client.split();
-                state = NoiseState.READY;
+                state = NoiseProtocolState.READY;
                 listener.onConnect();
             } catch (ShortBufferException | BadPaddingException e) {
                 throw new ProtocolAPIError(e.getMessage());
@@ -180,12 +176,10 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         }
     }
 
-    // TODO never tested
     private void handleReady(byte[] packetData) {
         try {
             byte[] decrypted = decryptPacket(packetData);
             int messageType = (decrypted[0] << 8) | decrypted[1];
-            int messageLength = (decrypted[2] << 8) | decrypted[3];
             byte[] messageData = Arrays.copyOfRange(decrypted, 4, decrypted.length);
             decodeProtoMessage(messageType, messageData);
         } catch (Exception e) {
@@ -193,7 +187,6 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         }
     }
 
-    // TODO never tested
     public ByteBuffer encodeFrame(GeneratedMessageV3 message) throws ProtocolAPIError {
         try {
             byte[] protoBytes = message.toByteArray();
@@ -210,7 +203,6 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         }
     }
 
-    // TODO never tested
     private byte[] encryptPacket(byte[] msg) throws Exception {
         byte[] encrypted = new byte[msg.length + 128];
         final int cipherTextLength = cipherStatePair.getSender().encryptWithAd(null, msg, 0, encrypted, 0, msg.length);
@@ -220,7 +212,6 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         return result;
     }
 
-    // TODO never tested
     private byte[] decryptPacket(byte[] msg) throws Exception {
         byte[] decrypted = new byte[msg.length + 128];
         final int cipherTextLength = cipherStatePair.getReceiver().decryptWithAd(null, msg, 0, decrypted, 0,
@@ -238,7 +229,7 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         return value;
     }
 
-    private enum NoiseState {
+    private enum NoiseProtocolState {
         HELLO,
         HANDSHAKE,
         READY

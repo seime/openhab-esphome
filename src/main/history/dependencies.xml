@@ -6,7 +6,7 @@
         <feature>wrap</feature>
         <bundle>mvn:com.google.protobuf/protobuf-java/3.25.2</bundle>
         <bundle>mvn:org.openhab.addons.bundles/no.seime.openhab.binding.esphome/4.1.0-SNAPSHOT</bundle>
+        <bundle>wrap:mvn:no.seime.amandel/noise-java/1.0-SNAPSHOT</bundle>
         <bundle>wrap:mvn:org.lastnpe.eea/eea-all/2.2.1</bundle>
-        <bundle>wrap:mvn:org.signal.forks/noise-java/0.1.0</bundle>
     </feature>
 </features>

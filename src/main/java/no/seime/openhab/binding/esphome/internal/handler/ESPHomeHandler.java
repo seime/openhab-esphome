@@ -147,7 +147,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
-            frameHelper = config.encryptionKey != null
+            boolean useEncryption = config.encryptionKey != null;
+            if (!useEncryption) {
+                logger.warn(
+                        "Using unencrypted connection. This is deprecated and will be removed in the future. Please use encryption.");
+            }
+
+            frameHelper = useEncryption
                     ? new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.server, logPrefix)
                     : new PlainTextFrameHelper(connectionSelector, this, logPrefix);
 

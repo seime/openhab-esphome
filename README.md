@@ -32,11 +32,6 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 
 ## FAQ
 
-- My ESPHome thing reports `COMMUNICATION_ERROR: Parse error`. What is wrong?
-
-  > This is most likely because you have encryption set on your ESPHome device. The binding does not support encrypted
-  > connections yet, so you need to disable encryption on your device.
-
 - I get warnings
   like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
 
@@ -54,10 +49,8 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 
 - `device`: A device flashed with https://esphome.io/ firmware.
 
-## Limitations as of 2024-02-21
+## Limitations as of 2024-03-28
 
-- **Only plaintext connections with password** are supported, not encrypted. This is insecure and should not be used on
-  untrusted networks, but is your only option at this time. I *intend* to add encryption.
 - Only
     - `sensor`,
     - `binary_sensor`,
@@ -79,13 +72,16 @@ The binding uses mDNS to automatically discover devices on the network.
 
 ### `device` Thing Configuration
 
-| Name              | Type      | Description                                                                    | Default | Required | Advanced |
-|-------------------|-----------|--------------------------------------------------------------------------------|---------|----------|----------|
-| `hostname`        | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local' | N/A     | yes      | no       |
-| `password`        | `text`    | Password to access the device if password protected                            | N/A     | no       | no       |
-| `port`            | `integer` | IP Port of the device                                                          | 6053    | no       | no       |
-| `pingInterval`    | `integer` | Seconds between sending ping requests to device to check if alive              | 10      | no       | yes      |
-| `maxPingTimeouts` | `integer` | Number of missed ping requests before deeming device unresponsive.             | 4       | no       | yes      |
+| Name              | Type      | Description                                                                                                                            | Default  | Required | Advanced |
+|-------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
+| `hostname`        | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                         | N/A      | yes      | no       |
+| `port`            | `integer` | IP Port of the device                                                                                                                  | 6053     | no       | no       |
+| `encryptionKey`   | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables | N/A      | no       | no       |
+| ~~`password`~~    | `text`    | Password to access the device if password protected. **DEPRECATED. Use `encryptionKey` instead**                                       | N/A      | no       | no       |
+| `pingInterval`    | `integer` | Seconds between sending ping requests to device to check if alive                                                                      | 10       | no       | yes      |
+| `maxPingTimeouts` | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                     | 4        | no       | yes      |
+| `server`          | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device                                              |          | no       | yes      |
+| `logPrefix`       | `text`    | Log prefix to use for this device.                                                                                                     | hostname | no       | yes      |
 
 ## Channels
 
@@ -96,7 +92,7 @@ Channels are auto-generated based on actual device configuration.
 ### Thing Configuration
 
 ```
-esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", password="MyPassword", pingInterval=10, maxPingTimeouts=4]
+esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4]
 ```
 
 ### Item Configuration
