@@ -150,7 +150,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             boolean useEncryption = config.encryptionKey != null;
             if (!useEncryption) {
                 logger.warn(
-                        "Using unencrypted connection. This is deprecated and will be removed in the future. Please use encryption.");
+                        "[{}] Using unencrypted connection. This is deprecated and will be removed in the future. Please use encryption.",
+                        logPrefix);
             }
 
             frameHelper = useEncryption
