@@ -10,30 +10,18 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
-import io.esphome.api.ConnectRequest;
-import io.esphome.api.ConnectResponse;
-import io.esphome.api.DeviceInfoRequest;
-import io.esphome.api.DeviceInfoResponse;
-import io.esphome.api.DisconnectRequest;
-import io.esphome.api.DisconnectResponse;
-import io.esphome.api.HelloRequest;
-import io.esphome.api.HelloResponse;
-import io.esphome.api.ListEntitiesDoneResponse;
-import io.esphome.api.ListEntitiesRequest;
-import io.esphome.api.PingRequest;
-import io.esphome.api.PingResponse;
-import io.esphome.api.SubscribeStatesRequest;
+import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 import no.seime.openhab.binding.esphome.internal.ESPHomeEmulator;
-import no.seime.openhab.binding.esphome.internal.PacketListener;
 
-public class LogReadingPacketListener implements PacketListener {
+public class LogReadingCommunicationListener implements CommunicationListener {
 
-    private final Logger logger = LoggerFactory.getLogger(LogReadingPacketListener.class);
+    private final Logger logger = LoggerFactory.getLogger(LogReadingCommunicationListener.class);
     private final ESPHomeEmulator emulator;
 
     List<GeneratedMessageV3> responseMessages;
 
-    public LogReadingPacketListener(ESPHomeEmulator emulator, File logFile)
+    public LogReadingCommunicationListener(ESPHomeEmulator emulator, File logFile)
             throws IOException, InvocationTargetException, IllegalAccessException {
         this.emulator = emulator;
         LogParser logParser = new LogParser();
@@ -41,7 +29,7 @@ public class LogReadingPacketListener implements PacketListener {
     }
 
     @Override
-    public void onPacket(GeneratedMessageV3 message) throws IOException {
+    public void onPacket(GeneratedMessageV3 message) throws IOException, ProtocolAPIError {
         if (message instanceof HelloRequest) {
             emulator.sendPacket(responseMessages.stream().filter(e -> e instanceof HelloResponse).findFirst().get());
         } else if (message instanceof DeviceInfoRequest) {
@@ -59,7 +47,7 @@ public class LogReadingPacketListener implements PacketListener {
                         try {
                             logger.debug("Sending list entities response {}", m);
                             emulator.sendPacket(m);
-                        } catch (IOException e) {
+                        } catch (IOException | ProtocolAPIError e) {
                             throw new RuntimeException(e);
                         }
                     });
@@ -71,7 +59,7 @@ public class LogReadingPacketListener implements PacketListener {
                     .forEach(m -> {
                         try {
                             emulator.sendPacket(m);
-                        } catch (IOException e) {
+                        } catch (IOException | ProtocolAPIError e) {
                             throw new RuntimeException(e);
                         }
                     });
@@ -84,6 +72,10 @@ public class LogReadingPacketListener implements PacketListener {
     }
 
     @Override
-    public void onParseError() {
+    public void onParseError(CommunicationError error) {
+    }
+
+    @Override
+    public void onConnect() {
     }
 }

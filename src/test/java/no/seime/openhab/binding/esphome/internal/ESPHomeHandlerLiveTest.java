@@ -4,14 +4,8 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.net.InetSocketAddress;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -22,8 +16,6 @@ import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
-import no.seime.openhab.binding.esphome.internal.comm.LogReadingCommunicationListener;
-import no.seime.openhab.binding.esphome.internal.comm.PlainTextFrameHelper;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -33,7 +25,7 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
  */
 
 @ExtendWith(MockitoExtension.class)
-class ESPHomeHandlerTest {
+class ESPHomeHandlerLiveTest {
 
     private @Mock Configuration configuration;
     private @Mock ESPChannelTypeProvider channelTypeProvider;
@@ -53,7 +45,10 @@ class ESPHomeHandlerTest {
 
         deviceConfiguration = new ESPHomeConfiguration();
         deviceConfiguration.hostname = "localhost";
-        deviceConfiguration.port = 10000;
+        deviceConfiguration.port = 6053;
+        // deviceConfiguration.password = "MyPassword";
+        deviceConfiguration.encryptionKey = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=";
+        deviceConfiguration.server = "virtual";
         when(configuration.as(ESPHomeConfiguration.class)).thenReturn(deviceConfiguration);
 
         selector = new ConnectionSelector();
@@ -71,21 +66,12 @@ class ESPHomeHandlerTest {
         deviceHandler.dispose();
     }
 
-    @Test
-    void testInitializeEverythingPresenceSensor()
-            throws IOException, InvocationTargetException, IllegalAccessException {
-
-        ESPHomeEmulator emulator = new ESPHomeEmulator(new InetSocketAddress("localhost", 10000),
-                new PlainTextFrameHelper(null, null, "emulator"));
-
-        emulator.setPacketListener(new LogReadingCommunicationListener(emulator,
-                new File("src/test/resources/logfiles/presence_sensor.log")));
-        emulator.start();
-
+    // @Test
+    public void testConnectToDeviceOnLocalhost() {
         deviceHandler.initialize();
-
         await().until(() -> deviceHandler.isInterrogated());
-        assertEquals(18, deviceHandler.getDynamicChannels().size());
+        assertEquals(1, deviceHandler.getDynamicChannels().size());
+        deviceHandler.dispose();
     }
 
     private ThingImpl createThing() {

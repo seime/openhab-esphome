@@ -26,11 +26,8 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 
-import io.esphome.api.ClimateCommandRequest;
-import io.esphome.api.ClimateStateResponse;
-import io.esphome.api.ListEntitiesClimateResponse;
+import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.ClimateEnumHelper;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -149,10 +146,11 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 "Target temperature", itemTypeTemperature, Collections.emptyList(), "%.1f %unit%",
                 Set.of(SEMANTIC_TYPE_SETPOINT, "Temperature"), false, "temperature",
                 rsp.getVisualTargetTemperatureStep() == 0f ? null
-                        : new BigDecimal(rsp.getVisualTargetTemperatureStep()),
+                        : BigDecimal.valueOf(rsp.getVisualTargetTemperatureStep()),
                 rsp.getVisualMinTemperature() == 0f ? null
-                        : rsp.getVisualMaxTemperature() == 0f ? null : new BigDecimal(rsp.getVisualMinTemperature()),
-                new BigDecimal(rsp.getVisualMaxTemperature()));
+                        : rsp.getVisualMaxTemperature() == 0f ? null
+                                : BigDecimal.valueOf(rsp.getVisualMinTemperature()),
+                BigDecimal.valueOf(rsp.getVisualMaxTemperature()));
 
         Channel channelTargetTemperature = ChannelBuilder
                 .create(createChannelUID(cleanedComponentName, CHANNEL_TARGET_TEMPERATURE))
@@ -167,11 +165,11 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     "Current temperature", itemTypeTemperature, Collections.emptyList(), "%.1f %unit%",
                     Set.of("Measurement", "Temperature"), true, "temperature",
                     rsp.getVisualCurrentTemperatureStep() == 0f ? null
-                            : new BigDecimal(rsp.getVisualCurrentTemperatureStep()),
+                            : BigDecimal.valueOf(rsp.getVisualCurrentTemperatureStep()),
                     rsp.getVisualMinTemperature() == 0f ? null
                             : rsp.getVisualMaxTemperature() == 0f ? null
-                                    : new BigDecimal(rsp.getVisualMinTemperature()),
-                    new BigDecimal(rsp.getVisualMaxTemperature()));
+                                    : BigDecimal.valueOf(rsp.getVisualMinTemperature()),
+                    BigDecimal.valueOf(rsp.getVisualMaxTemperature()));
 
             Channel channel = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_CURRENT_TEMPERATURE))
                     .withLabel(createLabel(rsp.getName(), "Current temperature")).withKind(ChannelKind.STATE)
@@ -271,5 +269,43 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 .ifPresent(channel -> handler.updateState(channel.getUID(), new StringType(rsp.getCustomPreset())));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_SWING_MODE).ifPresent(channel -> handler
                 .updateState(channel.getUID(), new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getSwingMode()))));
+    }
+
+    public static class ClimateEnumHelper {
+        public static String stripEnumPrefix(ClimateSwingMode mode) {
+            String toRemove = "CLIMATE_SWING";
+            return mode.toString().substring(toRemove.length() + 1);
+        }
+
+        public static String stripEnumPrefix(ClimateFanMode mode) {
+            String toRemove = "CLIMATE_FAN";
+            return mode.toString().substring(toRemove.length() + 1);
+        }
+
+        public static String stripEnumPrefix(ClimateMode climateMode) {
+            String toRemove = "CLIMATE_MODE";
+            return climateMode.toString().substring(toRemove.length() + 1);
+        }
+
+        public static String stripEnumPrefix(ClimatePreset climatePreset) {
+            String toRemove = "CLIMATE_PRESET";
+            return climatePreset.toString().substring(toRemove.length() + 1);
+        }
+
+        public static ClimateFanMode toFanMode(String fanMode) {
+            return ClimateFanMode.valueOf("CLIMATE_FAN_" + fanMode.toUpperCase());
+        }
+
+        public static ClimatePreset toClimatePreset(String climatePreset) {
+            return ClimatePreset.valueOf("CLIMATE_PRESET_" + climatePreset.toUpperCase());
+        }
+
+        public static ClimateMode toClimateMode(String mode) {
+            return ClimateMode.valueOf("CLIMATE_MODE_" + mode.toUpperCase());
+        }
+
+        public static ClimateSwingMode toClimateSwingMode(String mode) {
+            return ClimateSwingMode.valueOf("CLIMATE_SWING_" + mode.toUpperCase());
+        }
     }
 }

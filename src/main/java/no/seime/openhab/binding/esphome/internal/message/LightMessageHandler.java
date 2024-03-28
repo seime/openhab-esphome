@@ -167,7 +167,7 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
                         new int[] { (int) rsp.getRed() * 255, (int) rsp.getGreen() * 255, (int) rsp.getBlue() * 255 });
 
                 // If off, set brightness to 0
-                if (rsp.getState() == false) {
+                if (!rsp.getState()) {
                     hsbType = new HSBType(hsbType.getHue(), hsbType.getSaturation(), new PercentType(0));
                 } else {
                     // Adjust brightness

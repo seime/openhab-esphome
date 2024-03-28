@@ -15,7 +15,7 @@ import com.google.protobuf.GeneratedMessageV3;
 
 public class LogParser {
 
-    private MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
+    private final MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
 
     public List<GeneratedMessageV3> parseLog(File log)
             throws IOException, InvocationTargetException, IllegalAccessException {
@@ -51,10 +51,7 @@ public class LogParser {
 
         if (parseMethod != null) {
             GeneratedMessageV3 invoke = (GeneratedMessageV3) parseMethod.invoke(null, fromString(messageData));
-            if (invoke != null) {
-                return invoke;
-
-            }
+            return invoke;
         }
         return null;
     }
@@ -65,7 +62,7 @@ public class LogParser {
         }
 
         String[] strings = string.replace("[", "").replace("]", "").split(", ");
-        byte result[] = new byte[strings.length];
+        byte[] result = new byte[strings.length];
         for (int i = 0; i < result.length; i++) {
             result[i] = (byte) Integer.parseInt(strings[i]);
         }
