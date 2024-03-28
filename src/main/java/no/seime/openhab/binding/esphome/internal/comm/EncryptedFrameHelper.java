@@ -28,12 +28,13 @@ import com.google.protobuf.GeneratedMessageV3;
 import com.southernstorm.noise.protocol.CipherStatePair;
 import com.southernstorm.noise.protocol.HandshakeState;
 
+import io.esphome.api.ApiOptions;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
 public class EncryptedFrameHelper extends AbstractFrameHelper {
 
     // TODO not entirely clear whether this is identical to Noise_NNpsk0_25519_ChaChaPoly_SHA256
-    private final static String NOISE_PROTOCOL = "NoisePSK_NN_25519_ChaChaPoly_SHA256";
+    private final static String NOISE_PROTOCOL = "Noise_NNpsk0_25519_ChaChaPoly_SHA256";
     private final String encryptionKeyBase64;
     private final String expectedServername;
     private HandshakeState client;
@@ -196,9 +197,9 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
     public ByteBuffer encodeFrame(GeneratedMessageV3 message) throws ProtocolAPIError {
         try {
             byte[] protoBytes = message.toByteArray();
-            byte[] typeAndLength = new byte[] { (byte) (message.getDescriptorForType().getIndex() >> 8 & 0xFF),
-                    (byte) (message.getDescriptorForType().getIndex() & 0xFF), (byte) (protoBytes.length >> 8 & 0xFF),
-                    (byte) (protoBytes.length & 0xFF) };
+            int type = message.getDescriptorForType().getOptions().getExtension(ApiOptions.id);
+            byte[] typeAndLength = new byte[] { (byte) (type >> 8 & 0xFF), (byte) (type & 0xFF),
+                    (byte) (protoBytes.length >> 8 & 0xFF), (byte) (protoBytes.length & 0xFF) };
             byte[] frameUnencrypted = concatArrays(typeAndLength, protoBytes);
             byte[] frameEncrypted = encryptPacket(frameUnencrypted);
 
