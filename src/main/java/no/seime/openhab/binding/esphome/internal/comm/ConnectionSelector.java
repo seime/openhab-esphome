@@ -2,10 +2,7 @@ package no.seime.openhab.binding.esphome.internal.comm;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedSelectorException;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -77,7 +74,7 @@ public class ConnectionSelector {
             } else {
                 logger.trace("Key not readable");
             }
-        } catch (IOException e) {
+        } catch (IOException | CancelledKeyException e) {
             logger.debug("Socket exception", e);
             frameHelper.endOfStream();
         }
