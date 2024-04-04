@@ -59,6 +59,25 @@
 				<description>Useful when debugging communication with a particular device (and you have many)</description>
 				<advanced>true</advanced>
 			</parameter>
+			<parameter name="deviceLogLevel" type="text" required="false">
+				<label>Stream device logs with at least this log level</label>
+				<description>Ensure that your ESPHome YAML config logs at the appropriate level, ie if the device logs at WARN only
+					warn or higher logs may be shipped to openHAB even if you specify INFO here. Log statements are logged to the
+					'ESPHOMEDEVICE' logger at level INFO. Adjust your log4j.xml config file to redirect device logs to ie a sepearate
+					file.</description>
+				<options>
+					<option value="NONE">NONE</option>
+					<option value="ERROR">ERROR</option>
+					<option value="WARN">WARN</option>
+					<option value="INFO">INFO</option>
+					<option value="CONFIG">CONFIG</option>
+					<option value="DEBUG">DEBUG</option>
+					<option value="VERBOSE">VERBOSE</option>
+					<option value="VERY_VERBOSE">VERY_VERBOSE</option>
+				</options>
+				<default>NONE</default>
+				<advanced>true</advanced>
+			</parameter>
 
 		</config-description>
 	</thing-type>

@@ -39,4 +39,6 @@ public class ESPHomeConfiguration {
 
     @Nullable
     public String logPrefix;
+
+    public LogLevel deviceLogLevel = LogLevel.NONE;
 }

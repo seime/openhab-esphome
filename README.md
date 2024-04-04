@@ -30,6 +30,48 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 > **Note:** At the current state of the binding, it is highly recommended to use file based configuration for things and
 > items as channel types etc most likely will change.
 
+## Streaming device logs
+
+As an alternative to manually streaming device logs via ESPHome dashboard, you can have openHAB stream
+the device logs directly to openHAB - which will write them using the standard log system.
+
+1. Make sure your ESPHome yaml is configured with a log level that produces the logs you want to see.
+   See https://esphome.io/components/logger.html
+2. Configure the `deviceLogLevel` parameter on the `thing` configuration. Valid
+   values: https://esphome.io/components/logger.html#log-levels
+
+This will produce logs on level `INFO` in the openHAB logs like this:
+
+```
+[2024-04-04 15:06:25.822] [varmtvann] [D][dallas.sensor:143]: 'VV Temp bunn': Got Temperature=21.0°C
+[2024-04-04 15:06:25.834] [varmtvann] [D][sensor:094]: 'VV Temp bunn': Sending state 21.00000 °C with 1 decimals of accuracy
+[2024-04-04 15:06:25.850] [varmtvann] [D][dallas.sensor:143]: 'VV Temp midt': Got Temperature=71.7°C
+[2024-04-04 15:06:25.863] [varmtvann] [D][sensor:094]: 'VV Temp midt': Sending state 71.68750 °C with 1 decimals of accuracy
+```
+
+To redirect device logs to a separate log file, edit your `log4j.xml` file and add the following in the `Appenders`
+section:
+
+```xml
+
+<RollingFile fileName="${sys:openhab.logdir}/esphomedevice.log"
+             filePattern="${sys:openhab.logdir}/esphomedevice.log.%i" name="ESPHOMEDEVICE">
+    <PatternLayout pattern="[%d{yyyy-MM-dd HH:mm:ss.SSS}] %m%n"/>
+    <Policies>
+        <SizeBasedTriggeringPolicy size="32 MB"/>
+    </Policies>
+</RollingFile>
+```
+
+And add the following in the `Loggers` section:
+
+```xml
+
+<Logger additivity="false" level="INFO" name="ESPHOMEDEVICE">
+    <AppenderRef ref="ESPHOMEDEVICE"/>
+</Logger>
+```
+
 ## FAQ
 
 - I get warnings
@@ -82,6 +124,7 @@ The binding uses mDNS to automatically discover devices on the network.
 | `maxPingTimeouts` | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                     | 4        | no       | yes      |
 | `server`          | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device                                              |          | no       | yes      |
 | `logPrefix`       | `text`    | Log prefix to use for this device.                                                                                                     | hostname | no       | yes      |
+| `deviceLogLevel`  | `text`    | ESPHome device log level to stream from the device.                                                                                    | NONE     | no       | yes      |
 
 ## Channels
 
@@ -92,7 +135,7 @@ Channels are auto-generated based on actual device configuration.
 ### Thing Configuration
 
 ```
-esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4]
+esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, server="esphomename", logPrefix="esp1", deviceLogLevel="INFO"]
 ```
 
 ### Item Configuration

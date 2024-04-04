@@ -14,6 +14,7 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
@@ -38,6 +39,7 @@ import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
+import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.comm.*;
 import no.seime.openhab.binding.esphome.internal.message.*;
 
@@ -53,8 +55,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public static final int CONNECT_TIMEOUT = 20;
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 9;
+    private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
+    private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
+
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private @Nullable ESPHomeConfiguration config;
@@ -329,6 +334,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
             frameHelper.close();
+        } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
+            deviceLogger.info("[{}] {}", logPrefix,
+                    new String(subscribeLogsResponse.getMessage().toByteArray(), StandardCharsets.UTF_8));
         } else {
             // Regular messages handled by message handlers
             AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
@@ -354,6 +362,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 return;
             }
             connectionState = ConnectionState.CONNECTED;
+
+            if (config.deviceLogLevel != LogLevel.NONE) {
+                logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
+
+                frameHelper.send(SubscribeLogsRequest.newBuilder()
+                        .setLevel(io.esphome.api.LogLevel.valueOf("LOG_LEVEL_" + config.deviceLogLevel.name()))
+                        .build());
+            }
+
             updateStatus(ThingStatus.ONLINE);
             logger.debug("[{}] Device login complete, starting device interrogation", logPrefix);
 
