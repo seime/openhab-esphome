@@ -64,7 +64,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptyList(),
                 "%." + rsp.getAccuracyDecimals() + "f "
                         + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement),
-                tags, true, icon, null, null, null);
+                tags, true, icon, null, null, null, rsp.getEntityCategory());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

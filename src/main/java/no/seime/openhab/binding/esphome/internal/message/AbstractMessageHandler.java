@@ -15,22 +15,15 @@ import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.type.AutoUpdatePolicy;
-import org.openhab.core.thing.type.ChannelType;
-import org.openhab.core.thing.type.ChannelTypeBuilder;
-import org.openhab.core.thing.type.ChannelTypeUID;
-import org.openhab.core.thing.type.StateChannelTypeBuilder;
-import org.openhab.core.types.Command;
-import org.openhab.core.types.State;
-import org.openhab.core.types.StateDescriptionFragmentBuilder;
-import org.openhab.core.types.StateOption;
-import org.openhab.core.types.UnDefType;
+import org.openhab.core.thing.type.*;
+import org.openhab.core.types.*;
 import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessageV3;
 
+import io.esphome.api.EntityCategory;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
@@ -48,7 +41,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     protected ChannelType addChannelType(final String channelTypePrefix, final String label, final String itemType,
             final Collection<?> options, @Nullable final String pattern, @Nullable final Set<String> tags,
             boolean readOnly, String category, BigDecimal stateDescriptionStep, BigDecimal stateDescriptionMin,
-            BigDecimal stateDescriptionMax) {
+            BigDecimal stateDescriptionMax, EntityCategory entityCategory) {
         final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
                 channelTypePrefix + handler.getThing().getUID().getId());
         final List<StateOption> stateOptions = options.stream().map(e -> new StateOption(e.toString(), e.toString()))
@@ -83,6 +76,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         }
 
         channelTypeBuilder.withAutoUpdatePolicy(AutoUpdatePolicy.VETO);
+        channelTypeBuilder.isAdvanced(entityCategory != EntityCategory.ENTITY_CATEGORY_NONE);
 
         ChannelType channelType = channelTypeBuilder.build();
 
