@@ -42,6 +42,8 @@ import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.comm.*;
 import no.seime.openhab.binding.esphome.internal.message.*;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.EventSubscription;
 
 /**
  * The {@link ESPHomeHandler} is responsible for handling commands, which are
@@ -81,13 +83,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Nullable
     private String logPrefix = null;
+    private final ESPHomeEventSubscriber eventSubscriber;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
-            ESPChannelTypeProvider dynamicChannelTypeProvider) {
+            ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         logPrefix = thing.getUID().getId();
+        this.eventSubscriber = eventSubscriber;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -177,6 +181,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void dispose() {
         disposed = true;
+        eventSubscriber.removeEventSubscriptions(this);
         setUndefToAllChannels();
         cancelReconnectFuture();
         if (frameHelper != null) {
@@ -269,6 +274,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Override
     public void onEndOfStream() {
+        eventSubscriber.removeEventSubscriptions(this);
         if (!disposed) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                     "ESPHome device closed connection.");
@@ -282,6 +288,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Override
     public void onParseError(CommunicationError error) {
+        eventSubscriber.removeEventSubscriptions(this);
         if (!disposed) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, error.toString());
             setUndefToAllChannels();
@@ -293,6 +300,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void remoteDisconnect() {
+        eventSubscriber.removeEventSubscriptions(this);
         if (!disposed) {
             int reconnectDelaySeconds = CONNECT_TIMEOUT;
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String.format(
@@ -325,7 +333,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         } else if (message instanceof PingRequest) {
             logger.debug("[{}] Responding to ping request", logPrefix);
             frameHelper.send(PingResponse.getDefaultInstance());
-
         } else if (message instanceof PingResponse) {
             logger.debug("[{}] Received ping response", logPrefix);
             lastPong = Instant.now();
@@ -337,6 +344,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix,
                     new String(subscribeLogsResponse.getMessage().toByteArray(), StandardCharsets.UTF_8));
+        } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
+            initializeStateSubscription(subscribeHomeAssistantStateResponse);
+
         } else {
             // Regular messages handled by message handlers
             AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
@@ -347,6 +357,38 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 logger.warn("[{}] Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
                         logPrefix, message.getClass().getName(), message);
             }
+        }
+    }
+
+    private void initializeStateSubscription(SubscribeHomeAssistantStateResponse rsp) {
+        // Setup event subscriber
+        logger.debug("[{}] Start subscribe to OH events entity: {}, attribute: {}", logPrefix, rsp.getEntityId(),
+                rsp.getAttribute());
+
+        EventSubscription subscription = eventSubscriber.createEventSubscription(rsp.getEntityId(), rsp.getAttribute(),
+                this);
+        eventSubscriber.addEventSubscription(this, subscription);
+
+        String state = eventSubscriber.getInitialState(logPrefix, subscription);
+
+        HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
+                .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute()).setState(state)
+                .build();
+        try {
+            frameHelper.send(ohStateUpdate);
+        } catch (ProtocolAPIError e) {
+            logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
+        }
+    }
+
+    public void handleOpenHABEvent(EventSubscription subscription, String esphomeState) {
+        HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
+                .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute())
+                .setState(esphomeState).build();
+        try {
+            frameHelper.send(ohStateUpdate);
+        } catch (ProtocolAPIError e) {
+            logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
         }
     }
 
@@ -405,6 +447,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
             frameHelper.send(DeviceInfoRequest.getDefaultInstance());
             frameHelper.send(ListEntitiesRequest.getDefaultInstance());
+            frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
 
         }
     }

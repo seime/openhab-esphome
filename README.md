@@ -72,6 +72,58 @@ And add the following in the `Loggers` section:
 </Logger>
 ```
 
+## Sending state from openHAB to ESPHome
+
+You can send state to the ESPHome device using the `homeassistant` channel type. Only `entity_id` field is used.
+
+You can listen for several types of OpenHAB events, default is `ItemStateChangedEvent`. The following are supported:
+
+| entity_id                                  | OH Event listened for         | Item/Thing   |
+|--------------------------------------------|-------------------------------|--------------|
+| `<whatever>.ItemName`                      | `ItemStateChangedEvent`       | ItemName     | 
+| `ItemStateChangedEvent.ItemName`           | `ItemStateChangedEvent`       | ItemName     | 
+| `ItemStateEvent.ItemName`                  | `ItemStateEvent`              | ItemName     | 
+| `ItemStatePredictedEvent.ItemName`         | `ItemStatePredictedEvent`     | ItemName     | 
+| `ThingStatusInfoEvent.my_thing_uid`        | `ThingStatusInfoEvent`        | my:thing:uid | 
+| `ThingStatusInfoChangedEvent.my_thing_uid` | `ThingStatusInfoChangedEvent` | my:thing:uid | 
+
+> NOTE: EntityID in HA is case-insensitive - meaning only lowercase is used. Whatever you add in `entity_id` in the
+> ESPHome yaml will be converted to lowercase.
+> In OH item names are case-sensitive, so you > can have 2 items like `MYITEM` and `MyItem`, and we cannot distinguish
+> between the 2. Avoid this setup.
+
+> NOTE2: In Thing UIDs, the `:` is replaced with `_`
+
+### Examples
+
+Making state changes to OH temperature sensor available in ESPHome:
+
+```yaml
+sensor:
+  - platform: homeassistant
+    name: "Outside temperature"
+    entity_id: ItemStateChangedEvent.MyTemperatureItem
+    device_class: temperature
+```
+
+Listening for commands sent from OH to some OH item and making it available in ESPHome:
+
+```yaml
+binary_sensor:
+  - platform: homeassistant
+    name: "Flower watering activating"
+    entity_id: ItemCommandEvent.WaterValve_Switch
+```
+
+Making ESPHome device react when a Thing changes status, ie goes offline/online:
+
+```yaml
+text_sensor:
+  - platform: homeassistant
+    name: "ThingStatusInfoChangedEvent"
+    entity_id: ThingStatusInfoChangedEvent.astro_moon_local
+```
+
 ## FAQ
 
 - I get warnings
@@ -87,13 +139,9 @@ And add the following in the `Loggers` section:
 
 Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
 
-## Supported Things
-
-- `device`: A device flashed with https://esphome.io/ firmware.
-
 ## Limitations as of 2024-03-28
 
-- Only
+- The following entity types are supported
     - `sensor`,
     - `binary_sensor`,
     - `text_sensor`
@@ -102,8 +150,10 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
     - `button`,
     - `cover`,
     - `light` (some advanced configurations may not be supported yet),
-    - `climate` and
-    - `select` is supported.
+    - `climate`
+    - `select`
+    - `homeassistant` see [details here](#sending-state-from-openhab-to-esphome)
+
       Plans to add more, but not yet implemented. I need _your_ help.
 
 ## Discovery

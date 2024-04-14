@@ -18,6 +18,7 @@ import org.openhab.core.thing.internal.ThingImpl;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 /**
  *
@@ -29,6 +30,8 @@ class ESPHomeHandlerLiveTest {
 
     private @Mock Configuration configuration;
     private @Mock ESPChannelTypeProvider channelTypeProvider;
+
+    private @Mock ESPHomeEventSubscriber eventSubscriber;
 
     private Thing thing;
 
@@ -55,7 +58,7 @@ class ESPHomeHandlerLiveTest {
         selector.start();
 
         thing = createThing();
-        deviceHandler = Mockito.spy(new ESPHomeHandler(thing, selector, channelTypeProvider));
+        deviceHandler = Mockito.spy(new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber));
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         deviceHandler.setCallback(thingHandlerCallback);
     }

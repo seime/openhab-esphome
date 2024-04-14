@@ -1,7 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.comm;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -98,7 +97,7 @@ public abstract class AbstractFrameHelper {
                     logger.warn("Received null packet of type {}", parseMethod);
                 }
             }
-        } catch (ProtocolAPIError | IllegalAccessException | InvocationTargetException | IOException e) {
+        } catch (Exception e) {
             logger.warn("Error parsing packet", e);
             listener.onParseError(CommunicationError.PACKET_ERROR);
         }

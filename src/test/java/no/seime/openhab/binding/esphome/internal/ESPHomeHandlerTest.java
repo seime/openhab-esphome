@@ -26,6 +26,7 @@ import no.seime.openhab.binding.esphome.internal.comm.LogReadingCommunicationLis
 import no.seime.openhab.binding.esphome.internal.comm.PlainTextFrameHelper;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 /**
  *
@@ -37,6 +38,8 @@ class ESPHomeHandlerTest {
 
     private @Mock Configuration configuration;
     private @Mock ESPChannelTypeProvider channelTypeProvider;
+
+    private @Mock ESPHomeEventSubscriber eventSubscriber;
 
     private Thing thing;
 
@@ -60,7 +63,7 @@ class ESPHomeHandlerTest {
         selector.start();
 
         thing = createThing();
-        deviceHandler = Mockito.spy(new ESPHomeHandler(thing, selector, channelTypeProvider));
+        deviceHandler = Mockito.spy(new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber));
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         deviceHandler.setCallback(thingHandlerCallback);
     }
