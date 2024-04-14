@@ -13,8 +13,10 @@ the [ESPHome dashboard](https://esphome.io/guides/installing_esphome.html) for t
 
 Benefits of using the native API over MQTT:
 
-- State descriptions on openHAB channels with value options
-- No need for an MQTT broker
+- Very tight integration with openHAB, state patterns, options, icons etc fully integrated
+- Robust and reliable communication - 2 way keep-alive pings at fairly short intervals lets you know if the device has
+  gone offline
+- No need for an MQTT broker (but that is nice to have anyway for other things :))
 - Slightly faster than messaging over MQTT (according to the ESPHome documentation)
 
 Read more here: https://esphome.io/components/api#advantages-over-mqtt
@@ -133,6 +135,19 @@ the [HomeAssistant time source component](https://esphome.io/components/time/hom
 time:
   - platform: homeassistant
     id: openhab_time
+
+## Iconify support
+
+If you have
+the [Iconify icon provider bundle installed](https://community.openhab.org/t/iconify-icon-provider-4-0-0-0-5-0-0-0/149990),
+try configuring the `icon` field in the ESPHome yaml file. The binding will then use the icon from Iconify instead of
+[openHAB classic icons](https://www.openhab.org/docs/configuration/iconsets/classic/).
+
+```yaml
+sensor:
+  - platform: uptime
+    name: Uptime
+    icon: "mdi:counter"
 ```
 
 ## FAQ
@@ -150,22 +165,17 @@ time:
 
 Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
 
-## Limitations as of 2024-03-28
+## Limitations as of 2024-04-14
 
-- The following entity types are supported
-    - `sensor`,
-    - `binary_sensor`,
-    - `text_sensor`
-    - `switch`,
-    - `number`,
-    - `button`,
-    - `cover`,
-    - `light` (some advanced configurations may not be supported yet),
-    - `climate`
-    - `select`
-    - `homeassistant` see [details here](#sending-state-from-openhab-to-esphome)
+Most entity types and functions are now supported. However, there are some limitations:
 
-      Plans to add more, but not yet implemented. I need _your_ help.
+The following entity types are **not** yet supported (please submit a PR of file a feature request!)
+
+- `lock`,
+- `fan`,
+- `camera`
+
+In addition, the Bluetooth proxy isn't ready yet.
 
 ## Discovery
 
