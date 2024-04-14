@@ -126,6 +126,16 @@ text_sensor:
     entity_id: ThingStatusInfoChangedEvent.astro_moon_local
 ```
 
+## Time sync
+
+Time sync from your openHAB server is supported using
+the [HomeAssistant time source component](https://esphome.io/components/time/homeassistant).
+
+```yaml
+time:
+  - platform: homeassistant
+    id: openhab_time
+
 ## Iconify support
 
 If you have
@@ -138,7 +148,6 @@ sensor:
   - platform: uptime
     name: Uptime
     icon: "mdi:counter"
-
 ```
 
 ## FAQ

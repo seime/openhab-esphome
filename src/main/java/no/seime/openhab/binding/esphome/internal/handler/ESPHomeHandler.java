@@ -346,7 +346,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     new String(subscribeLogsResponse.getMessage().toByteArray(), StandardCharsets.UTF_8));
         } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
             initializeStateSubscription(subscribeHomeAssistantStateResponse);
-
+        } else if (message instanceof GetTimeRequest) {
+            logger.debug("[{}] Received time sync request", logPrefix);
+            GetTimeResponse getTimeResponse = GetTimeResponse.newBuilder()
+                    .setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build();
+            frameHelper.send(getTimeResponse);
         } else {
             // Regular messages handled by message handlers
             AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
