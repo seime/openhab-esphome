@@ -34,15 +34,15 @@ public class ButtonMessageHandler extends AbstractMessageHandler<ListEntitiesBut
     @Override
     public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
         if (command instanceof OnOffType) {
-            handler.sendMessage(ButtonCommandRequest.newBuilder().setKey(key).build());
             handler.updateState(channel.getUID(), OnOffType.OFF);
+            handler.sendMessage(ButtonCommandRequest.newBuilder().setKey(key).build());
         } else {
             logger.warn("Unsupported command type: {}, use OnOffType instead", command);
         }
     }
 
     public void buildChannels(ListEntitiesButtonResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, "Switch");
+        Configuration configuration = configuration(rsp.getKey(), null, "Button");
 
         String icon = getChannelIcon(rsp.getIcon(), "switch");
 
