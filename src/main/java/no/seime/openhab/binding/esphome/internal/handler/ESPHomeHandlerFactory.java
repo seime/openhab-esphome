@@ -17,7 +17,9 @@ import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.Thing;
+import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
@@ -55,9 +57,14 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
-            @Reference ESPHomeEventSubscriber eventSubscriber) throws IOException {
+            @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ItemRegistry itemRegistry,
+            @Reference ThingRegistry thingRegistry) throws IOException {
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
+
         this.eventSubscriber = eventSubscriber;
+        eventSubscriber.setItemRegistry(itemRegistry);
+        eventSubscriber.setThingRegistry(thingRegistry);
+
         connectionSelector = new ConnectionSelector();
     }
 

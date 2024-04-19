@@ -23,9 +23,7 @@ import org.openhab.core.thing.events.ThingStatusInfoChangedEvent;
 import org.openhab.core.thing.events.ThingStatusInfoEvent;
 import org.openhab.core.types.Type;
 import org.openhab.core.types.UnDefType;
-import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,8 +47,8 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
 
     public static final String THING_STATUS_INFO_CHANGED_EVENT = "ThingStatusInfoChangedEvent";
 
-    private final ItemRegistry itemRegistry;
-    private final ThingRegistry thingRegistry;
+    private ItemRegistry itemRegistry;
+    private ThingRegistry thingRegistry;
 
     private final static Set<String> supportedOpenhabEventTypes = Set.of(ITEM_COMMAND_EVENT, ITEM_STATE_EVENT,
             ITEM_STATE_PREDICTED_EVENT, ITEM_STATE_CHANGED_EVENT, THING_STATUS_INFO_EVENT,
@@ -59,16 +57,21 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
 
     private final Set<String> subscribedEventTypes = new HashSet<>();
 
-    @Activate
-    public ESPHomeEventSubscriber(@Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry) {
-        this.itemRegistry = itemRegistry;
-        this.thingRegistry = thingRegistry;
+    public ESPHomeEventSubscriber() {
         subscribedEventTypes.add(ItemCommandEvent.TYPE);
         subscribedEventTypes.add(ItemStateEvent.TYPE);
         subscribedEventTypes.add(ItemStatePredictedEvent.TYPE);
         subscribedEventTypes.add(ItemStateChangedEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoChangedEvent.TYPE);
+    }
+
+    public void setItemRegistry(ItemRegistry itemRegistry) {
+        this.itemRegistry = itemRegistry;
+    }
+
+    public void setThingRegistry(ThingRegistry thingRegistry) {
+        this.thingRegistry = thingRegistry;
     }
 
     public String getInitialState(String logPrefix, EventSubscription subscription) {
