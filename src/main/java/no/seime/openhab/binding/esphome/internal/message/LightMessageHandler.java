@@ -195,7 +195,7 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
 
     private SortedSet<LightColorCapability> decodeCapabilities(ListEntitiesLightResponse rsp) {
         SortedSet<LightColorCapability> capabilities = new TreeSet<>();
-        for (Integer bitset : rsp.getSupportedColorModesList()) {
+        for (Integer bitset : rsp.getSupportedColorModesValueList()) {
             if ((bitset & (1 << 0)) != 0) {
                 capabilities.add(LightColorCapability.ON_OFF);
             }

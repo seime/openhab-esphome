@@ -14,7 +14,6 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
@@ -344,8 +343,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         } else if (message instanceof DisconnectResponse) {
             frameHelper.close();
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
-            deviceLogger.info("[{}] {}", logPrefix,
-                    new String(subscribeLogsResponse.getMessage().toByteArray(), StandardCharsets.UTF_8));
+            deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage());
         } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
             initializeStateSubscription(subscribeHomeAssistantStateResponse);
         } else if (message instanceof GetTimeRequest) {
