@@ -26,7 +26,9 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 1. [Install ESPHome](https://esphome.io/guides/installing_esphome)
 2. Create an ESPHome configuration for your device
 3. Flash the device with the ESPHome firmware
-4. Install the ESPHome binding in openHAB https://github.com/seime/openhab-esphome/releases/tag/latest_oh4
+4. Install the openHAB ESPHome binding by copying the jar file
+   here https://github.com/seime/openhab-esphome/releases/tag/latest_oh4 into your `addons` folder, or by installing
+   from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849
 5. Wait for discovery to find your device - or add manually in a thing file.
 
 > **Note:** At the current state of the binding, it is highly recommended to use file based configuration for things and
@@ -135,15 +137,16 @@ the [HomeAssistant time source component](https://esphome.io/components/time/hom
 time:
   - platform: homeassistant
     id: openhab_time
+```
 
 ## Iconify support
 
 If you have
 the [Iconify icon provider bundle installed](https://community.openhab.org/t/iconify-icon-provider-4-0-0-0-5-0-0-0/149990),
 try configuring the `icon` field in the ESPHome yaml file. The binding will then use the icon from Iconify instead of
-[openHAB classic icons](https://www.openhab.org/docs/configuration/iconsets/classic/).
+[ openHAB classic icons ](https://www.openhab.org/docs/configuration/iconsets/classic/).
 
-```yaml
+  ```yaml
 sensor:
   - platform: uptime
     name: Uptime
@@ -172,7 +175,7 @@ Most entity types and functions are now supported. However, there are some limit
 The following entity types are **not** yet supported (please submit a PR of file a feature request!)
 
 - `lock`,
-- `fan`,
+- `datetime`,
 - `camera`
 
 In addition, the Bluetooth proxy isn't ready yet.

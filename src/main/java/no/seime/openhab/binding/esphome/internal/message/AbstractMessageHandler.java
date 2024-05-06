@@ -236,9 +236,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
     }
 
     public Optional<Channel> findChannelByKeyAndField(int key, String field) {
-        return handler.getThing().getChannels().stream()
-                .filter(e -> BigDecimal.valueOf(key).equals(e.getConfiguration().get(BindingConstants.COMMAND_KEY))
-                        && field.equals(e.getConfiguration().get(BindingConstants.COMMAND_FIELD)))
+        return handler.getThing().getChannels().stream().filter(
+                channel -> BigDecimal.valueOf(key).equals(channel.getConfiguration().get(BindingConstants.COMMAND_KEY))
+                        && field.equals(channel.getConfiguration().get(BindingConstants.COMMAND_FIELD)))
                 .findFirst();
     }
 
@@ -261,5 +261,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
         } else {
             return icon.replace(":", "_"); // ie mdi:thermometer -> mdi_thermometer
         }
+    }
+
+    protected String createLabel(String componentName, String channelName) {
+        return String.format("%s %s", componentName, channelName).trim();
     }
 }
