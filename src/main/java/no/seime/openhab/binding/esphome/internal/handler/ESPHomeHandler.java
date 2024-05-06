@@ -114,6 +114,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 ButtonCommandRequest.class);
         registerMessageHandler("Cover", new CoverMessageHandler(this), ListEntitiesCoverResponse.class,
                 CoverStateResponse.class);
+        registerMessageHandler("Fan", new FanMessageHandler(this), ListEntitiesFanResponse.class,
+                FanStateResponse.class);
     }
 
     private void registerMessageHandler(String select,
