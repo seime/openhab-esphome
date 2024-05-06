@@ -15,6 +15,7 @@ import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.thing.Channel;
+import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.type.*;
 import org.openhab.core.types.*;
 import org.openhab.core.types.util.UnitUtils;
@@ -265,5 +266,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
 
     protected String createLabel(String componentName, String channelName) {
         return String.format("%s %s", componentName, channelName).trim();
+    }
+
+    protected ChannelUID createChannelUID(String componentName, String channelName) {
+        return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
     }
 }

@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 
 import org.openhab.core.library.types.*;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
@@ -46,7 +45,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
     private final ReentrantLock lock = new ReentrantLock();
 
-    private final LoadingCache<Integer, FanCommandRequest.Builder> commands;
+    private final LoadingCache<Integer, FanCommandRequest.Builder> commandAggregatingCache;
 
     private Thread expiryThread = null;
 
@@ -55,7 +54,8 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
         // Cache the commands for a short time to allow for multiple OH channel commands to be sent as 1 request to
         // ESPHome
-        commands = CacheBuilder.newBuilder().maximumSize(10).expireAfterAccess(400, TimeUnit.MILLISECONDS)
+        commandAggregatingCache = CacheBuilder.newBuilder().maximumSize(10)
+                .expireAfterAccess(400, TimeUnit.MILLISECONDS)
                 .removalListener((RemovalListener<Integer, FanCommandRequest.Builder>) notification -> {
                     if (notification.getValue() != null) {
                         try {
@@ -76,7 +76,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
     public void handleCommand(Channel channel, Command command, int key) {
         try {
             lock.lock();
-            FanCommandRequest.Builder builder = commands.get(key);
+            FanCommandRequest.Builder builder = commandAggregatingCache.get(key);
 
             if (command == StopMoveType.STOP) {
                 builder.setSpeedLevel(0);
@@ -148,11 +148,11 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             // Start a thread that will clean up the cache (send the pending messages)
             if (expiryThread == null || !expiryThread.isAlive()) {
                 expiryThread = new Thread(() -> {
-                    while (commands.size() > 0) {
+                    while (commandAggregatingCache.size() > 0) {
                         try {
                             lock.lock();
                             logger.debug("Calling cleanup");
-                            commands.cleanUp();
+                            commandAggregatingCache.cleanUp();
                         } finally {
                             lock.unlock();
                         }
@@ -174,10 +174,6 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         }
     }
 
-    private ChannelUID createChannelUID(String componentName, String channelName) {
-        return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
-    }
-
     public static String stripEnumPrefix(FanDirection fanDirection) {
         String toRemove = "FAN_DIRECTION";
         return fanDirection.toString().substring(toRemove.length() + 1);
@@ -185,14 +181,12 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
     public void buildChannels(ListEntitiesFanResponse rsp) {
 
-        String cleanedComponentName = rsp.getName().replace(" ", "_").toLowerCase();
-
         String icon = getChannelIcon(rsp.getIcon(), "fan");
 
         ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + CHANNEL_STATE, "State", "Switch",
                 Collections.emptySet(), null, Set.of("Switch"), false, icon, null, null, null, rsp.getEntityCategory());
 
-        Channel channelState = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_STATE))
+        Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "State")).withKind(ChannelKind.STATE)
                 .withType(channelTypeState.getUID()).withAcceptedItemType("Switch")
                 .withConfiguration(configuration(rsp.getKey(), CHANNEL_STATE, COMMAND_CLASS_FAN)).build();
@@ -204,8 +198,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                     "Switch", Collections.emptySet(), null, Set.of("Switch"), false, icon, null, null, null,
                     rsp.getEntityCategory());
 
-            Channel channelOscillation = ChannelBuilder
-                    .create(createChannelUID(cleanedComponentName, CHANNEL_OSCILLATION))
+            Channel channelOscillation = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_OSCILLATION))
                     .withLabel(createLabel(rsp.getName(), "Oscillation")).withKind(ChannelKind.STATE)
                     .withType(channelTypeOscillation.getUID()).withAcceptedItemType("Switch")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_OSCILLATION, COMMAND_CLASS_FAN)).build();
@@ -220,7 +213,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                             .map(e -> stripEnumPrefix(e)).collect(Collectors.toList()),
                     "%s", null, false, "fan", null, null, null, rsp.getEntityCategory());
 
-            Channel channelDirection = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_DIRECTION))
+            Channel channelDirection = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_DIRECTION))
                     .withLabel(createLabel(rsp.getName(), "Direction")).withKind(ChannelKind.STATE)
                     .withType(channelTypeDirection.getUID()).withAcceptedItemType("String")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_DIRECTION, COMMAND_CLASS_FAN)).build();
@@ -237,7 +230,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                     BigDecimal.valueOf(100 / supportedSpeedLevels), BigDecimal.ZERO, BigDecimal.valueOf(100),
                     rsp.getEntityCategory());
 
-            Channel channelSpeed = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_SPEED_LEVEL))
+            Channel channelSpeed = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_SPEED_LEVEL))
                     .withLabel(createLabel(rsp.getName(), "Speed")).withKind(ChannelKind.STATE)
                     .withType(channelTypeSpeed.getUID()).withAcceptedItemType("Dimmer")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_SPEED_LEVEL, COMMAND_CLASS_FAN)).build();
@@ -249,7 +242,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             ChannelType channelTypePreset = addChannelType(rsp.getUniqueId() + CHANNEL_PRESET, "Preset", "String",
                     rsp.getSupportedPresetModesList(), "%s", Set.of("Setpoint"), false, "fan", null, null, null,
                     rsp.getEntityCategory());
-            Channel channelPreset = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_PRESET))
+            Channel channelPreset = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_PRESET))
                     .withLabel(createLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
                     .withType(channelTypePreset.getUID()).withAcceptedItemType("String")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_PRESET, COMMAND_CLASS_FAN)).build();

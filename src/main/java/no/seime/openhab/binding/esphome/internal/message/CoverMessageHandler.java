@@ -8,7 +8,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.openhab.core.library.types.*;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
@@ -38,14 +37,15 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
     private final ReentrantLock lock = new ReentrantLock();
 
-    private final LoadingCache<Integer, CoverCommandRequest.Builder> commands;
+    private final LoadingCache<Integer, CoverCommandRequest.Builder> commandAggregatingCache;
 
     private Thread expiryThread = null;
 
     public CoverMessageHandler(ESPHomeHandler handler) {
         super(handler);
 
-        commands = CacheBuilder.newBuilder().maximumSize(10).expireAfterAccess(400, TimeUnit.MILLISECONDS)
+        commandAggregatingCache = CacheBuilder.newBuilder().maximumSize(10)
+                .expireAfterAccess(400, TimeUnit.MILLISECONDS)
                 .removalListener((RemovalListener<Integer, CoverCommandRequest.Builder>) notification -> {
                     if (notification.getValue() != null) {
                         try {
@@ -72,7 +72,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     public void handleCommand(Channel channel, Command command, int key) {
         try {
             lock.lock();
-            CoverCommandRequest.Builder builder = commands.get(key);
+            CoverCommandRequest.Builder builder = commandAggregatingCache.get(key);
 
             if (command == StopMoveType.STOP) {
                 builder.setStop(true);
@@ -134,11 +134,11 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
             // Start a thread that will clean up the cache (send the pending messages)
             if (expiryThread == null || !expiryThread.isAlive()) {
                 expiryThread = new Thread(() -> {
-                    while (commands.size() > 0) {
+                    while (commandAggregatingCache.size() > 0) {
                         try {
                             lock.lock();
                             logger.debug("Calling cleanup");
-                            commands.cleanUp();
+                            commandAggregatingCache.cleanUp();
                         } finally {
                             lock.unlock();
                         }
@@ -160,13 +160,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         }
     }
 
-    private ChannelUID createChannelUID(String componentName, String channelName) {
-        return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
-    }
-
     public void buildChannels(ListEntitiesCoverResponse rsp) {
-
-        String cleanedComponentName = rsp.getName().replace(" ", "_").toLowerCase();
 
         CoverDeviceClass deviceClass = CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass());
         if (deviceClass == null) {
@@ -184,7 +178,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("OpenLevel"), false, icon, null,
                     null, null, rsp.getEntityCategory());
 
-            Channel channelPosition = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_POSITION))
+            Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
                     .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                     .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_POSITION, COMMAND_CLASS_COVER)).build();
@@ -195,7 +189,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("Tilt"), false, icon, null,
                     null, null, rsp.getEntityCategory());
 
-            Channel channelTilt = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_TILT))
+            Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
                     .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_TILT, COMMAND_CLASS_COVER)).build();
@@ -207,7 +201,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                 deviceClass.getItemType(), Collections.emptyList(), "%s", Set.of("OpenClose"), false, icon, null, null,
                 null, rsp.getEntityCategory());
 
-        Channel channelState = ChannelBuilder.create(createChannelUID(cleanedComponentName, LEGACY_CHANNEL_STATE))
+        Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), LEGACY_CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "Legacy State")).withKind(ChannelKind.STATE)
                 .withType(channelTypeState.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(rsp.getKey(), LEGACY_CHANNEL_STATE, COMMAND_CLASS_COVER)).build();
@@ -219,7 +213,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                 "motion", null, null, null, rsp.getEntityCategory());
 
         Channel channelCurrentOperation = ChannelBuilder
-                .create(createChannelUID(cleanedComponentName, CHANNEL_CURRENT_OPERATION))
+                .create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_OPERATION))
                 .withLabel(createLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType("String")
                 .withConfiguration(configuration(rsp.getKey(), CHANNEL_CURRENT_OPERATION, COMMAND_CLASS_COVER)).build();
