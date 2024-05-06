@@ -150,13 +150,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
     }
 
-    private String createLabel(String componentName, String channelName) {
-        return String.format("%s %s", componentName, channelName).trim();
-    }
-
-    public static String stripEnumPrefix(FanDirection climatePreset) {
+    public static String stripEnumPrefix(FanDirection fanDirection) {
         String toRemove = "FAN_DIRECTION";
-        return climatePreset.toString().substring(toRemove.length() + 1);
+        return fanDirection.toString().substring(toRemove.length() + 1);
     }
 
     public void buildChannels(ListEntitiesFanResponse rsp) {
@@ -168,9 +164,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + CHANNEL_STATE, "State", "Switch",
                 Collections.emptySet(), null, Set.of("Switch"), false, icon, null, null, null, rsp.getEntityCategory());
 
-        Channel channelState = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                .withLabel("State").withKind(ChannelKind.STATE).withType(channelTypeState.getUID())
-                .withAcceptedItemType("Switch")
+        Channel channelState = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_STATE))
+                .withLabel(createLabel(rsp.getName(), "State")).withKind(ChannelKind.STATE)
+                .withType(channelTypeState.getUID()).withAcceptedItemType("Switch")
                 .withConfiguration(configuration(rsp.getKey(), CHANNEL_OSCILLATION, COMMAND_CLASS_FAN)).build();
 
         super.registerChannel(channelState, channelTypeState);
@@ -181,9 +177,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                     rsp.getEntityCategory());
 
             Channel channelOscillation = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId())).withLabel(rsp.getName())
-                    .withKind(ChannelKind.STATE).withType(channelTypeOscillation.getUID())
-                    .withAcceptedItemType("Switch")
+                    .create(createChannelUID(cleanedComponentName, CHANNEL_OSCILLATION))
+                    .withLabel(createLabel(rsp.getName(), "Oscillation")).withKind(ChannelKind.STATE)
+                    .withType(channelTypeOscillation.getUID()).withAcceptedItemType("Switch")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_OSCILLATION, COMMAND_CLASS_FAN)).build();
 
             super.registerChannel(channelOscillation, channelTypeOscillation);
@@ -192,7 +188,8 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
             ChannelType channelTypeDirection = addChannelType(rsp.getUniqueId() + CHANNEL_DIRECTION, "Direction",
                     "String",
-                    Arrays.stream(FanDirection.values()).map(e -> stripEnumPrefix(e)).collect(Collectors.toList()),
+                    Arrays.stream(FanDirection.values()).filter(e -> e != FanDirection.UNRECOGNIZED)
+                            .map(e -> stripEnumPrefix(e)).collect(Collectors.toList()),
                     "%s", null, false, "fan", null, null, null, rsp.getEntityCategory());
 
             Channel channelDirection = ChannelBuilder.create(createChannelUID(cleanedComponentName, CHANNEL_DIRECTION))

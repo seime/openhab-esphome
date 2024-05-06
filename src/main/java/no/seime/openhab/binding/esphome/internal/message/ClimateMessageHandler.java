@@ -133,10 +133,6 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
     }
 
-    private String createLabel(String componentName, String channelName) {
-        return String.format("%s %s", componentName, channelName).trim();
-    }
-
     public void buildChannels(ListEntitiesClimateResponse rsp) {
 
         String cleanedComponentName = rsp.getName().replace(" ", "_").toLowerCase();

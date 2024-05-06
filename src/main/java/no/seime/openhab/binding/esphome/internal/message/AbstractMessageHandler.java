@@ -262,4 +262,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
             return icon.replace(":", "_"); // ie mdi:thermometer -> mdi_thermometer
         }
     }
+
+    protected String createLabel(String componentName, String channelName) {
+        return String.format("%s %s", componentName, channelName).trim();
+    }
 }

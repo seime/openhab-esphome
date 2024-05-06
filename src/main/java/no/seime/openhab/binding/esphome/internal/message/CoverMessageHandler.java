@@ -164,10 +164,6 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
     }
 
-    private String createLabel(String componentName, String channelName) {
-        return String.format("%s %s", componentName, channelName).trim();
-    }
-
     public void buildChannels(ListEntitiesCoverResponse rsp) {
 
         String cleanedComponentName = rsp.getName().replace(" ", "_").toLowerCase();
