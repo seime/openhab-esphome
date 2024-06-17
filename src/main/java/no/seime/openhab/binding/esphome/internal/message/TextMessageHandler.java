@@ -13,39 +13,33 @@ import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
 import org.openhab.core.types.UnDefType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import io.esphome.api.ListEntitiesTextSensorResponse;
-import io.esphome.api.TextSensorStateResponse;
+import io.esphome.api.ListEntitiesTextResponse;
+import io.esphome.api.TextCommandRequest;
+import io.esphome.api.TextStateResponse;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
-public class TextSensorMessageHandler
-        extends AbstractMessageHandler<ListEntitiesTextSensorResponse, TextSensorStateResponse> {
+public class TextMessageHandler extends AbstractMessageHandler<ListEntitiesTextResponse, TextStateResponse> {
 
-    private final Logger logger = LoggerFactory.getLogger(TextSensorMessageHandler.class);
-
-    public TextSensorMessageHandler(ESPHomeHandler handler) {
+    public TextMessageHandler(ESPHomeHandler handler) {
         super(handler);
     }
 
     @Override
     public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
-        // No command support
-        logger.warn("Cannot send command '{}' to text sensor channel {}, read only. Use a `text` component instead",
-                command, channel.getUID());
+        handler.sendMessage(TextCommandRequest.newBuilder().setKey(key).setState(command.toString()).build());
     }
 
     @Override
-    public void buildChannels(ListEntitiesTextSensorResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, null);
+    public void buildChannels(ListEntitiesTextResponse rsp) {
+        Configuration configuration = configuration(rsp.getKey(), null, "Text");
 
         String icon = getChannelIcon(rsp.getIcon(), "text");
 
         String itemType = "String";
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptySet(),
-                null, Set.of("Status"), true, icon, null, null, null, rsp.getEntityCategory());
+                null, Set.of("Status"), false, icon, null, null, null, rsp.getEntityCategory());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
@@ -55,7 +49,7 @@ public class TextSensorMessageHandler
     }
 
     @Override
-    public void handleState(TextSensorStateResponse rsp) {
+    public void handleState(TextStateResponse rsp) {
         findChannelByKey(rsp.getKey()).ifPresent(
                 channel -> handler.updateState(channel.getUID(), toTextState(rsp.getState(), rsp.getMissingState())));
     }

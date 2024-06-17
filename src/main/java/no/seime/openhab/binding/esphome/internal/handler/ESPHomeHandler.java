@@ -101,6 +101,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 ListEntitiesBinarySensorResponse.class, BinarySensorStateResponse.class);
         registerMessageHandler("TextSensor", new TextSensorMessageHandler(this), ListEntitiesTextSensorResponse.class,
                 TextSensorStateResponse.class);
+        registerMessageHandler("Text", new TextMessageHandler(this), ListEntitiesTextResponse.class,
+                TextStateResponse.class);
         registerMessageHandler("Switch", new SwitchMessageHandler(this), ListEntitiesSwitchResponse.class,
                 SwitchStateResponse.class);
         registerMessageHandler("Climate", new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,
