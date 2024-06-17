@@ -164,19 +164,21 @@ sensor:
   > ![img.png](esphomeconfig_deviceclass.png)
   > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
   device_class values (**use lowercase values**)
-  > Also note that you may override `device_class: ""` to remove any device class from the sensor.
+  > Also note that you may override default device_class by specifying `device_class: ""` to remove any device class
+  from the sensor.
 
 Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
 
-## Limitations as of 2024-04-14
+## Limitations as of 2024-06-17
 
 Most entity types and functions are now supported. However, there are some limitations:
 
 The following entity types are **not** yet supported (please submit a PR of file a feature request!)
 
 - `lock`,
-- `datetime`,
 - `camera`
+- `voice`
+- `valve`
 
 In addition, the Bluetooth proxy isn't ready yet.
 
