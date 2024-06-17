@@ -133,6 +133,10 @@ public abstract class AbstractFrameHelper {
             logger.debug("[{}] Sending message type {} with content '{}'", logPrefix,
                     message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
         }
-        connection.send(encodeFrame(message));
+        if (connection != null) {
+            connection.send(encodeFrame(message));
+        } else {
+            logger.debug("Connection is null, cannot send message");
+        }
     }
 }

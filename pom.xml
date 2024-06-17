@@ -50,6 +50,13 @@
       <scope>provided</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.openhab.addons.bundles</groupId>
+      <artifactId>org.openhab.binding.bluetooth</artifactId>
+      <version>${project.parent.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
 
     <dependency>
       <groupId>org.slf4j</groupId>
