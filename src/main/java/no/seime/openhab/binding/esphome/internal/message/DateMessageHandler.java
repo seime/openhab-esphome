@@ -1,10 +1,10 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
-import io.esphome.api.DateCommandRequest;
-import io.esphome.api.DateStateResponse;
-import io.esphome.api.ListEntitiesDateResponse;
-import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.Collections;
+import java.util.Set;
+
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.thing.Channel;
@@ -18,10 +18,11 @@ import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.Collections;
-import java.util.Set;
+import io.esphome.api.DateCommandRequest;
+import io.esphome.api.DateStateResponse;
+import io.esphome.api.ListEntitiesDateResponse;
+import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 public class DateMessageHandler extends AbstractMessageHandler<ListEntitiesDateResponse, DateStateResponse> {
 
