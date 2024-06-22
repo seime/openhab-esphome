@@ -1,14 +1,16 @@
 package no.seime.openhab.binding.esphome.internal.comm;
 
-import com.google.protobuf.GeneratedMessageV3;
-import no.seime.openhab.binding.esphome.internal.CommunicationListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.protobuf.GeneratedMessageV3;
+
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
 public abstract class AbstractFrameHelper {
 
