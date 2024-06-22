@@ -12,10 +12,12 @@
  */
 package no.seime.openhab.binding.esphome.internal.handler;
 
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
-import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
-import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Set;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
@@ -30,11 +32,10 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Map;
-import java.util.Set;
+import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
+import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 /**
  * The {@link ESPHomeHandlerFactory} is responsible for creating things and thing
@@ -81,7 +82,9 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber);
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
-            return new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry);
+            ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry);
+            registerBluetoothAdapter(handler);
+            return handler;
         }
 
         return null;

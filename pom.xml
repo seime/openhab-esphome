@@ -156,6 +156,7 @@
               <protocArtifact>com.google.protobuf:protoc:${proto.version}:exe:${os.detected.classifier}</protocArtifact>
               <attachProtoSources>false</attachProtoSources>
               <useArgumentFile>true</useArgumentFile>
+              <checkStaleness>true</checkStaleness>
             </configuration>
           </execution>
         </executions>
