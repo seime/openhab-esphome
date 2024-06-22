@@ -81,12 +81,4 @@
 
 		</config-description>
 	</thing-type>
-
-	<bridge-type id="bluetooth-proxy">
-		<label>Bluetooth proxy</label>
-		<description>ESPHome Bluetooth Proxy for beacons. Utilizes any registered ESPHome device with bluetooth proxy enabled</description>
-	</bridge-type>
-
-	<!-- Sample Channel Type -->
-
 </thing:thing-descriptions>
