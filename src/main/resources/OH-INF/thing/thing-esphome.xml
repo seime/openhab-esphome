@@ -43,6 +43,12 @@
 					device configuration yaml</description>
 			</parameter>
 
+			<parameter name="enableBluetoothProxy" type="boolean" required="false">
+				<label>Enable Bluetooth proxying</label>
+				<description>Ensure your ESPHome configuration contains the bluetooth_proxy configuration element</description>
+				<default>false</default>
+			</parameter>
+
 			<parameter name="pingInterval" type="integer" min="1" required="false">
 				<label>Ping interval in seconds</label>
 				<default>10</default>

@@ -534,7 +534,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
             bluetoothProxyStarted = false;
         } catch (ProtocolAPIError e) {
-            logger.error("[{}] Error starting BLE proxy", logPrefix, e);
+            logger.error("[{}] Error stopping BLE proxy", logPrefix, e);
         }
 
         espHomeBluetoothProxyHandler = null;
