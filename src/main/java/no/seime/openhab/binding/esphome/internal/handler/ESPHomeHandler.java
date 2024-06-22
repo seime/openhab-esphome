@@ -12,13 +12,17 @@
  */
 package no.seime.openhab.binding.esphome.internal.handler;
 
-import java.math.BigDecimal;
-import java.net.InetSocketAddress;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
+import com.google.protobuf.GeneratedMessageV3;
+import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
+import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
+import no.seime.openhab.binding.esphome.internal.LogLevel;
+import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
+import no.seime.openhab.binding.esphome.internal.comm.*;
+import no.seime.openhab.binding.esphome.internal.message.*;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.EventSubscription;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -32,18 +36,12 @@ import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
-
-import io.esphome.api.*;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.CommunicationListener;
-import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
-import no.seime.openhab.binding.esphome.internal.LogLevel;
-import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
-import no.seime.openhab.binding.esphome.internal.comm.*;
-import no.seime.openhab.binding.esphome.internal.message.*;
-import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
-import no.seime.openhab.binding.esphome.internal.message.statesubscription.EventSubscription;
+import java.math.BigDecimal;
+import java.net.InetSocketAddress;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The {@link ESPHomeHandler} is responsible for handling commands, which are
@@ -528,7 +526,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
             bluetoothProxyStarted = false;
         } catch (ProtocolAPIError e) {
-            logger.error("[{}] Error starting BLE proxy", logPrefix, e);
+            logger.error("[{}] Error stopping BLE proxy", logPrefix, e);
         }
 
         espHomeBluetoothProxyHandler = null;

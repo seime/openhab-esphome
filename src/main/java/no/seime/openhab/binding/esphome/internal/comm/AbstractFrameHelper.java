@@ -1,16 +1,14 @@
 package no.seime.openhab.binding.esphome.internal.comm;
 
+import com.google.protobuf.GeneratedMessageV3;
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.protobuf.GeneratedMessageV3;
-
-import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
 public abstract class AbstractFrameHelper {
 
@@ -119,10 +117,14 @@ public abstract class AbstractFrameHelper {
     }
 
     public void send(GeneratedMessageV3 message) throws ProtocolAPIError {
-        if (connection != null) {
-            connection.send(encodeFrame(message));
-        } else {
-            logger.debug("Connection is null, cannot send message");
+        try {
+            if (connection != null) {
+                connection.send(encodeFrame(message));
+            } else {
+                logger.debug("Connection is null, cannot send message");
+            }
+        } catch (ProtocolAPIError e) {
+            logger.warn("Error sending message", e);
         }
     }
 }

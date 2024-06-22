@@ -97,8 +97,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         }
 
         if (espHomeHandlers.isEmpty()) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
-                    String.format("Found no ESPHome devices configured for Bluetooth proxy support"));
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String.format(
+                    "Found no ESPHome devices configured for Bluetooth proxy support. Make sure your ESPHome things are online and have the 'enableBluetoothProxy' option set to 'true'"));
 
         } else {
             updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, String

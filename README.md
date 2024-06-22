@@ -34,7 +34,120 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 > **Note:** At the current state of the binding, it is highly recommended to use file based configuration for things and
 > items as channel types etc most likely will change.
 
-## Streaming device logs
+## Discovery
+
+The binding uses mDNS to automatically discover devices on the network.
+
+## Thing Configuration
+
+### `device` Thing Configuration
+
+| Name                   | Type      | Description                                                                                                                                              | Default  | Required | Advanced |
+|------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
+| `hostname`             | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                                           | N/A      | yes      | no       |
+| `port`                 | `integer` | IP Port of the device                                                                                                                                    | 6053     | no       | no       |
+| `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables                   | N/A      | no       | no       |
+| ~~`password`~~         | `text`    | Password to access the device if password protected. **DEPRECATED. Use `encryptionKey` instead**                                                         | N/A      | no       | no       |
+| `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                            | false    | no       | no       |
+| `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                        | 10       | no       | yes      |
+| `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                       | 4        | no       | yes      |
+| `server`               | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device. Use value from `esphome.name` in ESPHome device configuration |          | no       | yes      |
+| `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                       | hostname | no       | yes      |
+| `deviceLogLevel`       | `text`    | ESPHome device log level to stream from the device.                                                                                                      | NONE     | no       | yes      |
+
+## Channels
+
+Channels are auto-generated based on actual device configuration.
+
+## Full Example file example
+
+### Thing Configuration for ESPHome device
+
+```
+esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, server="esphomename", logPrefix="esp1", deviceLogLevel="INFO"]
+```
+
+### Item Configuration
+
+```
+Number:Temperature ESP1_Temperature "Temperature" <temperature>   {channel="esphome:device:esp1:temperature"}
+Number:Dimensionless ESP1_Humidity "Humidity"     <humidity>      {channel="esphome:device:esp1:humidity"}
+Switch ESP1_Switch "Relay"                        <switch>        {channel="esphome:device:esp1:relay_4"}
+```
+
+## Bluetooth proxy support
+
+It is now possible to utilize the built-in Bluetooth proxy in ESPHome. This allows you to use ESPHome devices as proxies
+for other Bluetooth devices such as BTHome sensors or a range of other Bluetooth devices.
+
+> NOTE: Only beacons / devices broadcasting data are supported at the moment. Connectable devices will be supported in a
+> future release.
+
+The feature is still experimental and may not work as expected.
+
+1. Configure the ESPHome device with the `bluetooth_proxy` component. See https://esphome.io/components/bluetooth_proxy
+
+```yaml
+bluetooth_proxy:
+  active: true
+```
+
+2. Configure the ESPHome `device` in openHAB with `enableBluetoothProxy = true`
+
+```yaml
+esphome:device:esp1  "ESPHome Test card 1" [ ... enableBluetoothProxy=true ]
+```
+
+3. Configure a Bluetooth Proxy bridge of type `esphome`
+
+This is the standard configuration for any type of Bluetooth adapter in openHAB (not documented elsewhere)
+
+| Name                             | Type      | Description                                                                 | Default | Required | Advanced |
+|----------------------------------|-----------|-----------------------------------------------------------------------------|---------|----------|----------|
+| `backgroundDiscovery`            | `boolean` | Add discovered device automatically to tihe inbox in the background         | false   | no       | no       |
+| `inactiveDeviceCleanupInterval`  | `integer` | Number of seconds of Bluetooth device inactivity before removing from inbox | 60      | no       | no       |
+| `inactiveDeviceCleanupThreshold` | `integer` |                                                                             | 300     | no       | no       |
+
+```
+Bridge bluetooth:esphome:proxy "ESPHome BLE Advertisement listener" [backgroundDiscovery = false] {
+    bthome parasite1 "b-Parasite #4354" [address="XX:XX:XX:XX:18:91", expectedReportingIntervalSeconds = 600]
+}
+```
+
+> **NOTE:** Set backgroundDiscovery to true if you want to automatically add discovered devices to the inbox. If not use
+> manual
+> scanning from the inbox.
+
+## FAQ
+
+- I get warnings
+  like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
+
+  > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
+  > type in openHAB.
+  > Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
+  > ![img.png](esphomeconfig_deviceclass.png)
+  > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
+  device_class values (**use lowercase values**)
+  > Also note that you may override default device_class by specifying `device_class: ""` to remove any device class
+  from the sensor.
+
+Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
+
+## Limitations as of 2024-06-17
+
+Most entity types and functions are now supported. However, there are some limitations:
+
+The following entity types are **not** yet supported (please submit a PR of file a feature request!)
+
+- `lock`,
+- `camera`
+- `voice`
+- `valve`
+
+In addition, the Bluetooth proxy isn't fully ready yet.
+
+## Streaming logs from ESPHome device to openHAB
 
 As an alternative to manually streaming device logs via ESPHome dashboard, you can have openHAB stream
 the device logs directly to openHAB - which will write them using the standard log system.
@@ -47,10 +160,14 @@ the device logs directly to openHAB - which will write them using the standard l
 This will produce logs on level `INFO` in the openHAB logs like this:
 
 ```
+
 [2024-04-04 15:06:25.822] [varmtvann] [D][dallas.sensor:143]: 'VV Temp bunn': Got Temperature=21.0°C
-[2024-04-04 15:06:25.834] [varmtvann] [D][sensor:094]: 'VV Temp bunn': Sending state 21.00000 °C with 1 decimals of accuracy
+[2024-04-04 15:06:25.834] [varmtvann] [D][sensor:094]: 'VV Temp bunn': Sending state 21.00000 °C with 1 decimals of
+accuracy
 [2024-04-04 15:06:25.850] [varmtvann] [D][dallas.sensor:143]: 'VV Temp midt': Got Temperature=71.7°C
-[2024-04-04 15:06:25.863] [varmtvann] [D][sensor:094]: 'VV Temp midt': Sending state 71.68750 °C with 1 decimals of accuracy
+[2024-04-04 15:06:25.863] [varmtvann] [D][sensor:094]: 'VV Temp midt': Sending state 71.68750 °C with 1 decimals of
+accuracy
+
 ```
 
 To redirect device logs to a separate log file, edit your `log4j.xml` file and add the following in the `Appenders`
@@ -153,71 +270,3 @@ sensor:
     icon: "mdi:counter"
 ```
 
-## FAQ
-
-- I get warnings
-  like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
-
-  > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
-  > type in openHAB.
-  > Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
-  > ![img.png](esphomeconfig_deviceclass.png)
-  > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
-  device_class values (**use lowercase values**)
-  > Also note that you may override default device_class by specifying `device_class: ""` to remove any device class
-  from the sensor.
-
-Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
-
-## Limitations as of 2024-06-17
-
-Most entity types and functions are now supported. However, there are some limitations:
-
-The following entity types are **not** yet supported (please submit a PR of file a feature request!)
-
-- `lock`,
-- `camera`
-- `voice`
-- `valve`
-
-In addition, the Bluetooth proxy isn't ready yet.
-
-## Discovery
-
-The binding uses mDNS to automatically discover devices on the network.
-
-## Thing Configuration
-
-### `device` Thing Configuration
-
-| Name              | Type      | Description                                                                                                                            | Default  | Required | Advanced |
-|-------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
-| `hostname`        | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                         | N/A      | yes      | no       |
-| `port`            | `integer` | IP Port of the device                                                                                                                  | 6053     | no       | no       |
-| `encryptionKey`   | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables | N/A      | no       | no       |
-| ~~`password`~~    | `text`    | Password to access the device if password protected. **DEPRECATED. Use `encryptionKey` instead**                                       | N/A      | no       | no       |
-| `pingInterval`    | `integer` | Seconds between sending ping requests to device to check if alive                                                                      | 10       | no       | yes      |
-| `maxPingTimeouts` | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                     | 4        | no       | yes      |
-| `server`          | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device                                              |          | no       | yes      |
-| `logPrefix`       | `text`    | Log prefix to use for this device.                                                                                                     | hostname | no       | yes      |
-| `deviceLogLevel`  | `text`    | ESPHome device log level to stream from the device.                                                                                    | NONE     | no       | yes      |
-
-## Channels
-
-Channels are auto-generated based on actual device configuration.
-
-## Full Example
-
-### Thing Configuration
-
-```
-esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, server="esphomename", logPrefix="esp1", deviceLogLevel="INFO"]
-```
-
-### Item Configuration
-
-```
-Number:Temperature ESP1_Temperature "Temperature" <temperature>   {channel="esphome:device:esp1:temperature"}
-Number:Dimensionless ESP1_Humidity "Humidity"     <humidity>      {channel="esphome:device:esp1:humidity"}
-Switch ESP1_Switch "Relay"                        <switch>        {channel="esphome:device:esp1:relay_4"}
-```
