@@ -1,6 +1,7 @@
 # ESPHome Native API Binding
 
-![logo](logo.png)
+<img src="logo.png" width="200"/>
+<img src="openHAB_workswith.png" width="400"/>
 
 This binding makes [ESPHome](https://esphome.io) devices available in openHAB through the ESPHome Home Assistant Native
 API. This is an
