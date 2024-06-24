@@ -212,6 +212,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.close();
             }
         }
+        connectionState = ConnectionState.UNINITIALIZED;
+
         super.dispose();
     }
 
@@ -336,6 +338,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             logger.debug("[{}] Received message type {} with content '{}'", logPrefix,
                     message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
         }
+        if (disposed) {
+            return;
+        }
+
         if (message instanceof DeviceInfoResponse rsp) {
             Map<String, String> props = new HashMap<>();
             props.put("esphome_version", rsp.getEsphomeVersion());
@@ -372,7 +378,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(getTimeResponse);
         } else if (message instanceof BluetoothLEAdvertisementResponse rsp) {
             if (espHomeBluetoothProxyHandler != null) {
-                espHomeBluetoothProxyHandler.handleAdvertisement(rsp);
+                espHomeBluetoothProxyHandler.handleAdvertisement(rsp, this);
             }
         } else {
             // Regular messages handled by message handlers
@@ -521,7 +527,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             try {
                 frameHelper.send(SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
                 bluetoothProxyStarted = true;
-            } catch (ProtocolAPIError e) {
+            } catch (Exception e) {
                 logger.error("[{}] Error starting BLE proxy", logPrefix, e);
             }
         } else {
@@ -530,13 +536,16 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     public void stopListeningForBLEAdvertisements() {
-        try {
-            frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
-            bluetoothProxyStarted = false;
-        } catch (ProtocolAPIError e) {
-            logger.error("[{}] Error stopping BLE proxy", logPrefix, e);
+
+        if (connectionState == ConnectionState.CONNECTED) {
+            try {
+                frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+            } catch (Exception e) {
+                logger.warn("[{}] Error stopping BLE proxy", logPrefix, e);
+            }
         }
 
+        bluetoothProxyStarted = false;
         espHomeBluetoothProxyHandler = null;
     }
 

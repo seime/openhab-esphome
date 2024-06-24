@@ -1,11 +1,12 @@
 package no.seime.openhab.binding.esphome.internal.bluetooth;
 
-import java.util.ArrayList;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import io.esphome.api.BluetoothLEAdvertisementResponse;
+import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.AbstractBluetoothBridgeHandler;
@@ -15,9 +16,13 @@ import org.openhab.core.types.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.esphome.api.BluetoothLEAdvertisementResponse;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @NonNullByDefault
 public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler<ESPHomeBluetoothDevice> {
@@ -31,6 +36,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private List<ESPHomeHandler> espHomeHandlers = new ArrayList<>();
 
+    private final LoadingCache<Long, Optional<BluetoothLEAdvertisementResponse>> cache;
+
     /**
      * Creates a new instance of this class for the {@link Thing}.
      *
@@ -40,10 +47,21 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
     public ESPHomeBluetoothProxyHandler(Bridge thing, ThingRegistry thingRegistry) {
         super(thing);
         this.thingRegistry = thingRegistry;
+        CacheLoader<Long, Optional<BluetoothLEAdvertisementResponse>> loader;
+        loader = new CacheLoader<>() {
+
+            @Override
+            public Optional<BluetoothLEAdvertisementResponse> load(Long key) {
+                return Optional.empty();
+            }
+        };
+
+        cache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.SECONDS).maximumSize(1000).build(loader);
     }
 
     @Override
     public void initialize() {
+
         super.initialize();
         updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Looking for BLE enabled ESPHome devices");
 
@@ -60,7 +78,6 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private synchronized void updateESPHomeDeviceList() {
 
-        logger.debug("Updating list of ESPHome devices");
         // Get all ESPHome devices
         // For each device, check if it has BLE enabled, is enabled and ONLINE
         // If so, enable registration of BLE advertisements
@@ -104,6 +121,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
             updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, String
                     .format("Found %d ESPHome devices configured for Bluetooth proxy support", espHomeHandlers.size()));
         }
+        logger.debug("List of {} ESPHome devices: {}", espHomeHandlers.size(),
+                espHomeHandlers.stream().map(e -> e.getThing().getUID()).toList());
     }
 
     @Override
@@ -131,24 +150,34 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         return new BluetoothAddress(addressBuilder.toString().toUpperCase());
     }
 
-    public void handleAdvertisement(BluetoothLEAdvertisementResponse rsp) {
+    public void handleAdvertisement(@NonNull BluetoothLEAdvertisementResponse rsp, ESPHomeHandler handler) {
+
+        try {
+            Optional<BluetoothLEAdvertisementResponse> cachedAdvertisement = cache.get(rsp.getAddress());
+            if (cachedAdvertisement.isPresent() && equalsExceptRssi(rsp, cachedAdvertisement.get())) {
+                logger.debug("Received duplicate BLE advertisement from device {} via {}", rsp.getAddress(),
+                        handler.getThing().getUID());
+                return;
+            } else {
+                cache.put(rsp.getAddress(), Optional.of(rsp));
+            }
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
 
         try {
             BluetoothAddress address = createAddress(rsp.getAddress());
             ESPHomeBluetoothDevice device = getDevice(address);
 
-            logger.debug("Received BLE advertisement from device {}", address);
+            logger.debug("Received BLE advertisement from device {} via {}", address, handler.getThing().getUID());
 
             device.setName(rsp.getName());
             device.setRssi(rsp.getRssi());
 
             rsp.getManufacturerDataList().stream().findFirst().ifPresent(manufacturerData -> {
                 String uuid = manufacturerData.getUuid();
-                byte[] bytes = HexFormat.of().parseHex(uuid.substring(2));
-                int manufacturerId = (bytes[0] & 0xFF) << 8 | (bytes[1] & 0xFF);
+                int manufacturerId = parseManufacturerIdToInt(uuid);
                 device.setManufacturerId(manufacturerId);
-
-                logger.debug("Manufacturer data UUID: {}", uuid);
 
             });
 
@@ -161,9 +190,23 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         }
     }
 
+    private boolean equalsExceptRssi(BluetoothLEAdvertisementResponse rsp1, BluetoothLEAdvertisementResponse rsp2) {
+        return rsp1.getAddress() == rsp2.getAddress() && rsp1.getName().equals(rsp2.getName())
+                && rsp1.getManufacturerDataList().equals(rsp2.getManufacturerDataList())
+                && rsp1.getServiceDataList().equals(rsp2.getServiceDataList())
+                && rsp1.getServiceUuidsList().equals(rsp2.getServiceUuidsList())
+                && rsp1.getAddressType() == rsp2.getAddressType();
+    }
+
+    private int parseManufacturerIdToInt(String uuid) {
+        byte[] bytes = HexFormat.of().parseHex(uuid.substring(2));
+        int manufacturerId = (bytes[0] & 0xFF) << 8 | (bytes[1] & 0xFF);
+        logger.debug("Manufacturer UUID: {} -> {}", uuid, manufacturerId);
+        return manufacturerId;
+    }
+
     @Override
     public @Nullable BluetoothAddress getAddress() {
-        // Return adapter/ESPHome address
         return null;
     }
 }
