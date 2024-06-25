@@ -3,10 +3,12 @@ package no.seime.openhab.binding.esphome.internal.bluetooth;
 import java.util.concurrent.CompletableFuture;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.*;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
 
 import io.esphome.api.BluetoothLEAdvertisementResponse;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 @NonNullByDefault
 public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
@@ -17,8 +19,14 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
      * @param address
      */
 
+    @Nullable
+    private ESPHomeHandler lockToHandler;
+
+    private final ESPHomeBluetoothProxyHandler proxyHandler;
+
     public ESPHomeBluetoothDevice(BluetoothAdapter adapter, BluetoothAddress address) {
         super(adapter, address);
+        proxyHandler = (ESPHomeBluetoothProxyHandler) adapter;
     }
 
     public void handleAdvertisementPacket(BluetoothLEAdvertisementResponse packet) {
@@ -45,11 +53,25 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public boolean connect() {
+        ESPHomeHandler nearestESPHomeDevice = proxyHandler
+                .getNearestESPHomeDevice(proxyHandler.convertAddressToLong(address));
+        if (nearestESPHomeDevice != null) {
+            lockToHandler = nearestESPHomeDevice;
+            // Connect to the device
+            return true;
+        }
+
         return false;
     }
 
     @Override
     public boolean disconnect() {
+        if (lockToHandler != null) {
+            lockToHandler = null;
+            // Disconnect from the device
+            return true;
+
+        }
         return false;
     }
 
