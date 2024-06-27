@@ -44,6 +44,22 @@ the device logs directly to openHAB - which will write them using the standard l
    See https://esphome.io/components/logger.html
 2. Configure the `deviceLogLevel` parameter on the `thing` configuration. Valid
    values: https://esphome.io/components/logger.html#log-levels
+3. The default log level in openHAB is `WARN`, so you need to add a logger named `ESPHOMEDEVICE`with level `INFO` to see
+   actual log statements. Either add this to your `log4j.xml` file or use the Karaf console:
+
+```
+log:set INFO ESPHOMEDEVICE
+```
+
+**or**
+
+```xml
+
+<Loggers>
+    ...
+    <Logger level="DEBUG" name="ESPHOMEDEVICE"/>
+</Loggers>
+```
 
 This will produce logs on level `INFO` in the openHAB logs like this:
 
