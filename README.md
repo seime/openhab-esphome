@@ -70,7 +70,7 @@ This will produce logs on level `INFO` in the openHAB logs like this:
 [2024-04-04 15:06:25.863] [varmtvann] [D][sensor:094]: 'VV Temp midt': Sending state 71.68750 °C with 1 decimals of accuracy
 ```
 
-To redirect device logs to a separate log file, edit your `log4j.xml` file and add the following in the `Appenders`
+To redirect device logs to a separate log file, edit your `log4j.xml` file and add the following in the `<Appenders>`
 section:
 
 ```xml
