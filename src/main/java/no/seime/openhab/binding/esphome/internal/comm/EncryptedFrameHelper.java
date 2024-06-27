@@ -124,7 +124,7 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
             byte[] serverName = Arrays.copyOfRange(packetData, 1, packetData.length - 1);
             String server = new String(serverName, StandardCharsets.US_ASCII);
 
-            if (expectedServername != null && !server.equals(expectedServername)) {
+            if (expectedServername != null && !expectedServername.equals(server)) {
                 listener.onParseError(CommunicationError.DEVICE_NAME_MISMATCH);
                 return;
             }

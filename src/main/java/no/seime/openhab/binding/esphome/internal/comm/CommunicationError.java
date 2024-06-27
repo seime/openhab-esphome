@@ -7,7 +7,7 @@ public enum CommunicationError {
     ENCRYPTION_KEY_INVALID("Invalid api encryption key"),
     INVALID_PROTOCOL_PREAMBLE(
             "Invalid protocol preamble - this indicates a new major protocol change has arrived, but this binding does not support it yet"),
-    DEVICE_NAME_MISMATCH("ESPHome device reported a different name than configured for the thing");
+    DEVICE_NAME_MISMATCH("ESPHome device reported a different esphome.name than configured for the thing");
 
     private final String text;
 

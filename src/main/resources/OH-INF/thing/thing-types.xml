@@ -37,8 +37,10 @@
 			</parameter>
 
 			<parameter name="server" type="text" required="false">
-				<label>ESPHome device server name</label>
-				<description>Used to verify that we're talking to the correct device</description>
+				<label>ESPHome device name (not hostname)</label>
+				<description>Used to verify that we're talking to the correct device. Use the esphome: -> name: value from the
+					ESPHome
+					device configuration yaml</description>
 			</parameter>
 
 			<parameter name="pingInterval" type="integer" min="1" max="600" required="false">
