@@ -83,9 +83,11 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                 switch (subCommand) {
                     case CHANNEL_POSITION -> {
                         if (command instanceof QuantityType<?> qt) {
-                            builder.setPosition(qt.floatValue() / 100);
+                            builder.setPosition((1 - qt.floatValue()) / 100);
                         } else if (command instanceof DecimalType dc) {
-                            builder.setPosition(dc.floatValue() / 100);
+                            builder.setPosition((1 - dc.floatValue()) / 100);
+                        } else if (command instanceof PercentType dc) {
+                            builder.setPosition((1 - dc.floatValue()));
                         } else if (command == UpDownType.UP) {
                             builder.setPosition(1);
                         } else if (command == UpDownType.DOWN) {
@@ -223,9 +225,9 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     public void handleState(CoverStateResponse rsp) {
         findChannelByKeyAndField(rsp.getKey(), LEGACY_CHANNEL_STATE)
                 .ifPresent(channel -> handler.updateState(channel.getUID(),
-                        new DecimalType(rsp.getLegacyState() == LegacyCoverState.LEGACY_COVER_STATE_OPEN ? 0 : 100)));
-        findChannelByKeyAndField(rsp.getKey(), CHANNEL_POSITION).ifPresent(
-                channel -> handler.updateState(channel.getUID(), toNumericState(channel, rsp.getPosition(), false)));
+                        new DecimalType(rsp.getLegacyState() == LegacyCoverState.LEGACY_COVER_STATE_OPEN ? 0 : 1)));
+        findChannelByKeyAndField(rsp.getKey(), CHANNEL_POSITION).ifPresent(channel -> handler
+                .updateState(channel.getUID(), toNumericState(channel, 1 - rsp.getPosition(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_TILT).ifPresent(
                 channel -> handler.updateState(channel.getUID(), toNumericState(channel, rsp.getTilt(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_CURRENT_OPERATION).ifPresent(channel -> handler
