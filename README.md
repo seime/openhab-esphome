@@ -2,7 +2,7 @@
 
 <img src="logo.png" width="200"/>
 
-[<img src="https://github.com/seime/support-me/blob/main/openHAB_workswith.png" width=300>](https://buymeacoffee.com/arnes)
+[<img src="https://github.com/seime/support-me/blob/main/openHAB_workswith.png" width=300>](https://www.openhab.org)
 
 [<img src="https://github.com/seime/support-me/blob/main/beer_me.png" width=150>](https://buymeacoffee.com/arnes)
 
