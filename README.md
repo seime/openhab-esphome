@@ -3,6 +3,8 @@
 <img src="logo.png" width="200"/>
 <img src="openHAB_workswith.png" width="400"/>
 
+[<img src="https://github.com/seime/support-me/blob/main/beer_me.png" width=150>](https://buymeacoffee.com/arnes)
+
 This binding makes [ESPHome](https://esphome.io) devices available in openHAB through the ESPHome Home Assistant Native
 API. This is an
 alternative to using MQTT and/or running Home Assistant in addition to openHAB.
