@@ -1,14 +1,15 @@
 package no.seime.openhab.binding.esphome.internal.bluetooth;
 
-import java.util.concurrent.CompletableFuture;
-
+import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.*;
+import org.openhab.binding.bluetooth.notification.BluetoothConnectionStatusNotification;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
 
-import io.esphome.api.BluetoothLEAdvertisementResponse;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @NonNullByDefault
 public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
@@ -46,6 +47,42 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         notifyListeners(BluetoothEventType.SCAN_RECORD, notification);
     }
 
+    public void handleConnectionsMessage(BluetoothDeviceConnectionResponse rsp) {
+        notifyListeners(BluetoothEventType.CONNECTION_STATE, new BluetoothConnectionStatusNotification(
+                rsp.getConnected() ? ConnectionState.CONNECTED : ConnectionState.DISCONNECTED));
+
+        if (!rsp.getConnected()) {
+            proxyHandler.unlinkDevice(this);
+            lockToHandler = null;
+        }
+    }
+
+    public void handleGattServicesMessage(BluetoothGATTGetServicesResponse rsp) {
+
+        for (BluetoothGATTService service : rsp.getServicesList()) {
+            int handle = service.getHandle();
+            for (int i = 0; i < service.getUuidCount(); i++) {
+                long uuid = service.getUuid(i);
+                BluetoothGATTCharacteristic characteristics = service.getCharacteristics(i);
+
+                BluetoothService ohService = new BluetoothService(new UUID(uuid, 0), false, handle, handle); // TODO?
+                for (int j = 0; j < characteristics.getUuidCount(); j++) {
+                    long charUuid = characteristics.getUuid(j);
+                    BluetoothCharacteristic ohCharacteristic = new BluetoothCharacteristic(new UUID(charUuid, 0),
+                            handle); // TODO?
+                    ohService.addCharacteristic(ohCharacteristic);
+                }
+
+                notifyListeners(BluetoothEventType.SERVICES_DISCOVERED, ohService);
+            }
+        }
+    }
+
+    public void handleGattServicesDoneMessage(BluetoothGATTGetServicesDoneResponse rsp) {
+        notifyListeners(BluetoothEventType.CONNECTION_STATE,
+                new BluetoothConnectionStatusNotification(ConnectionState.DISCOVERED));
+    }
+
     private String to128BitUUID(String UUID16bit) {
         String uuid = "0000" + UUID16bit.substring(2) + "-0000-1000-8000-00805F9B34FB"; // Trim 0x
         return uuid.toLowerCase();
@@ -54,10 +91,19 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     @Override
     public boolean connect() {
         ESPHomeHandler nearestESPHomeDevice = proxyHandler
-                .getNearestESPHomeDevice(proxyHandler.convertAddressToLong(address));
+                .getNearestESPHomeDevice(BluetoothAddressUtil.convertAddressToLong(address));
         if (nearestESPHomeDevice != null) {
             lockToHandler = nearestESPHomeDevice;
+            proxyHandler.linkDevice(this, nearestESPHomeDevice);
+
             // Connect to the device
+            // notifyListeners(BluetoothEventType.CONNECTION_STATE,
+            // new BluetoothConnectionStatusNotification(ConnectionState.CONNECTING));
+            lockToHandler.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder()
+                    .setAddress(BluetoothAddressUtil.convertAddressToLong(address))
+                    .setRequestType(BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITHOUT_CACHE)
+                    .build());
+
             return true;
         }
 
@@ -67,8 +113,14 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     @Override
     public boolean disconnect() {
         if (lockToHandler != null) {
-            lockToHandler = null;
             // Disconnect from the device
+
+            // notifyListeners(BluetoothEventType.CONNECTION_STATE,
+            // new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTING));
+            lockToHandler.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder()
+                    .setAddress(BluetoothAddressUtil.convertAddressToLong(address))
+                    .setRequestType(BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_DISCONNECT).build());
+
             return true;
 
         }
@@ -77,11 +129,20 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public boolean discoverServices() {
-        return false;
+        notifyListeners(BluetoothEventType.CONNECTION_STATE,
+                new BluetoothConnectionStatusNotification(ConnectionState.DISCOVERING));
+        lockToHandler.sendBluetoothCommand(BluetoothGATTGetServicesRequest.newBuilder()
+                .setAddress(BluetoothAddressUtil.convertAddressToLong(address)).build());
+        return true;
     }
 
     @Override
     public CompletableFuture<byte[]> readCharacteristic(BluetoothCharacteristic characteristic) {
+
+        lockToHandler.sendBluetoothCommand(
+                BluetoothGATTReadRequest.newBuilder().setAddress(BluetoothAddressUtil.convertAddressToLong(address))
+                        .setHandle(characteristic.getHandle()).build());
+
         return CompletableFuture.failedFuture(new RuntimeException("Not implemented"));
     }
 

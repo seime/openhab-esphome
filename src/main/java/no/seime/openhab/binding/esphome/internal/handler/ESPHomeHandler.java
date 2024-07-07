@@ -376,9 +376,19 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             GetTimeResponse getTimeResponse = GetTimeResponse.newBuilder()
                     .setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build();
             frameHelper.send(getTimeResponse);
-        } else if (message instanceof BluetoothLEAdvertisementResponse rsp) {
+        } else if (message instanceof BluetoothLEAdvertisementResponse
+                | message instanceof BluetoothLERawAdvertisementsResponse
+                | message instanceof BluetoothDeviceConnectionResponse
+                | message instanceof BluetoothGATTGetServicesResponse
+                | message instanceof BluetoothGATTGetServicesDoneResponse | message instanceof BluetoothGATTReadResponse
+                | message instanceof BluetoothGATTNotifyDataResponse
+                | message instanceof BluetoothConnectionsFreeResponse | message instanceof BluetoothGATTErrorResponse
+                | message instanceof BluetoothGATTWriteResponse | message instanceof BluetoothGATTNotifyResponse
+                | message instanceof BluetoothDevicePairingResponse
+                | message instanceof BluetoothDeviceUnpairingResponse
+                | message instanceof BluetoothDeviceClearCacheResponse) {
             if (espHomeBluetoothProxyHandler != null) {
-                espHomeBluetoothProxyHandler.handleAdvertisement(rsp, this);
+                espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this);
             }
         } else {
             // Regular messages handled by message handlers
@@ -390,6 +400,18 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 logger.warn("[{}] Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
                         logPrefix, message.getClass().getName(), message);
             }
+        }
+    }
+
+    public void sendBluetoothCommand(GeneratedMessageV3 message) {
+        try {
+            if (connectionState == ConnectionState.CONNECTED) {
+                frameHelper.send(message);
+            } else {
+                logger.warn("[{}] Not connected, ignoring bluetooth command {}", logPrefix, message);
+            }
+        } catch (ProtocolAPIError e) {
+            logger.error("[{}] Error sending bluetooth command", logPrefix, e);
         }
     }
 
