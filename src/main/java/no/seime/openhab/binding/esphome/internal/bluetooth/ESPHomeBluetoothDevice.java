@@ -26,6 +26,12 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     private final ESPHomeBluetoothProxyHandler proxyHandler;
 
+    public void setAddressType(int addressType) {
+        this.addressType = addressType;
+    }
+
+    private int addressType;
+
     public ESPHomeBluetoothDevice(BluetoothAdapter adapter, BluetoothAddress address) {
         super(adapter, address);
         proxyHandler = (ESPHomeBluetoothProxyHandler) adapter;
@@ -101,14 +107,14 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
             // notifyListeners(BluetoothEventType.CONNECTION_STATE,
             // new BluetoothConnectionStatusNotification(ConnectionState.CONNECTING));
             lockToHandler.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder()
-                    .setAddress(BluetoothAddressUtil.convertAddressToLong(address))
+                    .setAddress(BluetoothAddressUtil.convertAddressToLong(address)).setAddressType(addressType)
                     .setRequestType(BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITHOUT_CACHE)
                     .build());
 
             return true;
         }
 
-        return false;
+        return true;
     }
 
     @Override

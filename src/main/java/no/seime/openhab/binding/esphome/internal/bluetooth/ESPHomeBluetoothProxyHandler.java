@@ -110,11 +110,14 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                     // Enable registration of BLE advertisements
 
                     ESPHomeHandler handler = (ESPHomeHandler) esphomeThing.getHandler();
+                    if (handler != null) {
+                        if (!espHomeHandlers.contains(handler)) {
+                            handler.listenForBLEAdvertisements(this);
+                            espHomeHandlers.add(handler);
+                        }
 
-                    if (!espHomeHandlers.contains(handler)) {
-                        handler.listenForBLEAdvertisements(this);
-                        espHomeHandlers.add(handler);
                     }
+
                 }
             }
         }
@@ -195,7 +198,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
             ESPHomeBluetoothDevice device = getDevice(address);
 
             logger.debug("Received BLE advertisement from device {} via {}", address, handler.getThing().getUID());
-
+            device.setAddressType(rsp.getAddressType());
             device.setName(rsp.getName());
             device.setRssi(rsp.getRssi());
 
