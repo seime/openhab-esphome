@@ -1,18 +1,16 @@
 package no.seime.openhab.binding.esphome.internal.comm;
 
-import static no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector.READ_BUFFER_SIZE;
+import com.google.protobuf.GeneratedMessageV3;
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.protobuf.GeneratedMessageV3;
-
-import no.seime.openhab.binding.esphome.internal.CommunicationListener;
+import static no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector.READ_BUFFER_SIZE;
 
 public abstract class AbstractFrameHelper {
 
@@ -87,7 +85,7 @@ public abstract class AbstractFrameHelper {
     }
 
     protected void decodeProtoMessage(int messageType, byte[] bytes) {
-        logger.debug("Received packet of type {} with data {}", messageType, bytes);
+        logger.trace("Received packet of type {} with data {}", messageType, bytes);
 
         try {
             Method parseMethod = messageTypeToClassConverter.getMethod(messageType);
