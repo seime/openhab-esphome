@@ -12,13 +12,13 @@
  */
 package no.seime.openhab.binding.esphome.internal.comm;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ESPHomeConnection {
 
@@ -54,6 +54,7 @@ public class ESPHomeConnection {
 
             socketChannel = SocketChannel.open(espDeviceAddress);
             socketChannel.configureBlocking(false);
+            socketChannel.setOption(java.net.StandardSocketOptions.SO_KEEPALIVE, true);
             connectionSelector.register(socketChannel, frameHelper);
 
             logger.info("[{}] Opening socket to {} at port {}.", logPrefix, espDeviceAddress.getHostName(),
