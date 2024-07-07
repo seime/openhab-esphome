@@ -84,6 +84,8 @@ public class ConnectionSelector {
         } catch (IOException | CancelledKeyException e) {
             logger.debug("Socket exception", e);
             frameHelper.endOfStream();
+        } catch (Exception e) {
+            logger.warn("Error processing key", e);
         }
     }
 
