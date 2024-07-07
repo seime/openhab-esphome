@@ -42,10 +42,10 @@ public class ConnectionSelector {
                         keyIterator.remove();
                     }
                 } catch (ClosedSelectorException e) {
-                    logger.debug("Selector closed");
+                    logger.debug("Selector closed, stopping thread");
                     keepRunning = false;
                 } catch (Exception e) {
-                    logger.warn("Error while selecting", e);
+                    logger.warn("Error while selecting, stopping thread", e);
                     keepRunning = false;
                 }
             }
@@ -70,7 +70,6 @@ public class ConnectionSelector {
                 } else {
                     processReceivedData(frameHelper, buffer, channel);
                 }
-
             } else {
                 logger.trace("Key not readable");
             }
