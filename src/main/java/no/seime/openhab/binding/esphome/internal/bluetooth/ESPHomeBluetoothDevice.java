@@ -1,15 +1,16 @@
 package no.seime.openhab.binding.esphome.internal.bluetooth;
 
-import io.esphome.api.*;
-import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.*;
 import org.openhab.binding.bluetooth.notification.BluetoothConnectionStatusNotification;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
 
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 @NonNullByDefault
 public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
