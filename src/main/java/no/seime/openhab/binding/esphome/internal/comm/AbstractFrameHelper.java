@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.comm;
 
+import static no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector.READ_BUFFER_SIZE;
+
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -20,7 +22,7 @@ public abstract class AbstractFrameHelper {
     protected final Logger logger = LoggerFactory.getLogger(AbstractFrameHelper.class);
     private final MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
     protected CommunicationListener listener;
-    protected ByteBuffer buffer = ByteBuffer.allocate(1024);
+    protected ByteBuffer internalBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE * 2);
     protected ESPHomeConnection connection;
 
     protected static byte[] concatArrays(byte[] length, byte[] additionalLength) {
@@ -56,14 +58,14 @@ public abstract class AbstractFrameHelper {
     }
 
     protected void processBuffer() throws ProtocolException {
-        buffer.limit(buffer.position());
-        buffer.position(0);
-        if (buffer.remaining() > 2) {
+        internalBuffer.limit(internalBuffer.position());
+        internalBuffer.position(0);
+        if (internalBuffer.remaining() > 2) {
             byte[] headerData = readBytes(3);
             headerReceived(headerData);
         } else {
-            buffer.position(buffer.limit());
-            buffer.limit(buffer.capacity());
+            internalBuffer.position(internalBuffer.limit());
+            internalBuffer.limit(internalBuffer.capacity());
         }
     }
 
@@ -76,11 +78,11 @@ public abstract class AbstractFrameHelper {
     protected abstract void headerReceived(byte[] headerData) throws ProtocolException;
 
     protected byte[] readBytes(int numBytes) {
-        if (buffer.remaining() < numBytes) {
+        if (internalBuffer.remaining() < numBytes) {
             return new byte[0];
         }
         byte[] data = new byte[numBytes];
-        buffer.get(data);
+        internalBuffer.get(data);
         return data;
     }
 
@@ -106,7 +108,7 @@ public abstract class AbstractFrameHelper {
     public void processReceivedData(ByteBuffer newDataBuffer) throws ProtocolException, IOException {
         // Copy new data into buffer
         newDataBuffer.flip();
-        buffer.put(newDataBuffer);
+        internalBuffer.put(newDataBuffer);
         processBuffer();
     }
 

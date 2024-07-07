@@ -1,8 +1,5 @@
 package no.seime.openhab.binding.esphome.internal.comm;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
@@ -11,9 +8,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class ConnectionSelector {
 
-    public static final int BUFFER_CAPACITY = 256;
+    public static final int READ_BUFFER_SIZE = 2048;
     private final Logger logger = LoggerFactory.getLogger(ConnectionSelector.class);
 
     private final Selector selector;
@@ -64,12 +64,12 @@ public class ConnectionSelector {
         try {
             if (readyKey.isReadable()) {
                 SocketChannel channel = (SocketChannel) readyKey.channel();
-                ByteBuffer buffer = ByteBuffer.allocate(BUFFER_CAPACITY);
+                ByteBuffer buffer = ByteBuffer.allocate(READ_BUFFER_SIZE);
                 int read = channel.read(buffer);
                 if (read == -1) {
                     frameHelper.endOfStream();
                 } else {
-                    if (read == BUFFER_CAPACITY) {
+                    if (read == READ_BUFFER_SIZE) {
                         logger.warn("Buffer full, increase capacity");
                     }
 

@@ -90,7 +90,7 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
 
             // Unwrap outer frame
             int protoPacketLength = bytesToShort(Arrays.copyOfRange(headerData, 1, 3));
-            if (buffer.remaining() >= protoPacketLength) {
+            if (internalBuffer.remaining() >= protoPacketLength) {
                 byte[] packetData = readBytes(protoPacketLength);
 
                 switch (state) {
@@ -105,11 +105,11 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
                         break;
                 }
 
-                buffer.compact();
+                internalBuffer.compact();
                 processBuffer();
             } else {
-                buffer.position(buffer.limit());
-                buffer.limit(buffer.capacity());
+                internalBuffer.position(internalBuffer.limit());
+                internalBuffer.limit(internalBuffer.capacity());
             }
         } catch (ShortBufferException e) {
             throw new ProtocolAPIError(e.getMessage());

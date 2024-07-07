@@ -69,8 +69,8 @@ public class PlainTextFrameHelper extends AbstractFrameHelper {
                 & VAR_INT_MARKER) == VAR_INT_MARKER) {
             byte[] additionalLength = readBytes(1);
             if (additionalLength.length == 0) {
-                buffer.position(buffer.limit());
-                buffer.limit(buffer.capacity());
+                internalBuffer.position(internalBuffer.limit());
+                internalBuffer.limit(internalBuffer.capacity());
                 return;
             }
             encodedProtoPacketLenghtBuffer = concatArrays(encodedProtoPacketLenghtBuffer, additionalLength);
@@ -81,8 +81,8 @@ public class PlainTextFrameHelper extends AbstractFrameHelper {
                 || (encodedMessageTypeBuffer[encodedMessageTypeBuffer.length - 1] & VAR_INT_MARKER) == VAR_INT_MARKER) {
             byte[] additionalencodedMessageTypeBuffer = readBytes(1);
             if (additionalencodedMessageTypeBuffer.length == 0) {
-                buffer.position(buffer.limit());
-                buffer.limit(buffer.capacity());
+                internalBuffer.position(internalBuffer.limit());
+                internalBuffer.limit(internalBuffer.capacity());
                 return;
             }
             encodedMessageTypeBuffer = concatArrays(encodedMessageTypeBuffer, additionalencodedMessageTypeBuffer);
@@ -93,19 +93,19 @@ public class PlainTextFrameHelper extends AbstractFrameHelper {
 
         if (protoPacketLength == 0) {
             decodeProtoMessage(messageType, new byte[0]);
-            buffer.compact();
+            internalBuffer.compact();
             // If we have more data, continue processing
             processBuffer();
 
-        } else if (buffer.remaining() >= protoPacketLength) {
+        } else if (internalBuffer.remaining() >= protoPacketLength) {
             // We have enough data in the buffer to read the whole packet
             byte[] packetData = readBytes(protoPacketLength);
             decodeProtoMessage(messageType, packetData);
-            buffer.compact();
+            internalBuffer.compact();
             processBuffer();
         } else {
-            buffer.position(buffer.limit());
-            buffer.limit(buffer.capacity());
+            internalBuffer.position(internalBuffer.limit());
+            internalBuffer.limit(internalBuffer.capacity());
         }
     }
 
