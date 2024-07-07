@@ -12,13 +12,13 @@
  */
 package no.seime.openhab.binding.esphome.internal.comm;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ESPHomeConnection {
 
@@ -43,7 +43,6 @@ public class ESPHomeConnection {
                 logger.trace("[{}] Writing data", logPrefix);
                 socketChannel.write(buffer);
             }
-
         } catch (IOException e) {
             throw new ProtocolAPIError(String.format("[%s] Error sending message: %s ", logPrefix, e));
         }

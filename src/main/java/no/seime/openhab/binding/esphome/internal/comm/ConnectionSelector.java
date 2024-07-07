@@ -67,10 +67,13 @@ public class ConnectionSelector {
                 ByteBuffer buffer = ByteBuffer.allocate(READ_BUFFER_SIZE);
                 int read = channel.read(buffer);
                 if (read == -1) {
+                    logger.debug("End of stream, closing");
                     frameHelper.endOfStream();
                 } else {
                     if (read == READ_BUFFER_SIZE) {
-                        logger.warn("Buffer full, increase capacity");
+                        logger.warn(
+                                "Socket read provided more data than buffer capacity of {}. Buffer capacity should be increased. Things still work, but performance is suboptimal. File a report on github to the developer",
+                                READ_BUFFER_SIZE);
                     }
 
                     processReceivedData(frameHelper, buffer, channel);

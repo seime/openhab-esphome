@@ -286,7 +286,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         eventSubscriber.removeEventSubscriptions(this);
         if (!disposed) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                    "ESPHome device closed connection.");
+                    "ESPHome device abruptly closed connection.");
             setUndefToAllChannels();
             frameHelper.close();
             cancelPingWatchdog();
