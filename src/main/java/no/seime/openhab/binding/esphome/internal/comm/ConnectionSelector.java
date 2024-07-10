@@ -40,6 +40,7 @@ public class ConnectionSelector {
                     while (keyIterator.hasNext()) {
                         SelectionKey readyKey = keyIterator.next();
                         processKey(readyKey);
+                        keyIterator.remove();
                     }
                 } catch (ClosedSelectorException e) {
                     logger.debug("Selector closed, stopping thread");
