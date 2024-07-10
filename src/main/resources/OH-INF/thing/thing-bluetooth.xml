@@ -8,6 +8,9 @@
 	<bridge-type id="esphome">
 		<label>ESPHome Bluetooth proxy</label>
 		<description>ESPHome Bluetooth Proxy for beacons. Utilizes any registered ESPHome device with bluetooth proxy enabled</description>
+		<config-description>
+		</config-description>
 	</bridge-type>
+
 
 </thing:thing-descriptions>
