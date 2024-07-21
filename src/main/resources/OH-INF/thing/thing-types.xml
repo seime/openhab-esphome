@@ -43,7 +43,7 @@
 					device configuration yaml</description>
 			</parameter>
 
-			<parameter name="pingInterval" type="integer" min="1" max="600" required="false">
+			<parameter name="pingInterval" type="integer" min="1" required="false">
 				<label>Ping interval in seconds</label>
 				<default>10</default>
 				<description>Seconds between sending ping requests to device to check if alive</description>
