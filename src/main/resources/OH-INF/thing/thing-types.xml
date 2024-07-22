@@ -12,56 +12,69 @@
 		<representation-property>hostname</representation-property>
 
 		<config-description>
-			<parameter name="hostname" type="text" required="true">
+			<parameter-group name="address">
+				<label>Device address</label>
+				<context>network-address</context>
+			</parameter-group>
+			<parameter-group name="security">
+				<label>Communication security</label>
+			</parameter-group>
+			<parameter-group name="timeout">
+				<label>Connection timeouts</label>
+			</parameter-group>
+			<parameter-group name="logging">
+				<label>Logging</label>
+			</parameter-group>
+
+			<parameter name="hostname" type="text" required="true" groupName="address">
 				<context>network-address</context>
 				<label>Hostname</label>
 				<description>Hostname or IP address of the device</description>
 			</parameter>
-			<parameter name="port" type="integer" min="1" max="65500" required="false">
+			<parameter name="port" type="integer" min="1" max="65500" required="false" groupName="address">
 				<context>network-address</context>
 				<label>Port</label>
 				<default>6053</default>
-				<description>IP Port address of the device</description>
+				<description>IP Port number of the device</description>
+			</parameter>
+			<parameter name="server" type="text" required="false" groupName="address">
+				<label>ESPHome device name (not hostname)</label>
+				<description>Used to verify that we're talking to the correct device. Use the esphome: -> name: value from the
+					ESPHome device configuration yaml</description>
 			</parameter>
 
-			<parameter name="encryptionKey" type="text" required="false">
+			<parameter name="encryptionKey" type="text" required="false" groupName="security">
 				<context>password</context>
-				<label>Base64 encoded encryption key for encrypted devices</label>
+				<label>Base64 encoded encryption key for encrypted connection</label>
 				<description>Specified in the api: -> encryption: -> key: section of the esphome device config. See
 					https://esphome.io/components/api#configuration-variables</description>
 			</parameter>
-			<parameter name="password" type="text" required="false">
+			<parameter name="password" type="text" required="false" groupName="security">
 				<context>password</context>
 				<label>DEPRECATED: Password for insecure, plaintext connection</label>
-				<description>DEPRECATED: Password to access the device. Instead, use encryptionKey for secured communications.</description>
+				<description>DEPRECATED: Password to access the device. Instead, use encryptionKey for encrypted connection.</description>
 			</parameter>
 
-			<parameter name="server" type="text" required="false">
-				<label>ESPHome device name (not hostname)</label>
-				<description>Used to verify that we're talking to the correct device. Use the esphome: -> name: value from the
-					ESPHome
-					device configuration yaml</description>
-			</parameter>
-
-			<parameter name="pingInterval" type="integer" min="1" required="false">
+			<parameter name="pingInterval" type="integer" min="1" required="false" groupName="timeout">
 				<label>Ping interval in seconds</label>
 				<default>10</default>
 				<description>Seconds between sending ping requests to device to check if alive</description>
 				<advanced>true</advanced>
 			</parameter>
-			<parameter name="maxPingTimeouts" type="integer" min="1" required="false">
+			<parameter name="maxPingTimeouts" type="integer" min="1" required="false" groupName="timeout">
 				<label>Number of missed ping requests before deeming device unresponsive</label>
 				<default>4</default>
 				<description>Ie if pingInterval=10 and this value is 4, the binding will wait a total of 10*4 = 40 seconds before
 					connection is assumed broken, and reconnect starts</description>
 				<advanced>true</advanced>
 			</parameter>
-			<parameter name="logPrefix" type="text" required="false">
+
+			<parameter name="logPrefix" type="text" required="false" groupName="logging">
 				<label>Prefix to use in logging for this particular device. Defaults to Thing ID</label>
 				<description>Useful when debugging communication with a particular device (and you have many)</description>
 				<advanced>true</advanced>
 			</parameter>
-			<parameter name="deviceLogLevel" type="text" required="false">
+			<parameter name="deviceLogLevel" type="text" required="false" groupName="logging">
 				<label>Stream device logs with at least this log level</label>
 				<description>Ensure that your ESPHome YAML config logs at the appropriate level, ie if the device logs at WARN only
 					warn or higher logs may be shipped to openHAB even if you specify INFO here. Log statements are logged to the
