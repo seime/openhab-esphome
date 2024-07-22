@@ -23,13 +23,10 @@ import org.slf4j.LoggerFactory;
 public class ESPHomeConnection {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeConnection.class);
-
-    private SocketChannel socketChannel;
-
     private final AbstractFrameHelper frameHelper;
     private final ConnectionSelector connectionSelector;
-
     private final String logPrefix;
+    private SocketChannel socketChannel;
 
     public ESPHomeConnection(ConnectionSelector connectionSelector, AbstractFrameHelper frameHelper, String logPrefix) {
         this.frameHelper = frameHelper;
@@ -40,7 +37,7 @@ public class ESPHomeConnection {
     public synchronized void send(ByteBuffer buffer) throws ProtocolAPIError {
         try {
             while (buffer.hasRemaining()) {
-                logger.trace("[{}] Writing data", logPrefix);
+                logger.trace("[{}] Writing data {} bytes", logPrefix, buffer.remaining());
                 socketChannel.write(buffer);
             }
         } catch (IOException e) {

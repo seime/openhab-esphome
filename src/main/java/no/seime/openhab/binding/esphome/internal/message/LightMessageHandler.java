@@ -178,11 +178,9 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
 
                 handler.updateState(channel.getUID(), hsbType);
             } else if (capabilities.contains(LightColorCapability.BRIGHTNESS)) {
-                // Convert to color
                 PercentType percentType = new PercentType((int) (rsp.getState() ? rsp.getBrightness() * 100 : 0));
                 handler.updateState(channel.getUID(), percentType);
             } else if (capabilities.contains(LightColorCapability.ON_OFF)) {
-                // Convert to color
                 OnOffType onOffType = rsp.getState() ? OnOffType.ON : OnOffType.OFF;
                 handler.updateState(channel.getUID(), onOffType);
             }

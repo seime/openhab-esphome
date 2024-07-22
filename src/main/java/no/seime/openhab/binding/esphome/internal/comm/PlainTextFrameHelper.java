@@ -28,7 +28,7 @@ public class PlainTextFrameHelper extends AbstractFrameHelper {
 
     public PlainTextFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
             String logPrefix) {
-        this.listener = listener;
+        super(logPrefix, listener);
         connection = new ESPHomeConnection(connectionSelector, this, logPrefix);
     }
 

@@ -41,11 +41,18 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
 
     public EncryptedFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
             String encryptionKeyBase64, @Nullable String expectedServername, String logPrefix) {
+        super(logPrefix, listener);
         this.encryptionKeyBase64 = encryptionKeyBase64;
         this.expectedServername = expectedServername;
-        this.listener = listener;
 
         connection = new ESPHomeConnection(connectionSelector, this, logPrefix);
+    }
+
+    private static short bytesToShort(final byte[] data) {
+        short value = (short) (data[0] & 0xff);
+        value <<= 8;
+        value |= data[1] & 0xff;
+        return value;
     }
 
     @Override
@@ -220,13 +227,6 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         byte[] result = new byte[cipherTextLength];
         System.arraycopy(decrypted, 0, result, 0, cipherTextLength);
         return result;
-    }
-
-    private static short bytesToShort(final byte[] data) {
-        short value = (short) (data[0] & 0xff);
-        value <<= 8;
-        value |= data[1] & 0xff;
-        return value;
     }
 
     private enum NoiseProtocolState {

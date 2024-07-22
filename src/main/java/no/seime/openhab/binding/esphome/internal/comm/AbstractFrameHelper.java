@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +25,12 @@ public abstract class AbstractFrameHelper {
     protected CommunicationListener listener;
     protected ByteBuffer internalBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE * 2);
     protected ESPHomeConnection connection;
+    protected String logPrefix;
+
+    public AbstractFrameHelper(String logPrefix, CommunicationListener listener) {
+        this.logPrefix = logPrefix;
+        this.listener = listener;
+    }
 
     protected static byte[] concatArrays(byte[] length, byte[] additionalLength) {
         byte[] result = new byte[length.length + additionalLength.length];
@@ -87,7 +94,7 @@ public abstract class AbstractFrameHelper {
     }
 
     protected void decodeProtoMessage(int messageType, byte[] bytes) {
-        logger.trace("Received packet of type {} with data {}", messageType, bytes);
+        logger.trace("[{}] Received packet of type {} with data {}", logPrefix, messageType, bytes);
 
         try {
             Method parseMethod = messageTypeToClassConverter.getMethod(messageType);
@@ -96,11 +103,11 @@ public abstract class AbstractFrameHelper {
                 if (invoke != null) {
                     listener.onPacket(invoke);
                 } else {
-                    logger.warn("Received null packet of type {}", parseMethod);
+                    logger.warn("[{}] Received null packet of type {}", logPrefix, parseMethod);
                 }
             }
         } catch (Exception e) {
-            logger.warn("Error parsing packet", e);
+            logger.warn("[{}] Error parsing packet", logPrefix, e);
             listener.onParseError(CommunicationError.PACKET_ERROR);
         }
     }
@@ -121,6 +128,11 @@ public abstract class AbstractFrameHelper {
     }
 
     public void send(GeneratedMessageV3 message) throws ProtocolAPIError {
+        if (logger.isDebugEnabled()) {
+            // ToString method costs a bit
+            logger.debug("[{}] Sending message type {} with content '{}'", logPrefix,
+                    message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
+        }
         connection.send(encodeFrame(message));
     }
 }

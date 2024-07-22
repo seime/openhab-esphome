@@ -19,6 +19,7 @@ import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -324,7 +325,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void handleConnected(GeneratedMessageV3 message) throws ProtocolAPIError {
-        logger.debug("[{}] Received message {}", logPrefix, message);
+        if (logger.isDebugEnabled()) {
+            // ToString method costs a bit
+            logger.debug("[{}] Received message type {} with content '{}'", logPrefix,
+                    message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
+        }
         if (message instanceof DeviceInfoResponse rsp) {
             Map<String, String> props = new HashMap<>();
             props.put("esphome_version", rsp.getEsphomeVersion());
