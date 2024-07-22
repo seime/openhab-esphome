@@ -32,7 +32,7 @@ public class ConnectionSelector {
             logger.debug("Starting selector thread");
             while (keepRunning) {
                 try {
-                    selector.select(1000);
+                    selector.select(10000);
                     // token representing the registration of a SelectableChannel with a Selector
                     Set<SelectionKey> keys = selector.selectedKeys();
                     logger.trace("Selected keys: {}", keys.size());
@@ -68,6 +68,7 @@ public class ConnectionSelector {
                 int read = channel.read(buffer);
                 if (read == -1) {
                     logger.debug("End of stream, closing");
+                    channel.keyFor(selector).cancel();
                     frameHelper.endOfStream();
                 } else {
                     if (read == READ_BUFFER_SIZE) {
