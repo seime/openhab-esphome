@@ -23,7 +23,7 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 /**
- * Channel Type Provider that does a callback the SensiboSkyHandler that initiated it.
+ * Channel Type Provider that does a callback the handler that initiated it.
  *
  * @author Arne Seime - Initial contribution
  */

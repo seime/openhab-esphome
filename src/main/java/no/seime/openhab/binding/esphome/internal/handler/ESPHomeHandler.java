@@ -40,6 +40,7 @@ import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.LogLevel;
+import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
 import no.seime.openhab.binding.esphome.internal.message.*;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -80,10 +81,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private boolean disposed = false;
     private boolean interrogated;
+    private boolean bluetoothProxyStarted = false;
+    private boolean bluetoothProxyRequested = false;
 
     @Nullable
     private String logPrefix = null;
     private final ESPHomeEventSubscriber eventSubscriber;
+    @Nullable
+    private ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber) {
@@ -207,6 +212,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.close();
             }
         }
+        connectionState = ConnectionState.UNINITIALIZED;
+
         super.dispose();
     }
 
@@ -331,6 +338,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             logger.debug("[{}] Received message type {} with content '{}'", logPrefix,
                     message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
         }
+        if (disposed) {
+            return;
+        }
+
         if (message instanceof DeviceInfoResponse rsp) {
             Map<String, String> props = new HashMap<>();
             props.put("esphome_version", rsp.getEsphomeVersion());
@@ -365,6 +376,20 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             GetTimeResponse getTimeResponse = GetTimeResponse.newBuilder()
                     .setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build();
             frameHelper.send(getTimeResponse);
+        } else if (message instanceof BluetoothLEAdvertisementResponse
+                | message instanceof BluetoothLERawAdvertisementsResponse
+                | message instanceof BluetoothDeviceConnectionResponse
+                | message instanceof BluetoothGATTGetServicesResponse
+                | message instanceof BluetoothGATTGetServicesDoneResponse | message instanceof BluetoothGATTReadResponse
+                | message instanceof BluetoothGATTNotifyDataResponse
+                | message instanceof BluetoothConnectionsFreeResponse | message instanceof BluetoothGATTErrorResponse
+                | message instanceof BluetoothGATTWriteResponse | message instanceof BluetoothGATTNotifyResponse
+                | message instanceof BluetoothDevicePairingResponse
+                | message instanceof BluetoothDeviceUnpairingResponse
+                | message instanceof BluetoothDeviceClearCacheResponse) {
+            if (espHomeBluetoothProxyHandler != null) {
+                espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this);
+            }
         } else {
             // Regular messages handled by message handlers
             AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
@@ -375,6 +400,18 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 logger.warn("[{}] Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
                         logPrefix, message.getClass().getName(), message);
             }
+        }
+    }
+
+    public void sendBluetoothCommand(GeneratedMessageV3 message) {
+        try {
+            if (connectionState == ConnectionState.CONNECTED) {
+                frameHelper.send(message);
+            } else {
+                logger.warn("[{}] Not connected, ignoring bluetooth command {}", logPrefix, message);
+            }
+        } catch (ProtocolAPIError e) {
+            logger.error("[{}] Error sending bluetooth command", logPrefix, e);
         }
     }
 
@@ -463,10 +500,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }
             }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS);
 
+            // Start interrogation
             frameHelper.send(DeviceInfoRequest.getDefaultInstance());
             frameHelper.send(ListEntitiesRequest.getDefaultInstance());
             frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
-
         }
     }
 
@@ -487,7 +524,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.send(ConnectRequest.newBuilder().setPassword(config.password).build());
             } else {
                 frameHelper.send(ConnectRequest.getDefaultInstance());
-
             }
 
         }
@@ -501,6 +537,38 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public void addChannel(Channel channel) {
         dynamicChannels.add(channel);
+    }
+
+    public boolean isDisposed() {
+        return disposed;
+    }
+
+    public void listenForBLEAdvertisements(ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler) {
+        this.espHomeBluetoothProxyHandler = espHomeBluetoothProxyHandler;
+        if (config.enableBluetoothProxy && !bluetoothProxyStarted && connectionState == ConnectionState.CONNECTED) {
+            try {
+                frameHelper.send(SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+                bluetoothProxyStarted = true;
+            } catch (Exception e) {
+                logger.error("[{}] Error starting BLE proxy", logPrefix, e);
+            }
+        } else {
+            bluetoothProxyRequested = true;
+        }
+    }
+
+    public void stopListeningForBLEAdvertisements() {
+
+        if (connectionState == ConnectionState.CONNECTED) {
+            try {
+                frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+            } catch (Exception e) {
+                logger.warn("[{}] Error stopping BLE proxy", logPrefix, e);
+            }
+        }
+
+        bluetoothProxyStarted = false;
+        espHomeBluetoothProxyHandler = null;
     }
 
     private enum ConnectionState {

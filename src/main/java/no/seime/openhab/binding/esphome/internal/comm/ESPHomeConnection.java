@@ -35,13 +35,18 @@ public class ESPHomeConnection {
     }
 
     public synchronized void send(ByteBuffer buffer) throws ProtocolAPIError {
-        try {
-            while (buffer.hasRemaining()) {
-                logger.trace("[{}] Writing data {} bytes", logPrefix, buffer.remaining());
-                socketChannel.write(buffer);
+        if (socketChannel != null) {
+            try {
+                while (buffer.hasRemaining()) {
+                    logger.trace("[{}] Writing data {} bytes", logPrefix, buffer.remaining());
+                    socketChannel.write(buffer);
+                }
+
+            } catch (IOException e) {
+                throw new ProtocolAPIError(String.format("[%s] Error sending message: %s ", logPrefix, e));
             }
-        } catch (IOException e) {
-            throw new ProtocolAPIError(String.format("[%s] Error sending message: %s ", logPrefix, e));
+        } else {
+            logger.warn("[{}] Attempted to send data on a closed connection", logPrefix);
         }
     }
 
