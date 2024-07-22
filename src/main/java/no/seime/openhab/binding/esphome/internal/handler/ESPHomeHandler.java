@@ -275,7 +275,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void onPacket(@NonNull GeneratedMessageV3 message) throws ProtocolAPIError {
         switch (connectionState) {
-            case UNINITIALIZED -> logger.warn("[{}] Received packet while uninitialized.", logPrefix);
+            case UNINITIALIZED -> logger.warn("[{}] Received packet {} while uninitialized.", logPrefix,
+                    message.getClass().getSimpleName());
             case HELLO_SENT -> handleHelloResponse(message);
             case LOGIN_SENT -> handleLoginResponse(message);
             case CONNECTED -> handleConnected(message);
