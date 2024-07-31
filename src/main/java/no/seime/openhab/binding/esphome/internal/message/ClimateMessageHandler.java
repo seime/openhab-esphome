@@ -33,6 +33,8 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesClimateResponse, ClimateStateResponse> {
 
     public static final String CHANNEL_TARGET_TEMPERATURE = "target_temperature";
+    public static final String CHANNEL_TARGET_TEMPERATURE_LOW = CHANNEL_TARGET_TEMPERATURE + "_low";
+    public static final String CHANNEL_TARGET_TEMPERATURE_HIGH = CHANNEL_TARGET_TEMPERATURE + "_high";
     public static final String CHANNEL_TARGET_HUMIDITY = "target_humidity";
     public static final String CHANNEL_FAN_MODE = "fan_mode";
     public static final String CHANNEL_CUSTOM_FAN_MODE = "custom_fan_mode";
@@ -94,6 +96,22 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     }
                     builder.setHasTargetTemperature(true);
                 }
+                case CHANNEL_TARGET_TEMPERATURE_LOW -> {
+                    if (command instanceof QuantityType<?> qt) {
+                        builder.setTargetTemperatureLow(qt.floatValue());
+                    } else if (command instanceof DecimalType dc) {
+                        builder.setTargetTemperatureLow(dc.floatValue());
+                    }
+                    builder.setHasTargetTemperatureLow(true);
+                }
+                case CHANNEL_TARGET_TEMPERATURE_HIGH -> {
+                    if (command instanceof QuantityType<?> qt) {
+                        builder.setTargetTemperatureHigh(qt.floatValue());
+                    } else if (command instanceof DecimalType dc) {
+                        builder.setTargetTemperatureHigh(dc.floatValue());
+                    }
+                    builder.setHasTargetTemperatureHigh(true);
+                }
                 case CHANNEL_TARGET_HUMIDITY -> {
                     if (command instanceof QuantityType<?> qt) {
                         builder.setTargetHumidity(qt.floatValue());
@@ -143,24 +161,12 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
 
     public void buildChannels(ListEntitiesClimateResponse rsp) {
 
-        ChannelType channelTypeTargetTemperature = addChannelType(rsp.getUniqueId() + CHANNEL_TARGET_TEMPERATURE,
-                "Target temperature", ITEM_TYPE_TEMPERATURE, Collections.emptyList(), "%.1f %unit%",
-                Set.of(SEMANTIC_TYPE_SETPOINT, "Temperature"), false, "temperature",
-                rsp.getVisualTargetTemperatureStep() == 0f ? null
-                        : BigDecimal.valueOf(rsp.getVisualTargetTemperatureStep()),
-                rsp.getVisualMinTemperature() == 0f ? null
-                        : rsp.getVisualMaxTemperature() == 0f ? null
-                                : BigDecimal.valueOf(rsp.getVisualMinTemperature()),
-                BigDecimal.valueOf(rsp.getVisualMaxTemperature()), rsp.getEntityCategory());
-
-        Channel channelTargetTemperature = ChannelBuilder
-                .create(createChannelUID(rsp.getObjectId(), CHANNEL_TARGET_TEMPERATURE))
-                .withLabel(createLabel(rsp.getName(), "Target temperature")).withKind(ChannelKind.STATE)
-                .withType(channelTypeTargetTemperature.getUID()).withAcceptedItemType(ITEM_TYPE_TEMPERATURE)
-                .withConfiguration(configuration(rsp.getKey(), CHANNEL_TARGET_TEMPERATURE, COMMAND_CLASS_CLIMATE))
-                .build();
-        super.registerChannel(channelTargetTemperature, channelTypeTargetTemperature);
-
+        if (rsp.getSupportsTwoPointTargetTemperature()) {
+            addTargetTemperatureChannel(CHANNEL_TARGET_TEMPERATURE_LOW, "Target temperature (low)", rsp);
+            addTargetTemperatureChannel(CHANNEL_TARGET_TEMPERATURE_HIGH, "Target temperature (high)", rsp);
+        } else {
+            addTargetTemperatureChannel(CHANNEL_TARGET_TEMPERATURE, "Target temperature", rsp);
+        }
         if (rsp.getSupportsCurrentTemperature()) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_TEMPERATURE,
                     "Current temperature", ITEM_TYPE_TEMPERATURE, Collections.emptyList(), "%.1f %unit%",
@@ -282,9 +288,31 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         }
     }
 
+    private void addTargetTemperatureChannel(String channelID, String label, ListEntitiesClimateResponse rsp) {
+        ChannelType channelTypeTargetTemperature = addChannelType(rsp.getUniqueId() + channelID, label,
+                ITEM_TYPE_TEMPERATURE, Collections.emptyList(), "%.1f %unit%",
+                Set.of(SEMANTIC_TYPE_SETPOINT, "Temperature"), false, "temperature",
+                rsp.getVisualTargetTemperatureStep() == 0f ? null
+                        : BigDecimal.valueOf(rsp.getVisualTargetTemperatureStep()),
+                rsp.getVisualMinTemperature() == 0f ? null
+                        : rsp.getVisualMaxTemperature() == 0f ? null
+                                : BigDecimal.valueOf(rsp.getVisualMinTemperature()),
+                BigDecimal.valueOf(rsp.getVisualMaxTemperature()), rsp.getEntityCategory());
+
+        Channel channelTargetTemperatureLow = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), channelID))
+                .withLabel(createLabel(rsp.getName(), label)).withKind(ChannelKind.STATE)
+                .withType(channelTypeTargetTemperature.getUID()).withAcceptedItemType(ITEM_TYPE_TEMPERATURE)
+                .withConfiguration(configuration(rsp.getKey(), channelID, COMMAND_CLASS_CLIMATE)).build();
+        super.registerChannel(channelTargetTemperatureLow, channelTypeTargetTemperature);
+    }
+
     public void handleState(ClimateStateResponse rsp) {
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_TARGET_TEMPERATURE).ifPresent(channel -> handler
                 .updateState(channel.getUID(), toNumericState(channel, rsp.getTargetTemperature(), false)));
+        findChannelByKeyAndField(rsp.getKey(), CHANNEL_TARGET_TEMPERATURE_LOW).ifPresent(channel -> handler
+                .updateState(channel.getUID(), toNumericState(channel, rsp.getTargetTemperatureLow(), false)));
+        findChannelByKeyAndField(rsp.getKey(), CHANNEL_TARGET_TEMPERATURE_HIGH).ifPresent(channel -> handler
+                .updateState(channel.getUID(), toNumericState(channel, rsp.getTargetTemperatureHigh(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_CURRENT_TEMPERATURE).ifPresent(channel -> handler
                 .updateState(channel.getUID(), toNumericState(channel, rsp.getCurrentTemperature(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_MODE).ifPresent(channel -> handler.updateState(channel.getUID(),
