@@ -6,6 +6,7 @@ on:
       - "master"
 
 jobs:
+
   build_oh4:
     strategy:
       fail-fast: false
@@ -26,7 +27,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.m2/repository
-          key: ${{ matrix.java }}-maven-
+          key: ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ matrix.java }}-maven-
             ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
