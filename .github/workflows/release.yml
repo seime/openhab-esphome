@@ -3,10 +3,9 @@ name: Build and create release
 on:
   push:
     branches:
-    - "master"
+      - "master"
 
 jobs:
-
   build_oh4:
     strategy:
       fail-fast: false
@@ -17,28 +16,28 @@ jobs:
     name: Build OH4 (Java ${{ matrix.java }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: ${{matrix.java}}
-        distribution: 'temurin'
-    - name: Cache local Maven repository
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2/repository
-        key: ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ matrix.java }}-maven-
-          ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
-    - name: Build
-      run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=17 clean verify
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{matrix.java}}
+          distribution: 'temurin'
+      - name: Cache local Maven repository
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ matrix.java }}-maven-
+          restore-keys: |
+            ${{ matrix.java }}-maven-
+            ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
+      - name: Build
+        run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=17 clean verify
 
-    - uses: "marvinpinto/action-automatic-releases@latest"
-      with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        automatic_release_tag: "latest_oh4"
-        prerelease: true
-        title: "Latest Build"
-        files: |
-          target/*.jar
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest_oh4"
+          prerelease: true
+          title: "Latest Build"
+          files: |
+            target/*.jar
