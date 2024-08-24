@@ -1,6 +1,9 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +15,7 @@ import javax.validation.constraints.NotNull;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.thing.Channel;
@@ -189,6 +193,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
                 if (sensorDeviceClass != null) {
                     if (sensorDeviceClass.getItemType().startsWith("Number")) {
                         return toNumericState(channel, state);
+                    } else if (sensorDeviceClass.getItemType().startsWith("DateTime")) {
+                        return toDateTimeState((int) state, missingState);
                     } else {
                         logger.warn(
                                 "Expected SensorNumberDeviceClass '{}' to be of item type Number[:Dimension]. Returning undef",
@@ -270,5 +276,14 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
 
     protected ChannelUID createChannelUID(String componentName, String channelName) {
         return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
+    }
+
+    protected State toDateTimeState(int epochSeconds, boolean missingState) {
+        if (missingState) {
+            return UnDefType.UNDEF;
+        } else {
+            return new DateTimeType(
+                    ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZoneId.systemDefault()));
+        }
     }
 }

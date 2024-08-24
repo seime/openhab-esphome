@@ -35,7 +35,7 @@ public class ConnectionSelector {
                     selector.select(10000);
                     // token representing the registration of a SelectableChannel with a Selector
                     Set<SelectionKey> keys = selector.selectedKeys();
-                    logger.trace("Selected keys: {}", keys.size());
+                    logger.trace("Num selected keys: {}", keys.size());
                     Iterator<SelectionKey> keyIterator = keys.iterator();
                     while (keyIterator.hasNext()) {
                         SelectionKey readyKey = keyIterator.next();
@@ -59,7 +59,7 @@ public class ConnectionSelector {
 
     private void processKey(SelectionKey readyKey) {
         AbstractFrameHelper frameHelper = (AbstractFrameHelper) readyKey.attachment();
-        logger.trace("Processing key {}", readyKey);
+        logger.trace("Processing key readable={}", readyKey.isReadable());
         // Tests whether this key's channel is ready to accept a new socket connection
         try {
             if (readyKey.isReadable()) {
