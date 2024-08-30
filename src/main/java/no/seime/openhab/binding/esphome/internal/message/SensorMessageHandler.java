@@ -63,7 +63,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         String itemType;
         ChannelType channelType;
 
-        if (sensorDeviceClass.getItemType().equals("DateTime")) {
+        if (sensorDeviceClass != null && "DateTime".equals(sensorDeviceClass.getItemType())) {
             itemType = "DateTime";
             channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptySet(),
                     "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS", Set.of("Status"), true, icon, null, null, null,
