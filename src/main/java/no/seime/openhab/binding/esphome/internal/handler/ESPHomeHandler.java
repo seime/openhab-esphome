@@ -124,6 +124,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 DateTimeStateResponse.class);
         registerMessageHandler("Time", new TimeMessageHandler(this), ListEntitiesTimeResponse.class,
                 TimeStateResponse.class);
+        registerMessageHandler("Lock", new LockMessageHandler(this), ListEntitiesLockResponse.class,
+                LockStateResponse.class);
     }
 
     private void registerMessageHandler(String select,

@@ -176,7 +176,8 @@ sensor:
 ## FAQ
 
 - I get warnings
-  like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
+  like
+  `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
 
   > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
   > type in openHAB.
@@ -193,9 +194,10 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 
 Most entity types and functions are now supported. However, there are some limitations:
 
+- `lock` (partial support),
+
 The following entity types are **not** yet supported (please submit a PR of file a feature request!)
 
-- `lock`,
 - `camera`
 - `voice`
 - `valve`
