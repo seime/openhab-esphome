@@ -98,7 +98,7 @@ And add the following in the `Loggers` section:
 
 ## Sending state from openHAB to ESPHome
 
-You can send state to the ESPHome device using the `homeassistant` channel type. Only `entity_id` field is used.
+You can send state to the ESPHome device using the `homeassistant` sensor type. Only `entity_id` field is used.
 
 You can listen for several types of OpenHAB events, default is `ItemStateChangedEvent`. The following are supported:
 
@@ -113,7 +113,7 @@ You can listen for several types of OpenHAB events, default is `ItemStateChanged
 
 > NOTE: EntityID in HA is case-insensitive - meaning only lowercase is used. Whatever you add in `entity_id` in the
 > ESPHome yaml will be converted to lowercase.
-> In OH item names are case-sensitive, so you > can have 2 items like `MYITEM` and `MyItem`, and we cannot distinguish
+> In OH item names are case-sensitive, so you can have 2 items like `MYITEM` and `MyItem`, and we cannot distinguish
 > between the 2. Avoid this setup.
 
 > NOTE2: In Thing UIDs, the `:` is replaced with `_`
