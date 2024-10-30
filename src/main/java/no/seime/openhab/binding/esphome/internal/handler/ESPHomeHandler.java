@@ -442,9 +442,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
                 if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval).isBefore(Instant.now())) {
                     logger.warn(
-                            "[{}] Ping responses lacking. Waited {} times {} seconds, total of {}. Assuming connection lost and disconnecting",
+                            "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
                             logPrefix, config.maxPingTimeouts, config.pingInterval,
-                            config.maxPingTimeouts * config.pingInterval);
+                            config.maxPingTimeouts * config.pingInterval,lastPong);
                     pingWatchdogFuture.cancel(false);
                     frameHelper.close();
                     connectionState = ConnectionState.UNINITIALIZED;
