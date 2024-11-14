@@ -54,7 +54,6 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.Event
 @NonNullByDefault
 public class ESPHomeHandler extends BaseThingHandler implements CommunicationListener {
 
-    public static final int CONNECT_TIMEOUT = 20;
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 9;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
@@ -185,7 +184,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             logger.warn("[{}] Error initial connection", logPrefix, e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
             if (!disposed) { // Don't reconnect if we've been disposed
-                scheduleReconnect(CONNECT_TIMEOUT * 2);
+                scheduleReconnect(config.reconnectInterval);
             }
         }
     }
@@ -295,7 +294,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.close();
             cancelPingWatchdog();
             connectionState = ConnectionState.UNINITIALIZED;
-            scheduleReconnect(CONNECT_TIMEOUT * 2);
+            scheduleReconnect(config.reconnectInterval);
         }
     }
 
@@ -308,14 +307,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             cancelPingWatchdog();
             frameHelper.close();
             connectionState = ConnectionState.UNINITIALIZED;
-            scheduleReconnect(CONNECT_TIMEOUT * 2);
+            scheduleReconnect(config.reconnectInterval);
         }
     }
 
     private void remoteDisconnect() {
         eventSubscriber.removeEventSubscriptions(this);
         if (!disposed) {
-            int reconnectDelaySeconds = CONNECT_TIMEOUT;
+            int reconnectDelaySeconds = config.reconnectInterval;
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String.format(
                     "ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelaySeconds));
 
@@ -452,7 +451,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
                                     config.maxPingTimeouts, config.pingInterval));
-                    scheduleReconnect(10);
+                    scheduleReconnect(config.reconnectInterval);
 
                 } else {
 
