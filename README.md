@@ -212,17 +212,18 @@ The binding uses mDNS to automatically discover devices on the network.
 
 ### `device` Thing Configuration
 
-| Name              | Type      | Description                                                                                                                            | Default  | Required | Advanced |
-|-------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
-| `hostname`        | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                         | N/A      | yes      | no       |
-| `port`            | `integer` | IP Port of the device                                                                                                                  | 6053     | no       | no       |
-| `encryptionKey`   | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables | N/A      | no       | no       |
-| ~~`password`~~    | `text`    | Password to access the device if password protected. **DEPRECATED. Use `encryptionKey` instead**                                       | N/A      | no       | no       |
-| `pingInterval`    | `integer` | Seconds between sending ping requests to device to check if alive                                                                      | 10       | no       | yes      |
-| `maxPingTimeouts` | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                     | 4        | no       | yes      |
-| `server`          | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device                                              |          | no       | yes      |
-| `logPrefix`       | `text`    | Log prefix to use for this device.                                                                                                     | hostname | no       | yes      |
-| `deviceLogLevel`  | `text`    | ESPHome device log level to stream from the device.                                                                                    | NONE     | no       | yes      |
+| Name                | Type      | Description                                                                                                                            | Default  | Required | Advanced |
+|---------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
+| `hostname`          | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                         | N/A      | yes      | no       |
+| `port`              | `integer` | IP Port of the device                                                                                                                  | 6053     | no       | no       |
+| `encryptionKey`     | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables | N/A      | no       | no       |
+| ~~`password`~~      | `text`    | Password to access the device if password protected. **DEPRECATED. Use `encryptionKey` instead**                                       | N/A      | no       | no       |
+| `reconnectInterval` | `integer` | Seconds between reconnecting to device after communication is lost or device request restart                                           | 20       | no       | yes      |
+| `pingInterval`      | `integer` | Seconds between sending ping requests to device to check if alive                                                                      | 10       | no       | yes      |
+| `maxPingTimeouts`   | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                     | 4        | no       | yes      |
+| `server`            | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device                                              |          | no       | yes      |
+| `logPrefix`         | `text`    | Log prefix to use for this device.                                                                                                     | hostname | no       | yes      |
+| `deviceLogLevel`    | `text`    | ESPHome device log level to stream from the device.                                                                                    | NONE     | no       | yes      |
 
 ## Channels
 
