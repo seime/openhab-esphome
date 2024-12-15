@@ -40,20 +40,20 @@ public class ConnectionSelector {
                     while (keyIterator.hasNext()) {
                         SelectionKey readyKey = keyIterator.next();
                         processKey(readyKey);
-                        keyIterator.remove();
                     }
+                    keys.clear();
                 } catch (ClosedSelectorException e) {
                     logger.debug("Selector closed, stopping thread");
                     keepRunning = false;
                 } catch (Exception e) {
-                    logger.warn("Error while selecting, stopping thread", e);
+                    logger.error("Error while selecting, stopping thread", e);
                     keepRunning = false;
                 }
             }
             logger.debug(
                     "Selector thread stopped. This should only happen on bundle stop, not during regular operation. See previous log statements for more information.");
         });
-        selectorThread.setName("ESPHome Reader");
+        selectorThread.setName("ESPHome Socket Reader");
         selectorThread.start();
     }
 
