@@ -6,6 +6,7 @@
 		<feature>openhab-runtime-base</feature>
 		<feature>openhab-transport-mdns</feature>
 
-		<bundle start-level="80">mvn:org.openhab.addons.bundles/no.seime.openhab.binding.esphome/${project.version}</bundle>
+		<bundle start-level="80">mvn:org.openhab.addons.bundles/org.openhab.binding.bluetooth/${project.version}</bundle>
+		<bundle start-level="81">mvn:org.openhab.addons.bundles/no.seime.openhab.binding.esphome/${project.version}</bundle>
 	</feature>
 </features>

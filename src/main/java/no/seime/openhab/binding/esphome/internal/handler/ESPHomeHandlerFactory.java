@@ -13,19 +13,22 @@
 package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.bluetooth.BluetoothAdapter;
 import org.openhab.core.items.ItemRegistry;
-import org.openhab.core.thing.Thing;
-import org.openhab.core.thing.ThingRegistry;
-import org.openhab.core.thing.ThingTypeUID;
+import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -34,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
@@ -49,7 +53,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandlerFactory.class);
 
-    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE);
+    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE,
+            BindingConstants.THING_TYPE_BLE_PROXY);
 
     private final AtomicLong threadCounter = new AtomicLong(0);
 
@@ -62,6 +67,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private final ESPHomeEventSubscriber eventSubscriber;
+    private final ThingRegistry thingRegistry;
 
     private ScheduledExecutorService scheduler;
 
@@ -81,6 +87,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
 
         this.eventSubscriber = eventSubscriber;
+        this.thingRegistry = thingRegistry;
         eventSubscriber.setItemRegistry(itemRegistry);
         eventSubscriber.setThingRegistry(thingRegistry);
 
@@ -92,8 +99,11 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber,
-                    scheduler);
+            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber, scheduler);
+        } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
+            ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry);
+            registerBluetoothAdapter(handler);
+            return handler;
         }
 
         return null;
@@ -116,5 +126,23 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         connectionSelector.stop();
 
         super.deactivate(componentContext);
+    }
+
+    private final Map<ThingUID, ServiceRegistration<?>> serviceRegs = new HashMap<>();
+
+    private synchronized void registerBluetoothAdapter(BluetoothAdapter adapter) {
+        serviceRegs.put(adapter.getUID(),
+                bundleContext.registerService(BluetoothAdapter.class.getName(), adapter, new Hashtable<>()));
+    }
+
+    @Override
+    protected synchronized void removeHandler(ThingHandler thingHandler) {
+        if (thingHandler instanceof BluetoothAdapter bluetoothAdapter) {
+            UID uid = bluetoothAdapter.getUID();
+            ServiceRegistration<?> serviceReg = serviceRegs.remove(uid);
+            if (serviceReg != null) {
+                serviceReg.unregister();
+            }
+        }
     }
 }

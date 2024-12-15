@@ -68,6 +68,11 @@
 				<description>Seconds between sending ping requests to device to check if alive</description>
 				<advanced>true</advanced>
 			</parameter>
+			<parameter name="enableBluetoothProxy" type="boolean" required="false">
+				<label>Enable Bluetooth proxying</label>
+				<description>Ensure your ESPHome configuration contains the bluetooth_proxy configuration element</description>
+				<default>false</default>
+			</parameter>
 			<parameter name="maxPingTimeouts" type="integer" min="1" required="false" groupName="timeout">
 				<label>Number of missed ping requests before deeming device unresponsive</label>
 				<default>4</default>
@@ -103,7 +108,4 @@
 
 		</config-description>
 	</thing-type>
-
-	<!-- Sample Channel Type -->
-
 </thing:thing-descriptions>
