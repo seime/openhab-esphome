@@ -45,6 +45,8 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
     public static final String CHANNEL_CURRENT_HUMIDITY = "current_humidity";
     public static final String CHANNEL_MODE = "mode";
     public static final String SEMANTIC_TYPE_SETPOINT = "Setpoint";
+    public static final String SEMANTIC_TYPE_CONTROL = "Control";
+    public static final String SEMANTIC_TYPE_MEASUREMENT = "Measurement";
     public static final String COMMAND_CLASS_CLIMATE = "Climate";
     public static final String ITEM_TYPE_NUMBER_DIMENSIONLESS = "Number:Dimensionless";
     public static final String ITEM_TYPE_TEMPERATURE = "Number:Temperature";
@@ -170,7 +172,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportsCurrentTemperature()) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_TEMPERATURE,
                     "Current temperature", ITEM_TYPE_TEMPERATURE, Collections.emptyList(), "%.1f %unit%",
-                    Set.of("Measurement", "Temperature"), true, "temperature",
+                    Set.of(SEMANTIC_TYPE_MEASUREMENT, "Temperature"), true, "temperature",
                     rsp.getVisualCurrentTemperatureStep() == 0f ? null
                             : BigDecimal.valueOf(rsp.getVisualCurrentTemperatureStep()),
                     rsp.getVisualMinTemperature() == 0f ? null
@@ -204,7 +206,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportsCurrentHumidity()) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_HUMIDITY, "Current humidity",
                     ITEM_TYPE_NUMBER_DIMENSIONLESS, Collections.emptyList(), "%.0f %unit%",
-                    Set.of("Measurement", "Humidity"), true, "humidity", null, null, null, rsp.getEntityCategory());
+                    Set.of(SEMANTIC_TYPE_MEASUREMENT, "Humidity"), true, "humidity", null, null, null, rsp.getEntityCategory());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_HUMIDITY))
                     .withLabel(createLabel(rsp.getName(), "Current humidity")).withKind(ChannelKind.STATE)
@@ -218,7 +220,8 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_MODE, "Mode", itemTypeString,
                     rsp.getSupportedModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
-                    "%s", null, false, "climate", null, null, null, rsp.getEntityCategory());
+                    "%s", Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null,
+                    rsp.getEntityCategory());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_MODE))
                     .withLabel(createLabel(rsp.getName(), "Mode")).withKind(ChannelKind.STATE)
@@ -230,7 +233,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_FAN_MODE, "Fan Mode", itemTypeString,
                     rsp.getSupportedFanModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_SETPOINT, "Wind"), false, "fan", null, null, null,
+                    "%s", Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), false, "fan", null, null, null,
                     rsp.getEntityCategory());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_FAN_MODE))
@@ -242,7 +245,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportedCustomFanModesCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CUSTOM_FAN_MODE, "Custom Fan Mode",
                     itemTypeString, new ArrayList<>(rsp.getSupportedCustomFanModesList()), "%s",
-                    Set.of(SEMANTIC_TYPE_SETPOINT, "Wind"), false, "fan", null, null, null, rsp.getEntityCategory());
+                    Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), false, "fan", null, null, null, rsp.getEntityCategory());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_CUSTOM_FAN_MODE))
                     .withLabel(createLabel(rsp.getName(), "Custom Fan Mode")).withKind(ChannelKind.STATE)
@@ -255,7 +258,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_PRESET, "Preset", itemTypeString,
                     rsp.getSupportedPresetsList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_SETPOINT), false, "climate", null, null, null, rsp.getEntityCategory());
+                    "%s", Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null, rsp.getEntityCategory());
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_PRESET))
                     .withLabel(createLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
@@ -265,7 +268,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportedCustomPresetsCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CUSTOM_PRESET, "Custom Preset",
                     itemTypeString, new ArrayList<>(rsp.getSupportedCustomPresetsList()), "%s",
-                    Set.of(SEMANTIC_TYPE_SETPOINT), false, "climate", null, null, null, rsp.getEntityCategory());
+                    Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null, rsp.getEntityCategory());
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_CUSTOM_PRESET))
                     .withLabel(createLabel(rsp.getName(), "Custom Preset")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
@@ -278,7 +281,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     itemTypeString,
                     rsp.getSupportedSwingModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_SETPOINT, "Wind"), false, "fan", null, null, null,
+                    "%s", Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), false, "fan", null, null, null,
                     rsp.getEntityCategory());
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_SWING_MODE))
                     .withAcceptedItemType(itemTypeString).withLabel(createLabel(rsp.getName(), "Swing Mode"))
