@@ -14,8 +14,8 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -51,6 +51,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE);
 
+    private final AtomicLong threadCounter = new AtomicLong(0);
+
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
         return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
@@ -67,12 +69,15 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ItemRegistry itemRegistry,
             @Reference ThingRegistry thingRegistry) throws IOException {
-        scheduler = Executors.newScheduledThreadPool(2, r -> {
+        scheduler = new MonitoredScheduledThreadPoolExecutor(2, r -> {
+            long currentCount = threadCounter.incrementAndGet();
+            logger.debug("Creating new worker thread {} for scheduler", currentCount);
             Thread t = new Thread(r);
             t.setDaemon(true);
-            t.setName("ESPHome scheduler worker thread");
+            t.setName("ESPHome scheduler worker thread " + currentCount);
             return t;
         });
+
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
 
         this.eventSubscriber = eventSubscriber;

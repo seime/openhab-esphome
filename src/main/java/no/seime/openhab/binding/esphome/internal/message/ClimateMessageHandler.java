@@ -206,7 +206,8 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportsCurrentHumidity()) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_HUMIDITY, "Current humidity",
                     ITEM_TYPE_NUMBER_DIMENSIONLESS, Collections.emptyList(), "%.0f %unit%",
-                    Set.of(SEMANTIC_TYPE_MEASUREMENT, "Humidity"), true, "humidity", null, null, null, rsp.getEntityCategory());
+                    Set.of(SEMANTIC_TYPE_MEASUREMENT, "Humidity"), true, "humidity", null, null, null,
+                    rsp.getEntityCategory());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_HUMIDITY))
                     .withLabel(createLabel(rsp.getName(), "Current humidity")).withKind(ChannelKind.STATE)
@@ -220,8 +221,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_MODE, "Mode", itemTypeString,
                     rsp.getSupportedModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
                             .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null,
-                    rsp.getEntityCategory());
+                    "%s", Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null, rsp.getEntityCategory());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_MODE))
                     .withLabel(createLabel(rsp.getName(), "Mode")).withKind(ChannelKind.STATE)
