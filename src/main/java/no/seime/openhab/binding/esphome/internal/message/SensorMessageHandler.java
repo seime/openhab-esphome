@@ -11,6 +11,7 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,10 +37,6 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
     @Override
     public void buildChannels(ListEntitiesSensorResponse rsp) {
         Configuration configuration = configuration(rsp.getKey(), null, null);
-        String unitOfMeasurement = rsp.getUnitOfMeasurement();
-        if (!"None".equals(unitOfMeasurement) && !"".equals(unitOfMeasurement)) {
-            configuration.put("unit", unitOfMeasurement);
-        }
         String deviceClass = rsp.getDeviceClass();
         if (deviceClass != null && !"".equals(deviceClass)) {
             configuration.put("deviceClass", deviceClass);
@@ -69,8 +66,18 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
                     "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS", Set.of("Status"), true, icon, null, null, null,
                     rsp.getEntityCategory());
         } else {
-
+            String unitOfMeasurement = rsp.getUnitOfMeasurement();
             itemType = resolveNumericItemType(unitOfMeasurement, rsp.getName(), sensorDeviceClass);
+
+            if (!"None".equals(unitOfMeasurement) && !"".equals(unitOfMeasurement)) {
+                if (isOHSupportedUnit(unitOfMeasurement)) {
+                    configuration.put("unit", unitOfMeasurement);
+                } else {
+                    logger.warn("Unit of measurement '{}' is not supported by openHAB, ignoring", unitOfMeasurement);
+                    itemType = "Number";
+                }
+            }
+
             channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptyList(),
                     "%." + rsp.getAccuracyDecimals() + "f "
                             + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement),
@@ -80,6 +87,10 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
         super.registerChannel(channel, channelType);
+    }
+
+    private boolean isOHSupportedUnit(String unitOfMeasurement) {
+        return UnitUtils.parseUnit(unitOfMeasurement) != null;
     }
 
     @Override
