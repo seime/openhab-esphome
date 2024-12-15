@@ -14,6 +14,8 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -28,6 +30,8 @@ import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
@@ -43,6 +47,8 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHo
 @Component(configurationPid = "binding.esphome", service = ThingHandlerFactory.class)
 public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
+    private final Logger logger = LoggerFactory.getLogger(ESPHomeHandlerFactory.class);
+
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE);
 
     @Override
@@ -55,10 +61,18 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private final ESPHomeEventSubscriber eventSubscriber;
 
+    private ScheduledExecutorService scheduler;
+
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ItemRegistry itemRegistry,
             @Reference ThingRegistry thingRegistry) throws IOException {
+        scheduler = Executors.newScheduledThreadPool(2, r -> {
+            Thread t = new Thread(r);
+            t.setDaemon(true);
+            t.setName("ESPHome scheduler worker thread");
+            return t;
+        });
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
 
         this.eventSubscriber = eventSubscriber;
@@ -73,7 +87,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber);
+            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber,
+                    scheduler);
         }
 
         return null;
@@ -87,6 +102,12 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     @Override
     protected void deactivate(ComponentContext componentContext) {
+        scheduler.shutdown();
+        try {
+            scheduler.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            logger.warn("Scheduler did not terminate in time. This may indicate ESPs with hanging connections");
+        }
         connectionSelector.stop();
 
         super.deactivate(componentContext);

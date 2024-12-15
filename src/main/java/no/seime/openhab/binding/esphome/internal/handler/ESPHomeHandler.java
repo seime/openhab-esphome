@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -81,16 +82,19 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private boolean interrogated;
 
     @Nullable
-    private String logPrefix = null;
+    private String logPrefix;
     private final ESPHomeEventSubscriber eventSubscriber;
+    private final ScheduledExecutorService executorService;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
-            ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber) {
+            ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber,
+            ScheduledExecutorService executorService) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         logPrefix = thing.getUID().getId();
         this.eventSubscriber = eventSubscriber;
+        this.executorService = executorService;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -438,13 +442,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             // Reset last pong
             lastPong = Instant.now();
 
-            pingWatchdogFuture = scheduler.scheduleAtFixedRate(() -> {
+            pingWatchdogFuture = executorService.scheduleAtFixedRate(() -> {
 
                 if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval).isBefore(Instant.now())) {
                     logger.warn(
                             "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
                             logPrefix, config.maxPingTimeouts, config.pingInterval,
-                            config.maxPingTimeouts * config.pingInterval,lastPong);
+                            config.maxPingTimeouts * config.pingInterval, lastPong);
                     pingWatchdogFuture.cancel(false);
                     frameHelper.close();
                     connectionState = ConnectionState.UNINITIALIZED;
@@ -534,7 +538,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private void scheduleReconnect(int delaySeconds) {
         cancelReconnectFuture();
-        reconnectFuture = scheduler.schedule(this::connect, delaySeconds, TimeUnit.SECONDS);
+        reconnectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS);
     }
 
     public boolean isInterrogated() {

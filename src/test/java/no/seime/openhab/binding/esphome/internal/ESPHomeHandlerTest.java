@@ -8,6 +8,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,9 +53,11 @@ class ESPHomeHandlerTest {
 
     ConnectionSelector selector;
 
+    ScheduledExecutorService executor;
+
     @BeforeEach
     public void setUp() throws Exception {
-
+        executor = Executors.newScheduledThreadPool(1);
         deviceConfiguration = new ESPHomeConfiguration();
         deviceConfiguration.hostname = "localhost";
         deviceConfiguration.port = 10000;
@@ -63,7 +67,8 @@ class ESPHomeHandlerTest {
         selector.start();
 
         thing = createThing();
-        deviceHandler = Mockito.spy(new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber));
+        deviceHandler = Mockito
+                .spy(new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber, executor));
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         deviceHandler.setCallback(thingHandlerCallback);
     }
@@ -72,6 +77,7 @@ class ESPHomeHandlerTest {
     public void shutdown() {
         selector.stop();
         deviceHandler.dispose();
+        executor.shutdownNow();
     }
 
     @Test

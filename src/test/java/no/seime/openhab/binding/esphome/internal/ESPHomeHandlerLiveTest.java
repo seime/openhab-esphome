@@ -4,6 +4,8 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
+import java.util.concurrent.ScheduledExecutorService;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +45,8 @@ class ESPHomeHandlerLiveTest {
 
     ConnectionSelector selector;
 
+    ScheduledExecutorService executor;
+
     @BeforeEach
     public void setUp() throws Exception {
 
@@ -58,7 +62,8 @@ class ESPHomeHandlerLiveTest {
         selector.start();
 
         thing = createThing();
-        deviceHandler = Mockito.spy(new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber));
+        deviceHandler = Mockito
+                .spy(new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber, executor));
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         deviceHandler.setCallback(thingHandlerCallback);
     }
@@ -67,6 +72,7 @@ class ESPHomeHandlerLiveTest {
     public void shutdown() {
         selector.stop();
         deviceHandler.dispose();
+        executor.shutdownNow();
     }
 
     // @Test
