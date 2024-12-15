@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.BluetoothDeviceConnectionResponse;
 import io.esphome.api.BluetoothGATTGetServicesDoneResponse;
@@ -143,7 +143,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         return new ESPHomeBluetoothDevice(this, address);
     }
 
-    public void handleBluetoothMessage(@NonNull GeneratedMessageV3 message, ESPHomeHandler handler) {
+    public void handleBluetoothMessage(@NonNull GeneratedMessage message, ESPHomeHandler handler) {
 
         // Update RSSi list
 
