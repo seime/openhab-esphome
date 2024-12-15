@@ -13,7 +13,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import no.seime.openhab.binding.esphome.internal.comm.AbstractFrameHelper;
 import no.seime.openhab.binding.esphome.internal.comm.CommunicationError;
@@ -109,7 +109,7 @@ public class ESPHomeEmulator {
         selector.close();
     }
 
-    public void sendPacket(GeneratedMessageV3 message) throws IOException, ProtocolAPIError {
+    public void sendPacket(GeneratedMessage message) throws IOException, ProtocolAPIError {
         ByteBuffer buffer = frameHelper.encodeFrame(message);
 
         while (buffer.hasRemaining()) {

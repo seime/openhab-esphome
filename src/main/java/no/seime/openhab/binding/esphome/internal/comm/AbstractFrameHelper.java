@@ -11,7 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
@@ -54,7 +54,7 @@ public abstract class AbstractFrameHelper {
      * @return byte buffer with the encoded frame
      * @throws ProtocolAPIError
      */
-    public abstract ByteBuffer encodeFrame(GeneratedMessageV3 message) throws ProtocolAPIError;
+    public abstract ByteBuffer encodeFrame(GeneratedMessage message) throws ProtocolAPIError;
 
     public void setPacketListener(CommunicationListener listener) {
         this.listener = listener;
@@ -99,7 +99,7 @@ public abstract class AbstractFrameHelper {
         try {
             Method parseMethod = messageTypeToClassConverter.getMethod(messageType);
             if (parseMethod != null) {
-                GeneratedMessageV3 invoke = (GeneratedMessageV3) parseMethod.invoke(null, bytes);
+                GeneratedMessage invoke = (GeneratedMessage) parseMethod.invoke(null, bytes);
                 if (invoke != null) {
                     listener.onPacket(invoke);
                 } else {
@@ -127,7 +127,7 @@ public abstract class AbstractFrameHelper {
         listener.onParseError(error);
     }
 
-    public void send(GeneratedMessageV3 message) throws ProtocolAPIError {
+    public void send(GeneratedMessage message) throws ProtocolAPIError {
         if (logger.isDebugEnabled()) {
             // ToString method costs a bit
             logger.debug("[{}] Sending message type {} with content '{}'", logPrefix,

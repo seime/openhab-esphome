@@ -24,7 +24,7 @@ import javax.crypto.ShortBufferException;
 
 import org.eclipse.jdt.annotation.Nullable;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 import com.southernstorm.noise.protocol.CipherStatePair;
 import com.southernstorm.noise.protocol.HandshakeState;
 
@@ -194,7 +194,7 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         }
     }
 
-    public ByteBuffer encodeFrame(GeneratedMessageV3 message) throws ProtocolAPIError {
+    public ByteBuffer encodeFrame(GeneratedMessage message) throws ProtocolAPIError {
         try {
             byte[] protoBytes = message.toByteArray();
             int type = message.getDescriptorForType().getOptions().getExtension(ApiOptions.id);

@@ -18,7 +18,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
@@ -109,7 +109,7 @@ public class PlainTextFrameHelper extends AbstractFrameHelper {
         }
     }
 
-    public ByteBuffer encodeFrame(GeneratedMessageV3 message) {
+    public ByteBuffer encodeFrame(GeneratedMessage message) {
         byte[] protoBytes = message.toByteArray();
         byte[] idVarUint = VarIntConverter
                 .intToBytes(message.getDescriptorForType().getOptions().getExtension(io.esphome.api.ApiOptions.id));

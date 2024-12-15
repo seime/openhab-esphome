@@ -26,7 +26,7 @@ import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.EntityCategory;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
@@ -34,7 +34,7 @@ import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 import no.seime.openhab.binding.esphome.internal.util.Debug;
 
-public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T extends GeneratedMessageV3> {
+public abstract class AbstractMessageHandler<S extends GeneratedMessage, T extends GeneratedMessage> {
 
     private final Logger logger = LoggerFactory.getLogger(AbstractMessageHandler.class);
     protected final ESPHomeHandler handler;
@@ -249,7 +249,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessageV3, T ext
                 .findFirst();
     }
 
-    public void handleMessage(GeneratedMessageV3 message) {
+    public void handleMessage(GeneratedMessage message) {
         if (message.getClass().getSimpleName().startsWith("ListEntities")) {
             buildChannels((S) message);
         } else {

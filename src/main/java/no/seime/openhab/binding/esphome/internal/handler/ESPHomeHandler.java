@@ -34,7 +34,7 @@ import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
@@ -72,8 +72,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private Instant lastPong = Instant.now();
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
-    private final Map<String, AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3>> commandTypeToHandlerMap = new HashMap<>();
-    private final Map<Class<? extends GeneratedMessageV3>, AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3>> classToHandlerMap = new HashMap<>();
+    private final Map<String, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> commandTypeToHandlerMap = new HashMap<>();
+    private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
 
     private final List<Channel> dynamicChannels = new ArrayList<>();
@@ -132,8 +132,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void registerMessageHandler(String select,
-            AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> messageHandler,
-            Class<? extends GeneratedMessageV3> listEntitiesClass, Class<? extends GeneratedMessageV3> stateClass) {
+            AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> messageHandler,
+            Class<? extends GeneratedMessage> listEntitiesClass, Class<? extends GeneratedMessage> stateClass) {
 
         commandTypeToHandlerMap.put(select, messageHandler);
         classToHandlerMap.put(listEntitiesClass, messageHandler);
@@ -215,7 +215,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         super.dispose();
     }
 
-    public void sendMessage(GeneratedMessageV3 message) throws ProtocolAPIError {
+    public void sendMessage(GeneratedMessage message) throws ProtocolAPIError {
         frameHelper.send(message);
     }
 
@@ -252,7 +252,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     return;
                 }
 
-                AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = commandTypeToHandlerMap
+                AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = commandTypeToHandlerMap
                         .get(commandClass);
                 if (abstractMessageHandler == null) {
                     logger.warn("[{}] No message handler for command class {}", logPrefix, commandClass);
@@ -278,7 +278,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     @Override
-    public void onPacket(@NonNull GeneratedMessageV3 message) throws ProtocolAPIError {
+    public void onPacket(@NonNull GeneratedMessage message) throws ProtocolAPIError {
         switch (connectionState) {
             case UNINITIALIZED -> logger.warn("[{}] Received packet {} while uninitialized.", logPrefix,
                     message.getClass().getSimpleName());
@@ -330,7 +330,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private void handleConnected(GeneratedMessageV3 message) throws ProtocolAPIError {
+    private void handleConnected(GeneratedMessage message) throws ProtocolAPIError {
         if (logger.isDebugEnabled()) {
             // ToString method costs a bit
             logger.debug("[{}] Received message type {} with content '{}'", logPrefix,
@@ -372,7 +372,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(getTimeResponse);
         } else {
             // Regular messages handled by message handlers
-            AbstractMessageHandler<? extends GeneratedMessageV3, ? extends GeneratedMessageV3> abstractMessageHandler = classToHandlerMap
+            AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = classToHandlerMap
                     .get(message.getClass());
             if (abstractMessageHandler != null) {
                 abstractMessageHandler.handleMessage(message);
@@ -415,7 +415,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private void handleLoginResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
+    private void handleLoginResponse(GeneratedMessage message) throws ProtocolAPIError {
         if (message instanceof ConnectResponse connectResponse) {
             logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
 
@@ -480,7 +480,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         super.updateState(channelUID, state);
     }
 
-    private void handleHelloResponse(GeneratedMessageV3 message) throws ProtocolAPIError {
+    private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
             logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
             logger.info("[{}] Connected. Device '{}' running '{}' on protocol version '{}.{}'", logPrefix,

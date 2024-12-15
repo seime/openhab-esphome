@@ -13,7 +13,7 @@ import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
@@ -45,6 +45,6 @@ public class ClimateMessageHandlerTest {
         messageHandler.handleCommand(customPresetChannel, new StringType("presetmode1"), 1);
 
         Thread.sleep(500);
-        verify(handler).sendMessage(isA(GeneratedMessageV3.class));
+        verify(handler).sendMessage(isA(GeneratedMessage.class));
     }
 }

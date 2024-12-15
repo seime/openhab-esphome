@@ -11,15 +11,15 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 public class LogParser {
 
     private final MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
 
-    public List<GeneratedMessageV3> parseLog(File log)
+    public List<GeneratedMessage> parseLog(File log)
             throws IOException, InvocationTargetException, IllegalAccessException {
-        List<GeneratedMessageV3> messages = new ArrayList<>();
+        List<GeneratedMessage> messages = new ArrayList<>();
 
         FileReader reader = new FileReader(log);
         BufferedReader bufferedReader = new BufferedReader(reader);
@@ -34,9 +34,9 @@ public class LogParser {
                 String messageType = m.group(1);
                 String messageData = m.group(2);
 
-                GeneratedMessageV3 generatedMessageV3 = parseMessage(messageType, messageData);
-                if (generatedMessageV3 != null) {
-                    messages.add(generatedMessageV3);
+                GeneratedMessage GeneratedMessage = parseMessage(messageType, messageData);
+                if (GeneratedMessage != null) {
+                    messages.add(GeneratedMessage);
                 }
             }
         }
@@ -44,13 +44,13 @@ public class LogParser {
         return messages;
     }
 
-    private GeneratedMessageV3 parseMessage(String messageType, String messageData)
+    private GeneratedMessage parseMessage(String messageType, String messageData)
             throws InvocationTargetException, IllegalAccessException {
         Integer type = Integer.parseInt(messageType);
         Method parseMethod = messageTypeToClassConverter.getMethod(type);
 
         if (parseMethod != null) {
-            GeneratedMessageV3 invoke = (GeneratedMessageV3) parseMethod.invoke(null, fromString(messageData));
+            GeneratedMessage invoke = (GeneratedMessage) parseMethod.invoke(null, fromString(messageData));
             return invoke;
         }
         return null;

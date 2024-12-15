@@ -22,7 +22,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.HelloRequest;
 import io.esphome.api.HelloResponse;
@@ -58,7 +58,7 @@ public class PlainTextFrameHelperTest {
             PlainTextFrameHelper serverConnection = new PlainTextFrameHelper(connectionSelector, null, "openhab");
             serverConnection.setPacketListener(new CommunicationListener() {
                 @Override
-                public void onPacket(GeneratedMessageV3 message) {
+                public void onPacket(GeneratedMessage message) {
                     System.out.println("Received packet: " + message);
                     assertInstanceOf(HelloResponse.class, message);
                     responseReceived = true;
@@ -102,7 +102,7 @@ public class PlainTextFrameHelperTest {
         espHomeDevice = new ESPHomeEmulator(serverAddress, new PlainTextFrameHelper(null, null, "emulator"));
         espHomeDevice.setPacketListener(new CommunicationListener() {
             @Override
-            public void onPacket(GeneratedMessageV3 message) throws IOException, ProtocolAPIError {
+            public void onPacket(GeneratedMessage message) throws IOException, ProtocolAPIError {
                 System.out.println("Received packet: " + message);
                 assertInstanceOf(HelloRequest.class, message);
 

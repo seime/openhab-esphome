@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.ConnectResponse;
 
@@ -22,9 +22,9 @@ public class LogParserTest {
     @Test
     public void testParseLogfile() throws IOException, InvocationTargetException, IllegalAccessException {
         LogParser parser = new LogParser();
-        List<GeneratedMessageV3> generatedMessageV3s = parser
+        List<GeneratedMessage> GeneratedMessages = parser
                 .parseLog(new File("src/test/resources/logfiles/presence_sensor.log"));
-        assertEquals(50, generatedMessageV3s.size());
+        assertEquals(50, GeneratedMessages.size());
     }
 
     @Test

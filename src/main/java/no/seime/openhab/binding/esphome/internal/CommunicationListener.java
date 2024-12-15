@@ -16,7 +16,7 @@ import java.io.IOException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import no.seime.openhab.binding.esphome.internal.comm.CommunicationError;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
@@ -24,7 +24,7 @@ import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 @NonNullByDefault
 public interface CommunicationListener {
 
-    void onPacket(GeneratedMessageV3 message) throws ProtocolAPIError, IOException;
+    void onPacket(GeneratedMessage message) throws ProtocolAPIError, IOException;
 
     void onEndOfStream();
 

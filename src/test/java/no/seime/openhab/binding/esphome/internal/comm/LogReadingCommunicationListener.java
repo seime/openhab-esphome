@@ -8,7 +8,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
@@ -19,7 +19,7 @@ public class LogReadingCommunicationListener implements CommunicationListener {
     private final Logger logger = LoggerFactory.getLogger(LogReadingCommunicationListener.class);
     private final ESPHomeEmulator emulator;
 
-    List<GeneratedMessageV3> responseMessages;
+    List<GeneratedMessage> responseMessages;
 
     public LogReadingCommunicationListener(ESPHomeEmulator emulator, File logFile)
             throws IOException, InvocationTargetException, IllegalAccessException {
@@ -29,7 +29,7 @@ public class LogReadingCommunicationListener implements CommunicationListener {
     }
 
     @Override
-    public void onPacket(GeneratedMessageV3 message) throws IOException, ProtocolAPIError {
+    public void onPacket(GeneratedMessage message) throws IOException, ProtocolAPIError {
         if (message instanceof HelloRequest) {
             emulator.sendPacket(responseMessages.stream().filter(e -> e instanceof HelloResponse).findFirst().get());
         } else if (message instanceof DeviceInfoRequest) {

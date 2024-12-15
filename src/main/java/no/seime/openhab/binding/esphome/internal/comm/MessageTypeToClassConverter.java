@@ -4,7 +4,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.Api;
 
@@ -17,8 +17,8 @@ public class MessageTypeToClassConverter {
             try {
                 int id = messageDescriptor.getOptions().getExtension(io.esphome.api.ApiOptions.id);
                 if (id > 0) {
-                    Class<? extends GeneratedMessageV3> subclass = Class.forName(messageDescriptor.getFullName())
-                            .asSubclass(GeneratedMessageV3.class);
+                    Class<? extends GeneratedMessage> subclass = Class.forName(messageDescriptor.getFullName())
+                            .asSubclass(GeneratedMessage.class);
                     Method parseMethod = subclass.getDeclaredMethod("parseFrom", byte[].class);
 
                     messageTypeToMessageClass.put(id, parseMethod);
