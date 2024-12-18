@@ -8,8 +8,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +26,7 @@ import no.seime.openhab.binding.esphome.internal.comm.LogReadingCommunicationLis
 import no.seime.openhab.binding.esphome.internal.comm.PlainTextFrameHelper;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThreadPoolExecutor;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 /**
@@ -53,11 +52,11 @@ class ESPHomeHandlerTest {
 
     ConnectionSelector selector;
 
-    ScheduledExecutorService executor;
+    MonitoredScheduledThreadPoolExecutor executor;
 
     @BeforeEach
     public void setUp() throws Exception {
-        executor = Executors.newScheduledThreadPool(1);
+        executor = new MonitoredScheduledThreadPoolExecutor(1, r -> new Thread(r), 1000);
         deviceConfiguration = new ESPHomeConfiguration();
         deviceConfiguration.hostname = "localhost";
         deviceConfiguration.port = 10000;

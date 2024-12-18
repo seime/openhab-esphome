@@ -4,8 +4,6 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
-import java.util.concurrent.ScheduledExecutorService;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +18,7 @@ import org.openhab.core.thing.internal.ThingImpl;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThreadPoolExecutor;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 /**
@@ -45,7 +44,7 @@ class ESPHomeHandlerLiveTest {
 
     ConnectionSelector selector;
 
-    ScheduledExecutorService executor;
+    MonitoredScheduledThreadPoolExecutor executor;
 
     @BeforeEach
     public void setUp() throws Exception {

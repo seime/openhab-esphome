@@ -16,7 +16,6 @@ import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -87,13 +86,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Nullable
     private String logPrefix;
     private final ESPHomeEventSubscriber eventSubscriber;
-    private final ScheduledExecutorService executorService;
+    private final MonitoredScheduledThreadPoolExecutor executorService;
     @Nullable
     private ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber,
-            ScheduledExecutorService executorService) {
+            MonitoredScheduledThreadPoolExecutor executorService) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -503,7 +502,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         logger.warn("[{}] Error sending ping request", logPrefix, e);
                     }
                 }
-            }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS);
+            }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS,
+                    String.format("[%s] Ping watchdog", logPrefix));
 
             // Start interrogation
             frameHelper.send(DeviceInfoRequest.getDefaultInstance());
@@ -606,7 +606,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private void scheduleReconnect(int delaySeconds) {
         cancelReconnectFuture();
-        reconnectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS);
+        reconnectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS,
+                String.format("[%s] Reconnect", logPrefix), 7000);
     }
 
     public boolean isInterrogated() {

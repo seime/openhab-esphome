@@ -17,7 +17,6 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -69,20 +68,20 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final ESPHomeEventSubscriber eventSubscriber;
     private final ThingRegistry thingRegistry;
 
-    private ScheduledExecutorService scheduler;
+    private MonitoredScheduledThreadPoolExecutor scheduler;
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ItemRegistry itemRegistry,
             @Reference ThingRegistry thingRegistry) throws IOException {
-        scheduler = new MonitoredScheduledThreadPoolExecutor(2, r -> {
+        scheduler = new MonitoredScheduledThreadPoolExecutor(3, r -> {
             long currentCount = threadCounter.incrementAndGet();
             logger.debug("Creating new worker thread {} for scheduler", currentCount);
             Thread t = new Thread(r);
             t.setDaemon(true);
-            t.setName("ESPHome scheduler worker thread " + currentCount);
+            t.setName("ESPHome Thing Scheduler " + currentCount);
             return t;
-        });
+        }, 2000);
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
 
@@ -118,13 +117,13 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     @Override
     protected void deactivate(ComponentContext componentContext) {
+        connectionSelector.stop();
         scheduler.shutdown();
         try {
             scheduler.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             logger.warn("Scheduler did not terminate in time. This may indicate ESPs with hanging connections");
         }
-        connectionSelector.stop();
 
         super.deactivate(componentContext);
     }
