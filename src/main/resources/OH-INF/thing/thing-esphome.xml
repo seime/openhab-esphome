@@ -25,6 +25,9 @@
 			<parameter-group name="logging">
 				<label>Logging</label>
 			</parameter-group>
+			<parameter-group name="bluetooth">
+				<label>Bluetooth proxy</label>
+			</parameter-group>
 
 			<parameter name="hostname" type="text" required="true" groupName="address">
 				<context>network-address</context>
@@ -68,10 +71,13 @@
 				<description>Seconds between sending ping requests to device to check if alive</description>
 				<advanced>true</advanced>
 			</parameter>
-			<parameter name="enableBluetoothProxy" type="boolean" required="false">
-				<label>Enable Bluetooth proxying</label>
-				<description>Ensure your ESPHome configuration contains the bluetooth_proxy configuration element</description>
+			<parameter name="enableBluetoothProxy" type="boolean" required="false" groupName="bluetooth">
+				<label>Enable Bluetooth proxying (experimental)</label>
+				<description>Ensure your ESPHome configuration contains the bluetooth_proxy configuration element. Only works for
+					broadcasting devices ie BTHome devices such as Shelly BLU, b-parasite plant sensors etc. 2-way communication is not
+					yet supported. See https://bthome.io/</description>
 				<default>false</default>
+				<advanced>true</advanced>
 			</parameter>
 			<parameter name="maxPingTimeouts" type="integer" min="1" required="false" groupName="timeout">
 				<label>Number of missed ping requests before deeming device unresponsive</label>
