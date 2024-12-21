@@ -37,7 +37,7 @@ public enum SensorNumberDeviceClass {
     PM1("pm1", "Number", "smoke", null),
     PM10("pm10", "Number", "smoke", null),
     PM25("pm25", "Number", "smoke", null),
-    POWER_FACTOR("power_factor", "Number", "qualityofservice", null),
+    POWER_FACTOR("power_factor", "Number:Dimensionless", "energy", "Power"),
     POWER("power", "Number:Power", "energy", "Power"),
     PRECIPITATION("precipitation", "Number:Length", "rain", "Rain"),
     PRECIPITATION_RATE("precipitation_rate", "Number:Speed", "rain", "Rain"),
