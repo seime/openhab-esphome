@@ -1,4 +1,6 @@
-# ESPHome Native API Binding
+# ESPHome Binding for openHAB
+
+### Docs updated 2025-01-21.
 
 <img src="logo.png" width="200"/>
 
@@ -61,7 +63,7 @@ The binding uses mDNS to automatically discover devices on the network.
 
 ## Channels
 
-Channels are auto-generated based on actual device configuration.
+Channels are auto-generated based on actual device configuration. Bring the device online, and the binding will interrogate the device and create channels based on the device configuration.
 
 ## Full Example file example
 
@@ -78,6 +80,45 @@ Number:Temperature ESP1_Temperature "Temperature" <temperature>   {channel="esph
 Number:Dimensionless ESP1_Humidity "Humidity"     <humidity>      {channel="esphome:device:esp1:humidity"}
 Switch ESP1_Switch "Relay"                        <switch>        {channel="esphome:device:esp1:relay_4"}
 ```
+
+## FAQ
+
+### Why does the discovered `Thing` ID start with `REMOVEMEWHENADDING`?
+> This is to avoid openHAB overwriting your `hostname` attribute with mDNS discovery results. **Remove this prefix when adding as a managed thing!**
+>
+> This problem does *not* occur if you use `Thing` files ("file based") configuration.
+>
+> See https://github.com/seime/openhab-esphome/issues/1 . TLDR: A "feature" in openHAB.
+
+### I cannot connect to my device
+I get errors like ```[WARN ] [phome.internal.handler.ESPHomeHandler] - [REMOVEMEWHENADDINGbewaesserung] Error initial connection no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError: Failed to connect to 'XXXX.local.' port 6053```
+> See previous question
+
+### openHAB looses connection to my device
+with log messages like `[WARN ] [home.internal.handler.ESPHomeHandler] - [esphome-devicename] Ping responses lacking. Waited 4 times 10 seconds, total of 40. Assuming connection lost and disconnecting`
+> This can be caused by a flaky device or network connection. However, this may also be caused by openHAB is not executing the scheduled check in time. 
+> This typically happens on installations with many physical things and bindings doing blocking network I/O. You might already have noticed other things not responding immediately for unknown reasons.
+>
+> In the current version the binding is using its own scheduler to avoid this.
+>
+> If you for some reason cannot upgrade, adding the following to your `services/runtime.cfg` file might help: `org.openhab.threadpool:thingHandler = 50`
+
+### I get warnings like `Unit 'XXXX' unknown to openHAB, returning DecimalType for state '1234.0' on channel 'esphome:device:8dcf64d482:my_channel_name`
+> The unit is reported by the ESPHome device, but it doesn't match anything known to openHAB.
+>
+> Solution: Add a valid `unit_of_measurement` to your entity in the ESPHome configuration. Use `unit_of_measurement: ""` to remove the unit altogether from the entity.
+
+### I get warnings like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
+
+> This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
+> type in openHAB.
+> Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
+> ![img.png](esphomeconfig_deviceclass.png)
+> <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid device_class values (**use lowercase values**)
+> Also note that you may override default device_class by specifying `device_class: ""` to remove any device class from the sensor.
+
+Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
+
 
 ## Bluetooth proxy support
 
@@ -122,34 +163,6 @@ Bridge bluetooth:esphome:proxy "ESPHome BLE Advertisement listener" [backgroundD
 > manual
 > scanning from the inbox.
 
-## FAQ
-
-- I get warnings
-  like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
-
-  > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
-  > type in openHAB.
-  > Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
-  > ![img.png](esphomeconfig_deviceclass.png)
-  > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
-  device_class values (**use lowercase values**)
-  > Also note that you may override default device_class by specifying `device_class: ""` to remove any device class
-  from the sensor.
-
-Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
-
-## Limitations as of 2024-06-17
-
-Most entity types and functions are now supported. However, there are some limitations:
-
-The following entity types are **not** yet supported (please submit a PR of file a feature request!)
-
-- `lock`,
-- `camera`
-- `voice`
-- `valve`
-
-In addition, the Bluetooth proxy isn't fully ready yet.
 
 ## Streaming logs from ESPHome device to openHAB
 
@@ -180,14 +193,10 @@ log:set INFO ESPHOMEDEVICE
 This will produce logs on level `INFO` in the openHAB logs like this:
 
 ```
-
-[2024-04-04 15:06:25.822] [varmtvann] [D][dallas.sensor:143]: 'VV Temp bunn': Got Temperature=21.0°C
-[2024-04-04 15:06:25.834] [varmtvann] [D][sensor:094]: 'VV Temp bunn': Sending state 21.00000 °C with 1 decimals of
-accuracy
-[2024-04-04 15:06:25.850] [varmtvann] [D][dallas.sensor:143]: 'VV Temp midt': Got Temperature=71.7°C
-[2024-04-04 15:06:25.863] [varmtvann] [D][sensor:094]: 'VV Temp midt': Sending state 71.68750 °C with 1 decimals of
-accuracy
-
+[2024-04-04 15:06:25.822] [boiler] [D][dallas.sensor:143]: 'VV Temp bottom': Got Temperature=21.0°C
+[2024-04-04 15:06:25.834] [boiler] [D][sensor:094]: 'VV Temp bottom': Sending state 21.00000 °C with 1 decimals of accuracy
+[2024-04-04 15:06:25.850] [boiler] [D][dallas.sensor:143]: 'VV Temp middle': Got Temperature=71.7°C 
+[2024-04-04 15:06:25.863] [boiler] [D][sensor:094]: 'VV Temp middle': Sending state 71.68750 °C with 1 decimals of accuracy
 ```
 
 To redirect device logs to a separate log file, edit your `log4j.xml` file and add the following in the `<Appenders>`
@@ -265,7 +274,7 @@ text_sensor:
     entity_id: ThingStatusInfoChangedEvent.astro_moon_local
 ```
 
-## Time sync
+## Time sync from openHAB
 
 Time sync from your openHAB server is supported using
 the [HomeAssistant time source component](https://esphome.io/components/time/homeassistant).
@@ -290,28 +299,9 @@ sensor:
     icon: "mdi:counter"
 ```
 
-## FAQ
-
-- I get warnings
-  like
-  `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
-
-  > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
-  > type in openHAB.
-  > Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
-  > ![img.png](esphomeconfig_deviceclass.png)
-  > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid
-  device_class values (**use lowercase values**)
-  > Also note that you may override default device_class by specifying `device_class: ""` to remove any device class
-  from the sensor.
-
-Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
-
-## Limitations as of 2024-06-17
+## Limitations
 
 Most entity types and functions are now supported. However, there are some limitations:
-
-- `lock` (partial support),
 
 The following entity types are **not** yet supported (please submit a PR of file a feature request!)
 
@@ -319,46 +309,5 @@ The following entity types are **not** yet supported (please submit a PR of file
 - `voice`
 - `valve`
 
-In addition, the Bluetooth proxy isn't ready yet.
-
-## Discovery
-
-The binding uses mDNS to automatically discover devices on the network.
-
-## Thing Configuration
-
-### `device` Thing Configuration
-
-| Name                | Type      | Description                                                                                                                            | Default  | Required | Advanced |
-|---------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
-| `hostname`          | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                         | N/A      | yes      | no       |
-| `port`              | `integer` | IP Port of the device                                                                                                                  | 6053     | no       | no       |
-| `encryptionKey`     | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables | N/A      | no       | no       |
-| ~~`password`~~      | `text`    | Password to access the device if password protected. **DEPRECATED. Use `encryptionKey` instead**                                       | N/A      | no       | no       |
-| `reconnectInterval` | `integer` | Seconds between reconnecting to device after communication is lost or device request restart                                           | 20       | no       | yes      |
-| `pingInterval`      | `integer` | Seconds between sending ping requests to device to check if alive                                                                      | 10       | no       | yes      |
-| `maxPingTimeouts`   | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                     | 4        | no       | yes      |
-| `server`            | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device                                              |          | no       | yes      |
-| `logPrefix`         | `text`    | Log prefix to use for this device.                                                                                                     | hostname | no       | yes      |
-| `deviceLogLevel`    | `text`    | ESPHome device log level to stream from the device.                                                                                    | NONE     | no       | yes      |
-
-## Channels
-
-Channels are auto-generated based on actual device configuration.
-
-## Full Example
-
-### Thing Configuration
-
-```
-esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, server="esphomename", logPrefix="esp1", deviceLogLevel="INFO"]
-```
-
-### Item Configuration
-
-```
-Number:Temperature ESP1_Temperature "Temperature" <temperature>   {channel="esphome:device:esp1:temperature"}
-Number:Dimensionless ESP1_Humidity "Humidity"     <humidity>      {channel="esphome:device:esp1:humidity"}
-Switch ESP1_Switch "Relay"                        <switch>        {channel="esphome:device:esp1:relay_4"}
-```
+In addition, the Bluetooth proxy isn't fully ready yet.
 
