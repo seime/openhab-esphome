@@ -10,10 +10,7 @@ import org.openhab.core.events.EventSubscriber;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemNotFoundException;
 import org.openhab.core.items.ItemRegistry;
-import org.openhab.core.items.events.ItemCommandEvent;
-import org.openhab.core.items.events.ItemStateChangedEvent;
-import org.openhab.core.items.events.ItemStateEvent;
-import org.openhab.core.items.events.ItemStatePredictedEvent;
+import org.openhab.core.items.events.*;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Thing;
@@ -62,6 +59,7 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
         subscribedEventTypes.add(ItemStateEvent.TYPE);
         subscribedEventTypes.add(ItemStatePredictedEvent.TYPE);
         subscribedEventTypes.add(ItemStateChangedEvent.TYPE);
+        subscribedEventTypes.add(GroupItemStateChangedEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoChangedEvent.TYPE);
     }

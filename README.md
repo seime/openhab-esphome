@@ -228,14 +228,15 @@ You can send state to the ESPHome device using the `homeassistant` sensor type. 
 
 You can listen for several types of OpenHAB events, default is `ItemStateChangedEvent`. The following are supported:
 
-| entity_id                                  | OH Event listened for         | Item/Thing   |
-|--------------------------------------------|-------------------------------|--------------|
-| `<whatever>.ItemName`                      | `ItemStateChangedEvent`       | ItemName     | 
-| `ItemStateChangedEvent.ItemName`           | `ItemStateChangedEvent`       | ItemName     | 
-| `ItemStateEvent.ItemName`                  | `ItemStateEvent`              | ItemName     | 
-| `ItemStatePredictedEvent.ItemName`         | `ItemStatePredictedEvent`     | ItemName     | 
-| `ThingStatusInfoEvent.my_thing_uid`        | `ThingStatusInfoEvent`        | my:thing:uid | 
-| `ThingStatusInfoChangedEvent.my_thing_uid` | `ThingStatusInfoChangedEvent` | my:thing:uid | 
+| entity_id                                  | OH Event listened for          | Item/Thing   |
+|--------------------------------------------|--------------------------------|--------------|
+| `<whatever>.ItemName`                      | `ItemStateChangedEvent`        | ItemName     | 
+| `ItemStateChangedEvent.ItemName`           | `ItemStateChangedEvent`        | ItemName     | 
+| `ItemStateEvent.ItemName`                  | `ItemStateEvent`               | ItemName     | 
+| `ItemStatePredictedEvent.ItemName`         | `ItemStatePredictedEvent`      | ItemName     | 
+| `GroupItemStateChangedEvent.ItemName`      | `GroupItemStateChangedEvent`   | ItemName     | 
+| `ThingStatusInfoEvent.my_thing_uid`        | `ThingStatusInfoEvent`         | my:thing:uid | 
+| `ThingStatusInfoChangedEvent.my_thing_uid` | `ThingStatusInfoChangedEvent`  | my:thing:uid | 
 
 > NOTE: EntityID in HA is case-insensitive - meaning only lowercase is used. Whatever you add in `entity_id` in the
 > ESPHome yaml will be converted to lowercase.
