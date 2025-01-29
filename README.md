@@ -247,6 +247,8 @@ You can listen for several types of OpenHAB events, default is `ItemStateChanged
 
 > NOTE2: In Thing UIDs, the `:` is replaced with `_`
 
+> NOTE3: For Group events, it is the group state that is sent, not the individual item states.
+
 ### Examples
 
 Making state changes to OH temperature sensor available in ESPHome:
