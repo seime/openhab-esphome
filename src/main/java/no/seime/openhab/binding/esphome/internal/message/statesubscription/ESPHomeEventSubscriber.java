@@ -33,22 +33,23 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
     private final Logger logger = LoggerFactory.getLogger(ESPHomeEventSubscriber.class);
 
     public static final String ITEM_COMMAND_EVENT = "ItemCommandEvent";
-
     public static final String ITEM_STATE_EVENT = "ItemStateEvent";
-
     public static final String ITEM_STATE_PREDICTED_EVENT = "ItemStatePredictedEvent";
-
     public static final String ITEM_STATE_CHANGED_EVENT = "ItemStateChangedEvent";
+    public static final String ITEM_STATE_UPDATED_EVENT = "ItemStateUpdatedEvent";
+
+    public static final String GROUP_ITEM_STATE_CHANGED_EVENT = "GroupItemStateChangedEvent";
+    public static final String GROUP_STATE_UPDATED_EVENT = "GroupStateUpdatedEvent";
 
     public static final String THING_STATUS_INFO_EVENT = "ThingStatusInfoEvent";
-
     public static final String THING_STATUS_INFO_CHANGED_EVENT = "ThingStatusInfoChangedEvent";
 
     private ItemRegistry itemRegistry;
     private ThingRegistry thingRegistry;
 
     private final static Set<String> supportedOpenhabEventTypes = Set.of(ITEM_COMMAND_EVENT, ITEM_STATE_EVENT,
-            ITEM_STATE_PREDICTED_EVENT, ITEM_STATE_CHANGED_EVENT, THING_STATUS_INFO_EVENT,
+            ITEM_STATE_PREDICTED_EVENT, ITEM_STATE_CHANGED_EVENT, ITEM_STATE_UPDATED_EVENT,
+            GROUP_ITEM_STATE_CHANGED_EVENT, GROUP_STATE_UPDATED_EVENT, THING_STATUS_INFO_EVENT,
             THING_STATUS_INFO_CHANGED_EVENT);
     private Map<ESPHomeHandler, List<EventSubscription>> eventSubscriptions = new HashMap<>();
 
@@ -59,7 +60,9 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
         subscribedEventTypes.add(ItemStateEvent.TYPE);
         subscribedEventTypes.add(ItemStatePredictedEvent.TYPE);
         subscribedEventTypes.add(ItemStateChangedEvent.TYPE);
+        subscribedEventTypes.add(ItemStateUpdatedEvent.TYPE);
         subscribedEventTypes.add(GroupItemStateChangedEvent.TYPE);
+        subscribedEventTypes.add(GroupStateUpdatedEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoChangedEvent.TYPE);
     }
@@ -149,6 +152,10 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
             return e.getItemState();
         } else if (event instanceof ItemStatePredictedEvent e) {
             return e.getPredictedState();
+        } else if (event instanceof GroupStateUpdatedEvent e) {
+            return e.getItemState();
+        } else if (event instanceof GroupItemStateChangedEvent e) {
+            return e.getItemState();
         } else if (event instanceof ThingStatusInfoEvent e) {
             return new StringType(e.getStatusInfo().getStatus().toString());
         } else if (event instanceof ThingStatusInfoChangedEvent e) {
@@ -177,7 +184,8 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
         String eventType = supportedOpenhabEventTypes.stream().filter(e -> e.equalsIgnoreCase(parts[0])).findFirst()
                 .orElse(ITEM_STATE_CHANGED_EVENT);
 
-        TargetType targetType = eventType.startsWith("Item") ? TargetType.ITEM : TargetType.THING;
+        TargetType targetType = eventType.startsWith("Item") || eventType.startsWith("Group") ? TargetType.ITEM
+                : TargetType.THING;
 
         String targetName = targetType == TargetType.ITEM ? findCaseSensitiveItemName(parts[1])
                 : parts[1].replaceAll("_", ":");
@@ -220,10 +228,17 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
                 topicName = "openhab/items/" + targetName + "/statepredicted";
                 break;
             }
+            case GROUP_STATE_UPDATED_EVENT:
+            case ITEM_STATE_UPDATED_EVENT: {
+                topicName = "openhab/items/" + targetName + "/stateupdated";
+                break;
+            }
+            case GROUP_ITEM_STATE_CHANGED_EVENT:
             case ITEM_STATE_CHANGED_EVENT: {
                 topicName = "openhab/items/" + targetName + "/statechanged";
                 break;
             }
+
             case THING_STATUS_INFO_EVENT: {
                 topicName = "openhab/things/" + targetName + "/status";
                 break;
