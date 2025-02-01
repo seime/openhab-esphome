@@ -9,7 +9,7 @@ logger:
 
 api:
   encryption:
-    key: !secret encryption_key
+    key: !secret emulator_encryption_key
 
 
 sensor:
