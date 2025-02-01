@@ -11,17 +11,17 @@ import org.slf4j.LoggerFactory;
 import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.deviceutil.ESPHomeLogReadingEmulator;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
-import no.seime.openhab.binding.esphome.internal.ESPHomeEmulator;
 
 public class LogReadingCommunicationListener implements CommunicationListener {
 
     private final Logger logger = LoggerFactory.getLogger(LogReadingCommunicationListener.class);
-    private final ESPHomeEmulator emulator;
+    private final ESPHomeLogReadingEmulator emulator;
 
     List<GeneratedMessage> responseMessages;
 
-    public LogReadingCommunicationListener(ESPHomeEmulator emulator, File logFile)
+    public LogReadingCommunicationListener(ESPHomeLogReadingEmulator emulator, File logFile)
             throws IOException, InvocationTargetException, IllegalAccessException {
         this.emulator = emulator;
         LogParser logParser = new LogParser();

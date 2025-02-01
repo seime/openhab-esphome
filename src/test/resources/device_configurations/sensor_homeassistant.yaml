@@ -1,0 +1,123 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret encryption_key
+
+
+sensor:
+
+  #Default
+  - platform: homeassistant
+    id: itemstatechanged_default
+    name: "ItemStateChanged_Default"
+    entity_id: Something.ItemStateChanged_Default
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: itemstatechanged_default
+    name: "itemstatechanged_default_readback"
+
+
+  #ItemStateChanged
+  - platform: homeassistant
+    id: itemstatechanged
+    name: "ItemStateChanged"
+    entity_id: ItemStateChangedEvent.ItemStateChanged
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: itemstatechanged
+    name: "itemstatechanged_readback"
+
+  #ItemState
+  - platform: homeassistant
+    id: itemstate
+    name: "ItemState"
+    entity_id: ItemStateEvent.ItemState
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: itemstate
+    name: "itemstate_readback"
+
+  #ItemStateUpdated
+  - platform: homeassistant
+    id: itemstateupdated
+    name: "ItemStateUpdated"
+    entity_id: ItemStateUpdatedEvent.ItemStateUpdated
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: itemstateupdated
+    name: "itemstateupdated_readback"
+
+  #ItemCommand
+  - platform: homeassistant
+    id: itemcommand
+    name: "ItemCommand"
+    entity_id: ItemCommandEvent.ItemCommand
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: itemcommand
+    name: "itemcommand_readback"
+
+  #ItemStatePredicted
+  - platform: homeassistant
+    id: itemstatepredicted
+    name: "ItemStatePredicted"
+    entity_id: ItemStatePredictedEvent.ItemStatePredicted
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: itemstatepredicted
+    name: "itemstatepredicted_readback"
+
+  #GroupItemStateChanged
+  - platform: homeassistant
+    id: groupitemstatechanged
+    name: "GroupItemStateChanged"
+    entity_id: GroupItemStateChangedEvent.GroupItemStateChanged
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: groupitemstatechanged
+    name: "groupitemstatechanged_readback"
+
+  #GroupStateUpdated
+  - platform: homeassistant
+    id: groupstateupdated
+    name: "GroupStateUpdatedEvent"
+    entity_id: GroupStateUpdatedEvent.GroupStateUpdated
+    device_class: temperature
+    unit_of_measurement: "°C"
+  - platform: copy
+    source_id: groupstateupdated
+    name: "groupstateupdated_readback"
+
+#ThingStatusInfoChanged
+text_sensor:
+  - platform: homeassistant
+    id: thingstatusinfochanged
+    name: "ThingStatusInfoChangedEvent"
+    entity_id: ThingStatusInfoChangedEvent.astro_moon_local
+  - platform: copy
+    source_id: thingstatusinfochanged
+    name: "astro_moon_local_readback"
+
+  #ThingStatusInfo
+  - platform: homeassistant
+    id: thingstatusinfo
+    name: "ThingStatusInfoEvent"
+    entity_id: ThingStatusInfoEvent.astro_sun_local
+  - platform: copy
+    source_id: thingstatusinfo
+    name: "astro_sun_local_readback"

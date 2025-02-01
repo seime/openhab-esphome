@@ -1,4 +1,4 @@
-package no.seime.openhab.binding.esphome.internal;
+package no.seime.openhab.binding.esphome.deviceutil;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -15,32 +15,31 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessage;
 
+import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 import no.seime.openhab.binding.esphome.internal.comm.AbstractFrameHelper;
 import no.seime.openhab.binding.esphome.internal.comm.CommunicationError;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
 
-public class ESPHomeEmulator {
+public class ESPHomeLogReadingEmulator {
 
-    private final Logger logger = LoggerFactory.getLogger(ESPHomeEmulator.class);
+    private final Logger logger = LoggerFactory.getLogger(ESPHomeLogReadingEmulator.class);
 
     private final InetSocketAddress listenAddress;
     private final AbstractFrameHelper frameHelper;
     private boolean keepRunning = true;
 
     private boolean ready = false;
+    private Selector selector;
+    private SocketChannel channel;
+
+    public ESPHomeLogReadingEmulator(InetSocketAddress listenAddress, AbstractFrameHelper frameHelper) {
+        this.listenAddress = listenAddress;
+        this.frameHelper = frameHelper;
+    }
 
     public boolean isReady() {
         return ready;
-    }
-
-    private Selector selector;
-
-    private SocketChannel channel;
-
-    public ESPHomeEmulator(InetSocketAddress listenAddress, AbstractFrameHelper frameHelper) {
-        this.listenAddress = listenAddress;
-        this.frameHelper = frameHelper;
     }
 
     public void start() {

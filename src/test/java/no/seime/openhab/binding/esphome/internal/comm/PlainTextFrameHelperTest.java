@@ -26,17 +26,15 @@ import com.google.protobuf.GeneratedMessage;
 
 import io.esphome.api.HelloRequest;
 import io.esphome.api.HelloResponse;
+import no.seime.openhab.binding.esphome.deviceutil.ESPHomeLogReadingEmulator;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
-import no.seime.openhab.binding.esphome.internal.ESPHomeEmulator;
 
 public class PlainTextFrameHelperTest {
 
-    boolean responseReceived = false;
-
     private final ConnectionSelector connectionSelector = new ConnectionSelector();
-
     private final InetSocketAddress serverAddress = new InetSocketAddress("localhost",
             new Random().nextInt(10000) + 10000);
+    boolean responseReceived = false;
 
     public PlainTextFrameHelperTest() throws IOException {
     }
@@ -44,7 +42,7 @@ public class PlainTextFrameHelperTest {
     @Test
     void testParsePacket() throws IOException {
 
-        final ESPHomeEmulator espHomeDevice = getEspHomeEmulator();
+        final ESPHomeLogReadingEmulator espHomeDevice = getEspHomeEmulator();
 
         try {
 
@@ -96,10 +94,10 @@ public class PlainTextFrameHelperTest {
         }
     }
 
-    private ESPHomeEmulator getEspHomeEmulator() {
-        final ESPHomeEmulator espHomeDevice;
+    private ESPHomeLogReadingEmulator getEspHomeEmulator() {
+        final ESPHomeLogReadingEmulator espHomeDevice;
 
-        espHomeDevice = new ESPHomeEmulator(serverAddress, new PlainTextFrameHelper(null, null, "emulator"));
+        espHomeDevice = new ESPHomeLogReadingEmulator(serverAddress, new PlainTextFrameHelper(null, null, "emulator"));
         espHomeDevice.setPacketListener(new CommunicationListener() {
             @Override
             public void onPacket(GeneratedMessage message) throws IOException, ProtocolAPIError {
