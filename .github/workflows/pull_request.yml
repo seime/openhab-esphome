@@ -25,6 +25,12 @@ jobs:
         with:
           java-version: ${{matrix.java}}
           distribution: 'temurin'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install ESPHome
+        run: |
+          pip install esphome
       - name: Cache local Maven repository
         uses: actions/cache@v3
         with:
@@ -36,11 +42,3 @@ jobs:
       - name: Build
         run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=17 clean verify
 
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: ${{ github.head_ref || github.ref_name }}
-          prerelease: true
-          title: "Latest Build"
-          files: |
-            target/*.jar
