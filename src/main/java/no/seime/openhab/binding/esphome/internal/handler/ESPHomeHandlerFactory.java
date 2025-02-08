@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
-import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
@@ -62,18 +61,17 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
     }
 
-    private final ConnectionSelector connectionSelector;
-
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private final ESPHomeEventSubscriber eventSubscriber;
-    private final ThingRegistry thingRegistry;
 
-    private MonitoredScheduledThreadPoolExecutor scheduler;
+    private final ThingRegistry thingRegistry;
+    private final MonitoredScheduledThreadPoolExecutor scheduler;
+    private final ConnectionSelector connectionSelector;
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
-            @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ItemRegistry itemRegistry,
-            @Reference ThingRegistry thingRegistry) throws IOException {
+            @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry)
+            throws IOException {
         scheduler = new MonitoredScheduledThreadPoolExecutor(3, r -> {
             long currentCount = threadCounter.incrementAndGet();
             logger.debug("Creating new worker thread {} for scheduler", currentCount);
@@ -84,11 +82,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         }, 2000);
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
-
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
-        eventSubscriber.setItemRegistry(itemRegistry);
-        eventSubscriber.setThingRegistry(thingRegistry);
 
         connectionSelector = new ConnectionSelector();
     }

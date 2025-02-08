@@ -64,29 +64,24 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
+    private final Map<String, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> commandTypeToHandlerMap = new HashMap<>();
+    private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
+    private final List<Channel> dynamicChannels = new ArrayList<>();
+    private final ESPHomeEventSubscriber eventSubscriber;
+    private final MonitoredScheduledThreadPoolExecutor executorService;
     private @Nullable ESPHomeConfiguration config;
-
     private @Nullable AbstractFrameHelper frameHelper;
     @Nullable
     private ScheduledFuture<?> pingWatchdogFuture;
     private Instant lastPong = Instant.now();
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
-    private final Map<String, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> commandTypeToHandlerMap = new HashMap<>();
-    private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
-
-    private final List<Channel> dynamicChannels = new ArrayList<>();
-
     private boolean disposed = false;
     private boolean interrogated;
     private boolean bluetoothProxyStarted = false;
-    private boolean bluetoothProxyRequested = false;
-
     @Nullable
     private String logPrefix;
-    private final ESPHomeEventSubscriber eventSubscriber;
-    private final MonitoredScheduledThreadPoolExecutor executorService;
     @Nullable
     private ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler;
 
@@ -162,6 +157,30 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     @Override
+    public void dispose() {
+        disposed = true;
+        eventSubscriber.removeEventSubscriptions(this);
+        setUndefToAllChannels();
+        cancelReconnectFuture();
+        if (frameHelper != null) {
+            cancelPingWatchdog();
+
+            if (connectionState == ConnectionState.CONNECTED) {
+                try {
+                    frameHelper.send(DisconnectRequest.getDefaultInstance());
+                } catch (ProtocolAPIError e) {
+                    // Quietly ignore
+                }
+            } else {
+                frameHelper.close();
+            }
+        }
+        connectionState = ConnectionState.UNINITIALIZED;
+
+        super.dispose();
+    }
+
+    @Override
     public void handleRemoval() {
         dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
         super.handleRemoval();
@@ -195,30 +214,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 scheduleReconnect(config.reconnectInterval);
             }
         }
-    }
-
-    @Override
-    public void dispose() {
-        disposed = true;
-        eventSubscriber.removeEventSubscriptions(this);
-        setUndefToAllChannels();
-        cancelReconnectFuture();
-        if (frameHelper != null) {
-            cancelPingWatchdog();
-
-            if (connectionState == ConnectionState.CONNECTED) {
-                try {
-                    frameHelper.send(DisconnectRequest.getDefaultInstance());
-                } catch (ProtocolAPIError e) {
-                    // Quietly ignore
-                }
-            } else {
-                frameHelper.close();
-            }
-        }
-        connectionState = ConnectionState.UNINITIALIZED;
-
-        super.dispose();
     }
 
     public void sendMessage(GeneratedMessage message) throws ProtocolAPIError {
@@ -557,8 +552,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             } catch (Exception e) {
                 logger.error("[{}] Error starting BLE proxy", logPrefix, e);
             }
-        } else {
-            bluetoothProxyRequested = true;
         }
     }
 
@@ -574,20 +567,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         bluetoothProxyStarted = false;
         espHomeBluetoothProxyHandler = null;
-    }
-
-    private enum ConnectionState {
-        // Initial state, no connection
-        UNINITIALIZED,
-        // TCP connected to ESPHome, first handshake sent
-        HELLO_SENT,
-
-        // First handshake received, login sent (with password)
-        LOGIN_SENT,
-
-        // Connection established
-        CONNECTED
-
     }
 
     private void cancelPingWatchdog() {
@@ -616,5 +595,19 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public List<Channel> getDynamicChannels() {
         return dynamicChannels;
+    }
+
+    private enum ConnectionState {
+        // Initial state, no connection
+        UNINITIALIZED,
+        // TCP connected to ESPHome, first handshake sent
+        HELLO_SENT,
+
+        // First handshake received, login sent (with password)
+        LOGIN_SENT,
+
+        // Connection established
+        CONNECTED
+
     }
 }

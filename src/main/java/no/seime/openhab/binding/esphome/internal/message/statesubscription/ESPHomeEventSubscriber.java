@@ -21,7 +21,9 @@ import org.openhab.core.thing.events.ThingStatusInfoChangedEvent;
 import org.openhab.core.thing.events.ThingStatusInfoEvent;
 import org.openhab.core.types.Type;
 import org.openhab.core.types.UnDefType;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +52,10 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
     private ItemRegistry itemRegistry;
     private ThingRegistry thingRegistry;
 
-    public ESPHomeEventSubscriber() {
+    @Activate
+    public ESPHomeEventSubscriber(@Reference ThingRegistry thingRegistry, @Reference ItemRegistry itemRegistry) {
+        this.thingRegistry = thingRegistry;
+        this.itemRegistry = itemRegistry;
         subscribedEventTypes.add(ItemCommandEvent.TYPE);
         subscribedEventTypes.add(ItemStateEvent.TYPE);
         subscribedEventTypes.add(ItemStatePredictedEvent.TYPE);
