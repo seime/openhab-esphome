@@ -49,8 +49,8 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
     private final Logger logger = LoggerFactory.getLogger(ESPHomeEventSubscriber.class);
     private final Set<String> subscribedEventTypes = new HashSet<>();
     private final Map<ESPHomeHandler, List<EventSubscription>> eventSubscriptions = new HashMap<>();
-    private ItemRegistry itemRegistry;
-    private ThingRegistry thingRegistry;
+    private final ItemRegistry itemRegistry;
+    private final ThingRegistry thingRegistry;
 
     @Activate
     public ESPHomeEventSubscriber(@Reference ThingRegistry thingRegistry, @Reference ItemRegistry itemRegistry) {
@@ -65,14 +65,6 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
         subscribedEventTypes.add(GroupStateUpdatedEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoEvent.TYPE);
         subscribedEventTypes.add(ThingStatusInfoChangedEvent.TYPE);
-    }
-
-    public void setItemRegistry(ItemRegistry itemRegistry) {
-        this.itemRegistry = itemRegistry;
-    }
-
-    public void setThingRegistry(ThingRegistry thingRegistry) {
-        this.thingRegistry = thingRegistry;
     }
 
     public String getInitialState(String logPrefix, EventSubscription subscription) {
