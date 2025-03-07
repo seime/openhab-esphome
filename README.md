@@ -63,7 +63,8 @@ The binding uses mDNS to automatically discover devices on the network.
 
 ## Channels
 
-Channels are auto-generated based on actual device configuration. Bring the device online, and the binding will interrogate the device and create channels based on the device configuration.
+Channels are auto-generated based on actual device configuration. Bring the device online, and the binding will
+interrogate the device and create channels based on the device configuration.
 
 ## Full Example file example
 
@@ -84,41 +85,60 @@ Switch ESP1_Switch "Relay"                        <switch>        {channel="esph
 ## FAQ
 
 ### Why does the discovered `Thing` ID start with `REMOVEMEWHENADDING`?
-> This is to avoid openHAB overwriting your `hostname` attribute with mDNS discovery results. **Remove this prefix when adding as a managed thing!**
+
+> This is to avoid openHAB overwriting your `hostname` attribute with mDNS discovery results. **Remove this prefix when
+adding as a managed thing!**
 >
 > This problem does *not* occur if you use `Thing` files ("file based") configuration.
 >
 > See https://github.com/seime/openhab-esphome/issues/1 . TLDR: A "feature" in openHAB.
 
 ### I cannot connect to my device
-I get errors like ```[WARN ] [phome.internal.handler.ESPHomeHandler] - [REMOVEMEWHENADDINGbewaesserung] Error initial connection no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError: Failed to connect to 'XXXX.local.' port 6053```
+
+I get errors like
+```[WARN ] [phome.internal.handler.ESPHomeHandler] - [REMOVEMEWHENADDINGbewaesserung] Error initial connection no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError: Failed to connect to 'XXXX.local.' port 6053```
 > See previous question
 
 ### openHAB looses connection to my device
-with log messages like `[WARN ] [home.internal.handler.ESPHomeHandler] - [esphome-devicename] Ping responses lacking. Waited 4 times 10 seconds, total of 40. Assuming connection lost and disconnecting`
-> This can be caused by a flaky device or network connection. However, this may also be caused by openHAB is not executing the scheduled check in time. 
-> This typically happens on installations with many physical things and bindings doing blocking network I/O. You might already have noticed other things not responding immediately for unknown reasons.
+
+with log messages like
+`[WARN ] [home.internal.handler.ESPHomeHandler] - [esphome-devicename] Ping responses lacking. Waited 4 times 10 seconds, total of 40. Assuming connection lost and disconnecting`
+> This can be caused by a flaky device or network connection. However, this may also be caused by openHAB is not
+> executing the scheduled check in time.
+> This typically happens on installations with many physical things and bindings doing blocking network I/O. You might
+> already have noticed other things not responding immediately for unknown reasons.
 >
 > In the current version the binding is using its own scheduler to avoid this.
 >
-> If you for some reason cannot upgrade, adding the following to your `services/runtime.cfg` file might help: `org.openhab.threadpool:thingHandler = 50`
+> If you for some reason cannot upgrade, adding the following to your `services/runtime.cfg` file might help:
+`org.openhab.threadpool:thingHandler = 50`
 
-### I get warnings like `Unit 'XXXX' unknown to openHAB, returning DecimalType for state '1234.0' on channel 'esphome:device:8dcf64d482:my_channel_name`
+> If you have the `uptime` sensor in your ESPHome configuration, you can use that to monitor the device uptime. If the
+> device uptime is increasing while openHAB reports the device as offline, it is likely a network issue.
+
+### I get warnings like
+
+`Unit 'XXXX' unknown to openHAB, returning DecimalType for state '1234.0' on channel 'esphome:device:8dcf64d482:my_channel_name`
+
 > The unit is reported by the ESPHome device, but it doesn't match anything known to openHAB.
 >
-> Solution: Add a valid `unit_of_measurement` to your entity in the ESPHome configuration. Use `unit_of_measurement: ""` to remove the unit altogether from the entity.
+> Solution: Add a valid `unit_of_measurement` to your entity in the ESPHome configuration. Use `unit_of_measurement: ""`
+> to remove the unit altogether from the entity.
 
-### I get warnings like `No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
+### I get warnings like
+
+`No device_class reported by sensor '<name of sensor>'. Add device_class to sensor configuration in ESPHome. Defaulting to plain Number without dimension`
 
 > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
 > type in openHAB.
 > Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
 > ![img.png](esphomeconfig_deviceclass.png)
-> <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid device_class values (**use lowercase values**)
-> Also note that you may override default device_class by specifying `device_class: ""` to remove any device class from the sensor.
+> <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid device_class
+> values (**use lowercase values**)
+> Also note that you may override default device_class by specifying `device_class: ""` to remove any device class from
+> the sensor.
 
 Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/146849/1 for more information.
-
 
 ## Bluetooth proxy support
 
@@ -162,7 +182,6 @@ Bridge bluetooth:esphome:proxy "ESPHome BLE Advertisement listener" [backgroundD
 > **NOTE:** Set backgroundDiscovery to true if you want to automatically add discovered devices to the inbox. If not use
 > manual
 > scanning from the inbox.
-
 
 ## Streaming logs from ESPHome device to openHAB
 
