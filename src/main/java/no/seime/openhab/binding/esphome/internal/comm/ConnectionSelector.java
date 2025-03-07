@@ -69,7 +69,7 @@ public class ConnectionSelector {
                 if (read == -1) {
                     logger.debug("End of stream, closing");
                     channel.keyFor(selector).cancel();
-                    frameHelper.endOfStream();
+                    frameHelper.endOfStream("No more bytes available in connection stream");
                 } else {
                     if (read == READ_BUFFER_SIZE) {
                         logger.warn(
@@ -84,7 +84,7 @@ public class ConnectionSelector {
             }
         } catch (IOException | CancelledKeyException e) {
             logger.debug("Socket exception", e);
-            frameHelper.endOfStream();
+            frameHelper.endOfStream(e.getMessage());
         } catch (Exception e) {
             logger.warn("Error processing key", e);
         }

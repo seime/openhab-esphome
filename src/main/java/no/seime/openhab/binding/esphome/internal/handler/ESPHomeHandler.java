@@ -290,11 +290,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     @Override
-    public void onEndOfStream() {
+    public void onEndOfStream(String message) {
         eventSubscriber.removeEventSubscriptions(this);
         if (!disposed) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                    "ESPHome device abruptly closed connection.");
+                    "ESPHome device abruptly closed connection: " + message);
             setUndefToAllChannels();
             frameHelper.close();
             cancelPingWatchdog();

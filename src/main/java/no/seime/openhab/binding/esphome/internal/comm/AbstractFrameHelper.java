@@ -119,8 +119,8 @@ public abstract class AbstractFrameHelper {
         processBuffer();
     }
 
-    public void endOfStream() {
-        listener.onEndOfStream();
+    public void endOfStream(String message) {
+        listener.onEndOfStream(message);
     }
 
     public void onParseError(CommunicationError error) {

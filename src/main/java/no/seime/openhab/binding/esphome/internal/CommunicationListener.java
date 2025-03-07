@@ -26,7 +26,7 @@ public interface CommunicationListener {
 
     void onPacket(GeneratedMessage message) throws ProtocolAPIError, IOException;
 
-    void onEndOfStream();
+    void onEndOfStream(String message);
 
     void onParseError(CommunicationError error);
 
