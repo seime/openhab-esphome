@@ -68,7 +68,7 @@ public class LogReadingCommunicationListener implements CommunicationListener {
     }
 
     @Override
-    public void onEndOfStream() {
+    public void onEndOfStream(String message) {
     }
 
     @Override

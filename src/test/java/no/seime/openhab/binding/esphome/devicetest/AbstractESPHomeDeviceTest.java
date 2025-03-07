@@ -14,6 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.items.GenericItem;
 import org.openhab.core.items.Item;
@@ -34,6 +36,7 @@ import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThrea
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 public abstract class AbstractESPHomeDeviceTest {
 
     private final MonitoredScheduledThreadPoolExecutor executor = new MonitoredScheduledThreadPoolExecutor(1,

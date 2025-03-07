@@ -63,7 +63,7 @@ public class PlainTextFrameHelperTest {
                 }
 
                 @Override
-                public void onEndOfStream() {
+                public void onEndOfStream(String message) {
                     fail();
                 }
 
@@ -111,7 +111,7 @@ public class PlainTextFrameHelperTest {
             }
 
             @Override
-            public void onEndOfStream() {
+            public void onEndOfStream(String message) {
                 fail();
             }
 

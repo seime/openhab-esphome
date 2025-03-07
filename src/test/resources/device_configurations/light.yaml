@@ -1,0 +1,34 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+sm16716:
+  data_pin: GPIO22
+  clock_pin: GPIO23
+  num_channels: 3
+  num_chips: 1
+
+light:
+  - platform: cwww
+    name: "Office Spot Lights 1"
+    cold_white: LED_channel_1
+    warm_white: LED_channel_3
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+
+output:
+  - platform: sm16716
+    id: LED_channel_1
+    channel: 0
+  - platform: sm16716
+    id: LED_channel_3
+    channel: 1
