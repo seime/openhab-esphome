@@ -128,10 +128,17 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
             listener.onParseError(CommunicationError.DEVICE_REQUIRES_PLAINTEXT);
         } else {
             // Verify server name
-            byte[] serverName = Arrays.copyOfRange(packetData, 1, packetData.length - 1);
-            String server = new String(serverName, StandardCharsets.US_ASCII);
 
-            if (expectedServername != null && !expectedServername.equals(server)) {
+            int nullByteIndex = 1;
+            while (nullByteIndex < packetData.length && packetData[nullByteIndex] != 0) {
+                nullByteIndex++;
+            }
+
+            byte[] serverNameBytes = Arrays.copyOfRange(packetData, 1, nullByteIndex);
+            String serverName = new String(serverNameBytes, StandardCharsets.US_ASCII);
+
+            if (expectedServername != null && !(expectedServername.equals(serverName))) {
+                logger.warn("[{}] Expected server name '{}' but got '{}'", logPrefix, expectedServername, serverName);
                 listener.onParseError(CommunicationError.DEVICE_NAME_MISMATCH);
                 return;
             }
@@ -167,7 +174,6 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         if (packetData[0] != 0) {
             byte[] explanation = Arrays.copyOfRange(packetData, 1, packetData.length);
             listener.onParseError(CommunicationError.ENCRYPTION_KEY_INVALID);
-            return;
         } else {
             try {
                 byte[] handshakeRsp = Arrays.copyOfRange(packetData, 1, packetData.length);
