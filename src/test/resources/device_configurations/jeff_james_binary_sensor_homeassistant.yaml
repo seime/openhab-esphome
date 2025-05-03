@@ -1,0 +1,23 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: VERY_VERBOSE
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+binary_sensor:
+  - platform: homeassistant
+    id: set_sensor_zero
+    name: Set Sensor Zerop
+    entity_id: ItemStateChangedEvent.Pool_Zero_Flow_Sensor
+
+  # Used to make ESP device ping back changes from OH
+  - platform: copy
+    source_id: set_sensor_zero
+    name: "set_sensor_zero_readback"
