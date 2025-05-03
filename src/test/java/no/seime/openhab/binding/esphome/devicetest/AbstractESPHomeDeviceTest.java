@@ -29,6 +29,7 @@ import org.openhab.core.types.State;
 import no.seime.openhab.binding.esphome.deviceutil.ESPHomeDeviceRunner;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
+import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
@@ -66,6 +67,7 @@ public abstract class AbstractESPHomeDeviceTest {
         deviceConfiguration.port = 6053;
         deviceConfiguration.encryptionKey = "TiFvlzL9tNB29cys/ZR4o+YYHvwawrTF8csI13hZaPw=";
         deviceConfiguration.server = "virtual";
+        deviceConfiguration.deviceLogLevel = LogLevel.VERY_VERBOSE;
         when(configuration.as(ESPHomeConfiguration.class)).thenReturn(deviceConfiguration);
 
         selector = new ConnectionSelector();
