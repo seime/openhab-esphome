@@ -10,9 +10,9 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 public class EventSubscription implements EventFilter {
     private final String entityId;
     private final String attribute;
-    private Pattern topicPattern;
-    private TargetType targetType;
-    private String targetName;
+    private final Pattern topicPattern;
+    private final TargetType targetType;
+    private final String targetName;
     private final ESPHomeHandler espHomeHandler;
 
     public EventSubscription(String entityId, String attribute, Pattern topicPattern, TargetType targetType,
@@ -48,5 +48,12 @@ public class EventSubscription implements EventFilter {
 
     public String getTargetName() {
         return targetName;
+    }
+
+    @Override
+    public String toString() {
+        return "EventSubscription{" + "entityId='" + entityId + '\'' + ", attribute='" + attribute + '\''
+                + ", topicPattern=" + topicPattern + ", targetType=" + targetType + ", targetName='" + targetName + '\''
+                + '}';
     }
 }

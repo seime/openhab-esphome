@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 public class ConnectionSelector {
 
-    public static final int READ_BUFFER_SIZE = 2048;
+    public static final int READ_BUFFER_SIZE = 10 * 2048;
     private final Logger logger = LoggerFactory.getLogger(ConnectionSelector.class);
 
     private final Selector selector;

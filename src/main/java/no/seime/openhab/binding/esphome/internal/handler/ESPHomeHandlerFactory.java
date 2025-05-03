@@ -72,7 +72,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry)
             throws IOException {
-        scheduler = new MonitoredScheduledThreadPoolExecutor(3, r -> {
+        scheduler = new MonitoredScheduledThreadPoolExecutor(6, r -> {
             long currentCount = threadCounter.incrementAndGet();
             logger.debug("Creating new worker thread {} for scheduler", currentCount);
             Thread t = new Thread(r);

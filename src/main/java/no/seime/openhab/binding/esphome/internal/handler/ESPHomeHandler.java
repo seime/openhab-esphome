@@ -279,14 +279,21 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     @Override
-    public void onPacket(@NonNull GeneratedMessage message) throws ProtocolAPIError {
-        switch (connectionState) {
-            case UNINITIALIZED -> logger.warn("[{}] Received packet {} while uninitialized.", logPrefix,
-                    message.getClass().getSimpleName());
-            case HELLO_SENT -> handleHelloResponse(message);
-            case LOGIN_SENT -> handleLoginResponse(message);
-            case CONNECTED -> handleConnected(message);
-        }
+    public void onPacket(@NonNull GeneratedMessage message) {
+        executorService.submit(() -> {
+            try {
+                switch (connectionState) {
+                    case UNINITIALIZED -> logger.warn("[{}] Received packet {} while uninitialized.", logPrefix,
+                            message.getClass().getSimpleName());
+                    case HELLO_SENT -> handleHelloResponse(message);
+                    case LOGIN_SENT -> handleLoginResponse(message);
+                    case CONNECTED -> handleConnected(message);
+                }
+            } catch (ProtocolAPIError e) {
+                logger.warn("[{}] Error parsing packet", logPrefix, e);
+                onParseError(CommunicationError.PACKET_ERROR);
+            }
+        }, "Packet parsing", 100);
     }
 
     @Override
@@ -425,6 +432,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         String state = eventSubscriber.getInitialState(logPrefix, subscription);
 
+        logger.debug("[{}] Sending initial state for subscription {} with state '{}'", logPrefix, subscription, state);
+
         HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
                 .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute()).setState(state)
                 .build();
@@ -524,6 +533,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.send(ConnectRequest.newBuilder().setPassword(config.password).build());
             } else {
                 frameHelper.send(ConnectRequest.getDefaultInstance());
+            }
+            if (config.deviceLogLevel != LogLevel.NONE) {
+                logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
+
+                frameHelper.send(SubscribeLogsRequest.newBuilder()
+                        .setLevel(io.esphome.api.LogLevel.valueOf("LOG_LEVEL_" + config.deviceLogLevel.name()))
+                        .build());
             }
 
         }

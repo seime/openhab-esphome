@@ -12,6 +12,8 @@ import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemNotFoundException;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.items.events.*;
+import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.OpenClosedType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Thing;
@@ -69,16 +71,15 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
 
     public String getInitialState(String logPrefix, EventSubscription subscription) {
 
-        // Send initial state
         TargetType targetType = subscription.getTargetType();
         String state = "";
         switch (targetType) {
             case ITEM:
                 try {
                     Item item = itemRegistry.getItem(subscription.getTargetName());
-                    if (item != null) {
-                        state = toESPHomeStringState(item.getState());
-                    }
+                    state = toESPHomeStringState(item.getState());
+                    logger.debug("[{}] Initial state for subscription '{}' is '{}', formatted as '{}'", logPrefix,
+                            subscription, item.getState(), state);
                 } catch (ItemNotFoundException e) {
                     logger.warn("[{}] Item not found for subscription {}", logPrefix, subscription);
                 }
@@ -88,6 +89,8 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
                 Thing thing = thingRegistry.get(new ThingUID(subscription.getTargetName()));
                 if (thing != null) {
                     state = thing.getStatus().toString();
+                    logger.debug("[{}] Initial state for subscription '{}' is '{}', formatted as '{}'", logPrefix,
+                            subscription, thing.getStatus(), state);
                 } else {
                     logger.warn("[{}] Thing not found for subscription {}", logPrefix, subscription);
 
@@ -107,6 +110,10 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
         } else if (state instanceof QuantityType<?> q) {
             // No units allowed
             return String.valueOf(q.doubleValue());
+        } else if (state instanceof OnOffType v) {
+            return v == OnOffType.ON ? "on" : "off";
+        } else if (state instanceof OpenClosedType v) {
+            return v == OpenClosedType.OPEN ? "on" : "off";
         } else {
             // Defaulting to this, not really sure if other types are relevant
             return state.toString();
