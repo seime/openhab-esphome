@@ -12,6 +12,10 @@
  */
 package no.seime.openhab.binding.esphome.internal.comm;
 
+import static no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector.READ_BUFFER_SIZE;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +26,10 @@ import java.util.Base64;
 import javax.crypto.BadPaddingException;
 import javax.crypto.ShortBufferException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessage;
 import com.southernstorm.noise.protocol.CipherStatePair;
@@ -31,17 +38,26 @@ import com.southernstorm.noise.protocol.HandshakeState;
 import io.esphome.api.ApiOptions;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
-public class EncryptedFrameHelper extends AbstractFrameHelper {
+public class EncryptedFrameHelper {
+    public static final int PROTOCOL_PLAINTEXT = 0x00;
+    public static final int PROTOCOL_ENCRYPTED = 0x01;
     private final static String NOISE_PROTOCOL = "Noise_NNpsk0_25519_ChaChaPoly_SHA256";
+    protected final Logger logger = LoggerFactory.getLogger(EncryptedFrameHelper.class);
     private final String encryptionKeyBase64;
     private final String expectedServername;
+    private final MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
+    protected CommunicationListener listener;
+    protected ByteBuffer internalBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE * 2);
+    protected ESPHomeConnection connection;
+    protected String logPrefix;
     private HandshakeState client;
     private CipherStatePair cipherStatePair;
     private NoiseProtocolState state;
 
     public EncryptedFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
             String encryptionKeyBase64, @Nullable String expectedServername, String logPrefix) {
-        super(logPrefix, listener);
+        this.logPrefix = logPrefix;
+        this.listener = listener;
         this.encryptionKeyBase64 = encryptionKeyBase64;
         this.expectedServername = expectedServername;
 
@@ -55,7 +71,13 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         return value;
     }
 
-    @Override
+    protected static byte[] concatArrays(byte[] length, byte[] additionalLength) {
+        byte[] result = new byte[length.length + additionalLength.length];
+        System.arraycopy(length, 0, result, 0, length.length);
+        System.arraycopy(additionalLength, 0, result, length.length, additionalLength.length);
+        return result;
+    }
+
     public void connect(InetSocketAddress espHomeAddress) throws ProtocolException {
         try {
             client = new HandshakeState(NOISE_PROTOCOL, HandshakeState.INITIATOR);
@@ -233,6 +255,86 @@ public class EncryptedFrameHelper extends AbstractFrameHelper {
         byte[] result = new byte[cipherTextLength];
         System.arraycopy(decrypted, 0, result, 0, cipherTextLength);
         return result;
+    }
+
+    public void setPacketListener(CommunicationListener listener) {
+        this.listener = listener;
+    }
+
+    public void close() {
+        connection.close();
+    }
+
+    protected void processBuffer() throws ProtocolException {
+        internalBuffer.limit(internalBuffer.position());
+        internalBuffer.position(0);
+        if (internalBuffer.remaining() > 2) {
+            byte[] headerData = readBytes(3);
+            headerReceived(headerData);
+        } else {
+            internalBuffer.position(internalBuffer.limit());
+            internalBuffer.limit(internalBuffer.capacity());
+        }
+    }
+
+    protected byte[] readBytes(int numBytes) {
+        if (internalBuffer.remaining() < numBytes) {
+            return new byte[0];
+        }
+        byte[] data = new byte[numBytes];
+        internalBuffer.get(data);
+        return data;
+    }
+
+    protected void decodeProtoMessage(int messageType, byte[] bytes) {
+        logger.trace("[{}] Received packet of type {} with data {}", logPrefix, messageType, bytes);
+
+        try {
+            Method parseMethod = messageTypeToClassConverter.getMethod(messageType);
+            if (parseMethod != null) {
+                GeneratedMessage invoke = (GeneratedMessage) parseMethod.invoke(null, bytes);
+                if (invoke != null) {
+                    listener.onPacket(invoke);
+                } else {
+                    logger.warn("[{}] Received null packet of type {}", logPrefix, parseMethod);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("[{}] Error parsing packet", logPrefix, e);
+            listener.onParseError(CommunicationError.PACKET_ERROR);
+        }
+    }
+
+    public void processReceivedData(ByteBuffer newDataBuffer) throws ProtocolException, IOException {
+        // Copy new data into buffer
+        newDataBuffer.flip();
+        internalBuffer.put(newDataBuffer);
+        processBuffer();
+    }
+
+    public void endOfStream(String message) {
+        listener.onEndOfStream(message);
+    }
+
+    public void onParseError(CommunicationError error) {
+        listener.onParseError(error);
+    }
+
+    public void send(GeneratedMessage message) throws ProtocolAPIError {
+        if (logger.isDebugEnabled()) {
+            // ToString method costs a bit
+            logger.debug("[{}] Sending message type {} with content '{}'", logPrefix,
+                    message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
+        }
+        try {
+            if (connection != null) {
+                connection.send(encodeFrame(message));
+            } else {
+                logger.debug("Connection is null, cannot send message");
+            }
+        } catch (ProtocolAPIError e) {
+            logger.warn("Error sending message", e);
+        }
     }
 
     private enum NoiseProtocolState {

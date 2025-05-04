@@ -1,6 +1,6 @@
 # ESPHome Binding for openHAB
 
-### Docs updated 2025-01-21.
+### Docs updated 2025-05-04.
 
 <img src="logo.png" width="200"/>
 
@@ -53,7 +53,6 @@ The binding uses mDNS to automatically discover devices on the network.
 | `hostname`             | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                                           | N/A      | yes      | no       |
 | `port`                 | `integer` | IP Port of the device                                                                                                                                    | 6053     | no       | no       |
 | `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables                   | N/A      | no       | no       |
-| ~~`password`~~         | `text`    | Password to access the device if password protected. **DEPRECATED. Use `encryptionKey` instead**                                                         | N/A      | no       | no       |
 | `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                            | false    | no       | no       |
 | `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                        | 10       | no       | yes      |
 | `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                       | 4        | no       | yes      |

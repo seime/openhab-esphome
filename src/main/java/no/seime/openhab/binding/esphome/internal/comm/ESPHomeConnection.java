@@ -23,12 +23,13 @@ import org.slf4j.LoggerFactory;
 public class ESPHomeConnection {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeConnection.class);
-    private final AbstractFrameHelper frameHelper;
+    private final EncryptedFrameHelper frameHelper;
     private final ConnectionSelector connectionSelector;
     private final String logPrefix;
     private SocketChannel socketChannel;
 
-    public ESPHomeConnection(ConnectionSelector connectionSelector, AbstractFrameHelper frameHelper, String logPrefix) {
+    public ESPHomeConnection(ConnectionSelector connectionSelector, EncryptedFrameHelper frameHelper,
+            String logPrefix) {
         this.frameHelper = frameHelper;
         this.connectionSelector = connectionSelector;
         this.logPrefix = logPrefix;

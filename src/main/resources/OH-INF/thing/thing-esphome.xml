@@ -46,16 +46,11 @@
 					ESPHome device configuration yaml</description>
 			</parameter>
 
-			<parameter name="encryptionKey" type="text" required="false" groupName="security">
+			<parameter name="encryptionKey" type="text" required="true" groupName="security">
 				<context>password</context>
 				<label>Base64 encoded encryption key for encrypted connection</label>
 				<description>Specified in the api: -> encryption: -> key: section of the esphome device config. See
 					https://esphome.io/components/api#configuration-variables</description>
-			</parameter>
-			<parameter name="password" type="text" required="false" groupName="security">
-				<context>password</context>
-				<label>DEPRECATED: Password for insecure, plaintext connection</label>
-				<description>DEPRECATED: Password to access the device. Instead, use encryptionKey for encrypted connection.</description>
 			</parameter>
 
 			<parameter name="reconnectInterval" type="integer" min="0" required="false" groupName="timeout">

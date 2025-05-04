@@ -17,7 +17,7 @@ public class ConnectionSelector {
     private final Logger logger = LoggerFactory.getLogger(ConnectionSelector.class);
 
     private final Selector selector;
-    private final Map<SocketChannel, AbstractFrameHelper> connectionMap = new ConcurrentHashMap<>();
+    private final Map<SocketChannel, EncryptedFrameHelper> connectionMap = new ConcurrentHashMap<>();
     private boolean keepRunning = true;
     private boolean selectorOpen;
 
@@ -58,7 +58,7 @@ public class ConnectionSelector {
     }
 
     private void processKey(SelectionKey readyKey) {
-        AbstractFrameHelper frameHelper = (AbstractFrameHelper) readyKey.attachment();
+        EncryptedFrameHelper frameHelper = (EncryptedFrameHelper) readyKey.attachment();
         logger.trace("Processing key readable={}", readyKey.isReadable());
         // Tests whether this key's channel is ready to accept a new socket connection
         try {
@@ -90,7 +90,7 @@ public class ConnectionSelector {
         }
     }
 
-    private void processReceivedData(AbstractFrameHelper frameHelper, ByteBuffer buffer, SocketChannel channel)
+    private void processReceivedData(EncryptedFrameHelper frameHelper, ByteBuffer buffer, SocketChannel channel)
             throws IOException {
         try {
             logger.trace("Received data");
@@ -114,7 +114,7 @@ public class ConnectionSelector {
         }
     }
 
-    public void register(SocketChannel socketChannel, AbstractFrameHelper frameHelper) {
+    public void register(SocketChannel socketChannel, EncryptedFrameHelper frameHelper) {
         connectionMap.put(socketChannel, frameHelper);
         try {
             SelectionKey key = socketChannel.register(selector, SelectionKey.OP_READ);

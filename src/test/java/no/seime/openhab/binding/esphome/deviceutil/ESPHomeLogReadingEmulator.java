@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
 import com.google.protobuf.GeneratedMessage;
 
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
-import no.seime.openhab.binding.esphome.internal.comm.AbstractFrameHelper;
 import no.seime.openhab.binding.esphome.internal.comm.CommunicationError;
+import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolException;
 
@@ -26,14 +26,14 @@ public class ESPHomeLogReadingEmulator {
     private final Logger logger = LoggerFactory.getLogger(ESPHomeLogReadingEmulator.class);
 
     private final InetSocketAddress listenAddress;
-    private final AbstractFrameHelper frameHelper;
+    private final EncryptedFrameHelper frameHelper;
     private boolean keepRunning = true;
 
     private boolean ready = false;
     private Selector selector;
     private SocketChannel channel;
 
-    public ESPHomeLogReadingEmulator(InetSocketAddress listenAddress, AbstractFrameHelper frameHelper) {
+    public ESPHomeLogReadingEmulator(InetSocketAddress listenAddress, EncryptedFrameHelper frameHelper) {
         this.listenAddress = listenAddress;
         this.frameHelper = frameHelper;
     }

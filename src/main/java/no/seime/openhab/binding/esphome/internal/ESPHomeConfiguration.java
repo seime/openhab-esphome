@@ -23,8 +23,6 @@ import org.eclipse.jdt.annotation.Nullable;
 public class ESPHomeConfiguration {
 
     public String hostname;
-    @Nullable
-    public String password;
 
     public int port = 6053;
 
@@ -34,8 +32,8 @@ public class ESPHomeConfiguration {
 
     public int maxPingTimeouts = 4;
 
-    @Nullable
     public String encryptionKey;
+
     @Nullable
     public String server;
 

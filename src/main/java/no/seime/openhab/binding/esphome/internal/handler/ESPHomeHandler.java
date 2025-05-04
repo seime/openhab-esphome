@@ -70,7 +70,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredScheduledThreadPoolExecutor executorService;
     private @Nullable ESPHomeConfiguration config;
-    private @Nullable AbstractFrameHelper frameHelper;
+    private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
     private ScheduledFuture<?> pingWatchdogFuture;
     private Instant lastPong = Instant.now();
@@ -194,16 +194,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
-            boolean useEncryption = config.encryptionKey != null;
-            if (!useEncryption) {
-                logger.warn(
-                        "[{}] Using unencrypted connection. This is deprecated and will be removed in the future. Please use encryption.",
-                        logPrefix);
-            }
-
-            frameHelper = useEncryption
-                    ? new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.server, logPrefix)
-                    : new PlainTextFrameHelper(connectionSelector, this, logPrefix);
+            frameHelper = new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.server,
+                    logPrefix);
 
             frameHelper.connect(new InetSocketAddress(config.hostname, config.port));
 
@@ -529,11 +521,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     helloResponse.getApiVersionMinor());
             connectionState = ConnectionState.LOGIN_SENT;
 
-            if (config.password != null && !config.password.isEmpty()) {
-                frameHelper.send(ConnectRequest.newBuilder().setPassword(config.password).build());
-            } else {
-                frameHelper.send(ConnectRequest.getDefaultInstance());
-            }
+            frameHelper.send(ConnectRequest.getDefaultInstance());
             if (config.deviceLogLevel != LogLevel.NONE) {
                 logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
 
