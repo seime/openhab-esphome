@@ -26,6 +26,8 @@ import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 import org.openhab.core.types.State;
 
+import com.jano7.executor.KeySequentialExecutor;
+
 import no.seime.openhab.binding.esphome.deviceutil.ESPHomeDeviceRunner;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
@@ -40,7 +42,9 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHo
 @MockitoSettings(strictness = Strictness.LENIENT)
 public abstract class AbstractESPHomeDeviceTest {
 
-    private final MonitoredScheduledThreadPoolExecutor executor = new MonitoredScheduledThreadPoolExecutor(1,
+    private final MonitoredScheduledThreadPoolExecutor executor = new MonitoredScheduledThreadPoolExecutor(2,
+            r -> new Thread(r), 1000);
+    private final MonitoredScheduledThreadPoolExecutor packetProcessor = new MonitoredScheduledThreadPoolExecutor(1,
             r -> new Thread(r), 1000);
     private final List<Item> registryItems = new ArrayList<>();
     protected ESPHomeHandler thingHandler;
@@ -79,7 +83,8 @@ public abstract class AbstractESPHomeDeviceTest {
         when(itemRegistry.getItems()).thenReturn(registryItems);
         eventSubscriber = new ESPHomeEventSubscriber(thingRegistry, itemRegistry);
 
-        thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber, executor);
+        thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber, executor,
+                new KeySequentialExecutor(executor));
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
     }

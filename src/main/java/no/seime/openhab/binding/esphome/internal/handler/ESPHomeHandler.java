@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessage;
+import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
@@ -69,6 +70,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final List<Channel> dynamicChannels = new ArrayList<>();
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredScheduledThreadPoolExecutor executorService;
+    private final KeySequentialExecutor packetProcessor;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -87,13 +89,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber,
-            MonitoredScheduledThreadPoolExecutor executorService) {
+            MonitoredScheduledThreadPoolExecutor executorService, KeySequentialExecutor packetProcessor) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         logPrefix = thing.getUID().getId();
         this.eventSubscriber = eventSubscriber;
         this.executorService = executorService;
+        this.packetProcessor = packetProcessor;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -195,7 +198,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
             frameHelper = new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.server,
-                    logPrefix);
+                    logPrefix, packetProcessor);
 
             frameHelper.connect(new InetSocketAddress(config.hostname, config.port));
 
@@ -272,20 +275,19 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Override
     public void onPacket(@NonNull GeneratedMessage message) {
-        executorService.submit(() -> {
-            try {
-                switch (connectionState) {
-                    case UNINITIALIZED -> logger.warn("[{}] Received packet {} while uninitialized.", logPrefix,
-                            message.getClass().getSimpleName());
-                    case HELLO_SENT -> handleHelloResponse(message);
-                    case LOGIN_SENT -> handleLoginResponse(message);
-                    case CONNECTED -> handleConnected(message);
-                }
-            } catch (ProtocolAPIError e) {
-                logger.warn("[{}] Error parsing packet", logPrefix, e);
-                onParseError(CommunicationError.PACKET_ERROR);
+        try {
+            switch (connectionState) {
+                case UNINITIALIZED -> logger.debug(
+                        "[{}] Received packet {} while uninitialized, this can happen when the socket is closed while unprocessed packets exists. Ignoring",
+                        logPrefix, message.getClass().getSimpleName());
+                case HELLO_SENT -> handleHelloResponse(message);
+                case LOGIN_SENT -> handleLoginResponse(message);
+                case CONNECTED -> handleConnected(message);
             }
-        }, "Packet parsing", 100);
+        } catch (ProtocolAPIError e) {
+            logger.warn("[{}] Error parsing packet", logPrefix, e);
+            onParseError(CommunicationError.PACKET_ERROR);
+        }
     }
 
     @Override
@@ -522,17 +524,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             connectionState = ConnectionState.LOGIN_SENT;
 
             frameHelper.send(ConnectRequest.getDefaultInstance());
-            if (config.deviceLogLevel != LogLevel.NONE) {
-                logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
-
-                frameHelper.send(SubscribeLogsRequest.newBuilder()
-                        .setLevel(io.esphome.api.LogLevel.valueOf("LOG_LEVEL_" + config.deviceLogLevel.name()))
-                        .build());
-            }
-
         }
-
-        // Check if
     }
 
     public void addChannelType(ChannelType channelType) {

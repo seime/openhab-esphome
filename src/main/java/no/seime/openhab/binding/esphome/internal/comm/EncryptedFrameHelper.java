@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.UUID;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.ShortBufferException;
@@ -32,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessage;
+import com.jano7.executor.KeyRunnable;
+import com.jano7.executor.KeySequentialExecutor;
 import com.southernstorm.noise.protocol.CipherStatePair;
 import com.southernstorm.noise.protocol.HandshakeState;
 
@@ -45,6 +48,7 @@ public class EncryptedFrameHelper {
     protected final Logger logger = LoggerFactory.getLogger(EncryptedFrameHelper.class);
     private final String encryptionKeyBase64;
     private final String expectedServername;
+    private final KeySequentialExecutor scheduler;
     private final MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
     protected CommunicationListener listener;
     protected ByteBuffer internalBuffer = ByteBuffer.allocate(READ_BUFFER_SIZE * 2);
@@ -53,29 +57,18 @@ public class EncryptedFrameHelper {
     private HandshakeState client;
     private CipherStatePair cipherStatePair;
     private NoiseProtocolState state;
+    private final String connectionId = UUID.randomUUID().toString();
 
     public EncryptedFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
-            String encryptionKeyBase64, @Nullable String expectedServername, String logPrefix) {
+            String encryptionKeyBase64, @Nullable String expectedServername, String logPrefix,
+            KeySequentialExecutor packetProcessor) {
         this.logPrefix = logPrefix;
         this.listener = listener;
         this.encryptionKeyBase64 = encryptionKeyBase64;
         this.expectedServername = expectedServername;
+        this.scheduler = packetProcessor;
 
         connection = new ESPHomeConnection(connectionSelector, this, logPrefix);
-    }
-
-    private static short bytesToShort(final byte[] data) {
-        short value = (short) (data[0] & 0xff);
-        value <<= 8;
-        value |= data[1] & 0xff;
-        return value;
-    }
-
-    protected static byte[] concatArrays(byte[] length, byte[] additionalLength) {
-        byte[] result = new byte[length.length + additionalLength.length];
-        System.arraycopy(length, 0, result, 0, length.length);
-        System.arraycopy(additionalLength, 0, result, length.length, additionalLength.length);
-        return result;
     }
 
     public void connect(InetSocketAddress espHomeAddress) throws ProtocolException {
@@ -119,9 +112,10 @@ public class EncryptedFrameHelper {
 
             // Unwrap outer frame
             int protoPacketLength = bytesToShort(Arrays.copyOfRange(headerData, 1, 3));
+
+            // Check if we have a complete packet
             if (internalBuffer.remaining() >= protoPacketLength) {
                 byte[] packetData = readBytes(protoPacketLength);
-
                 switch (state) {
                     case HELLO:
                         handleHello(packetData);
@@ -134,14 +128,17 @@ public class EncryptedFrameHelper {
                         break;
                 }
 
+                // Prepare buffer for next packet processing
                 internalBuffer.compact();
+
+                // Continue processing in case we have more complete packets
                 processBuffer();
             } else {
-                internalBuffer.position(internalBuffer.limit());
-                internalBuffer.limit(internalBuffer.capacity());
+                // Compact the buffer to make room for more data while preserving existing data
+                internalBuffer.compact();
             }
         } catch (ShortBufferException e) {
-            throw new ProtocolAPIError(e.getMessage());
+            throw new ProtocolAPIError(e.getMessage(), e);
         }
     }
 
@@ -211,15 +208,18 @@ public class EncryptedFrameHelper {
         }
     }
 
-    private void handleReady(byte[] packetData) {
-        try {
-            byte[] decrypted = decryptPacket(packetData);
-            int messageType = (decrypted[0] << 8) | decrypted[1];
-            byte[] messageData = Arrays.copyOfRange(decrypted, 4, decrypted.length);
-            decodeProtoMessage(messageType, messageData);
-        } catch (Exception e) {
-            listener.onParseError(CommunicationError.PACKET_ERROR);
-        }
+    private void handleReady(final byte[] packetData) {
+        // Pass on to packet processor
+        scheduler.execute(new KeyRunnable<>(connectionId, () -> {
+            try {
+                byte[] decrypted = decryptPacket(packetData);
+                int messageType = (decrypted[0] << 8) | decrypted[1];
+                byte[] messageData = Arrays.copyOfRange(decrypted, 4, decrypted.length);
+                decodeProtoMessage(messageType, messageData);
+            } catch (Exception e) {
+                listener.onParseError(CommunicationError.PACKET_ERROR);
+            }
+        }));
     }
 
     public ByteBuffer encodeFrame(GeneratedMessage message) throws ProtocolAPIError {
@@ -266,14 +266,66 @@ public class EncryptedFrameHelper {
     }
 
     protected void processBuffer() throws ProtocolException {
-        internalBuffer.limit(internalBuffer.position());
-        internalBuffer.position(0);
-        if (internalBuffer.remaining() > 2) {
-            byte[] headerData = readBytes(3);
-            headerReceived(headerData);
+        internalBuffer.flip(); // Prepare for reading
+
+        // First check if we have at least a complete header (3 bytes)
+        if (internalBuffer.remaining() >= 3) {
+            byte[] header = new byte[3];
+            internalBuffer.get(header);
+
+            // Process the complete header
+            headerReceived(header);
+        } else if (internalBuffer.remaining() > 0) {
+            // We have some data, but not a complete header yet
+            // Process partial header if possible, otherwise keep data in buffer
+            processPartialHeader();
         } else {
-            internalBuffer.position(internalBuffer.limit());
-            internalBuffer.limit(internalBuffer.capacity());
+            // No data at all, just prepare the buffer for writing
+            internalBuffer.clear();
+        }
+    }
+
+    /**
+     * Handles cases where a partial header might be present in the buffer.
+     */
+    protected void processPartialHeader() {
+        // The buffer should be in reading mode (flipped) before calling this
+        if (internalBuffer.remaining() >= 3) {
+            // We have enough data for at least a header
+            byte[] header = new byte[3];
+
+            // Save the current position to restore it if we don't have a complete packet
+            int initialPosition = internalBuffer.position();
+
+            // Read but don't consume from the buffer
+            internalBuffer.mark();
+            internalBuffer.get(header, 0, 3);
+
+            // Check protocol type
+            if (header[0] != PROTOCOL_ENCRYPTED && header[0] != PROTOCOL_PLAINTEXT) {
+                // Invalid protocol - reset and wait for more data
+                internalBuffer.reset();
+                return;
+            }
+
+            // Get the packet length
+            int packetLength = bytesToShort(Arrays.copyOfRange(header, 1, 3));
+
+            // Check if we have the full packet
+            if (internalBuffer.remaining() + 3 >= packetLength + 3) {
+                // Reset to the initial position so headerReceived can process it properly
+                internalBuffer.position(initialPosition);
+
+                // Now process the complete header and packet
+                try {
+                    headerReceived(header);
+                } catch (ProtocolException e) {
+                    logger.error("[{}] Error processing header: {}", logPrefix, e.getMessage());
+                }
+            } else {
+                // Not enough data, reset and wait for more
+                internalBuffer.reset();
+            }
         }
     }
 
@@ -341,5 +393,19 @@ public class EncryptedFrameHelper {
         HELLO,
         HANDSHAKE,
         READY
+    }
+
+    private static short bytesToShort(final byte[] data) {
+        short value = (short) (data[0] & 0xff);
+        value <<= 8;
+        value |= data[1] & 0xff;
+        return value;
+    }
+
+    private static byte[] concatArrays(byte[] length, byte[] additionalLength) {
+        byte[] result = new byte[length.length + additionalLength.length];
+        System.arraycopy(length, 0, result, 0, length.length);
+        System.arraycopy(additionalLength, 0, result, length.length, additionalLength.length);
+        return result;
     }
 }

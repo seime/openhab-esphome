@@ -14,32 +14,45 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
     public MonitoredScheduledThreadPoolExecutor(int corePoolSize, ThreadFactory threadFactory,
             long defaultMaxExecutionTimeMs) {
         super(corePoolSize, threadFactory);
+
         this.defaultMaxExecutionTimeMs = defaultMaxExecutionTimeMs;
+    }
+
+    private void logQueue() {
+        if (getQueue().size() > 20)
+            logger.warn(
+                    "Queue size for processing packets from ESP device as well as maintaining the watchdog is high: {}",
+                    getQueue().size());
     }
 
     @Override
     public void execute(Runnable command) {
+        logQueue();
         super.execute(new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null));
     }
 
     @Override
     public <T> Future<T> submit(Runnable task, T result) {
+        logQueue();
         return super.submit(new TimedRunnable(task, getStackTraceElements(), defaultMaxExecutionTimeMs, null), result);
     }
 
     @Override
     public Future<?> submit(Runnable task) {
+        logQueue();
         return super.submit(new TimedRunnable(task, getStackTraceElements(), defaultMaxExecutionTimeMs, null));
     }
 
     @Override
     public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+        logQueue();
         return super.schedule(new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null),
                 delay, unit);
     }
 
     @Override
     public ScheduledFuture<?> scheduleWithFixedDelay(Runnable task, long initialDelay, long delay, TimeUnit unit) {
+        logQueue();
         return super.scheduleWithFixedDelay(
                 new TimedRunnable(task, getStackTraceElements(), defaultMaxExecutionTimeMs, null), initialDelay, delay,
                 unit);
@@ -47,26 +60,31 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
 
     @Override
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
+        logQueue();
         return super.scheduleAtFixedRate(
                 new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null), initialDelay,
                 period, unit);
     }
 
     public void execute(Runnable command, String taskDescription) {
+        logQueue();
         super.execute(new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, taskDescription));
     }
 
     public <T> Future<T> submit(Runnable task, T result, String taskDescription) {
+        logQueue();
         return super.submit(
                 new TimedRunnable(task, getStackTraceElements(), defaultMaxExecutionTimeMs, taskDescription), result);
     }
 
     public Future<?> submit(Runnable task, String taskDescription) {
+        logQueue();
         return super.submit(
                 new TimedRunnable(task, getStackTraceElements(), defaultMaxExecutionTimeMs, taskDescription));
     }
 
     public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit, String taskDescription) {
+        logQueue();
         return super.schedule(
                 new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, taskDescription), delay,
                 unit);
@@ -74,6 +92,7 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
 
     public ScheduledFuture<?> scheduleWithFixedDelay(Runnable task, long initialDelay, long delay, TimeUnit unit,
             String taskDescription) {
+        logQueue();
         return super.scheduleWithFixedDelay(
                 new TimedRunnable(task, getStackTraceElements(), defaultMaxExecutionTimeMs, taskDescription),
                 initialDelay, delay, unit);
@@ -81,32 +100,38 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
 
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit,
             String taskDescription) {
+        logQueue();
         return super.scheduleAtFixedRate(
                 new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, taskDescription),
                 initialDelay, period, unit);
     }
 
     public void execute(Runnable command, String taskDescription, long maxExecutionTimeMs) {
+        logQueue();
         super.execute(new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, taskDescription));
     }
 
     public <T> Future<T> submit(Runnable task, T result, String taskDescription, long maxExecutionTimeMs) {
+        logQueue();
         return super.submit(new TimedRunnable(task, getStackTraceElements(), maxExecutionTimeMs, taskDescription),
                 result);
     }
 
     public Future<?> submit(Runnable task, String taskDescription, long maxExecutionTimeMs) {
+        logQueue();
         return super.submit(new TimedRunnable(task, getStackTraceElements(), maxExecutionTimeMs, taskDescription));
     }
 
     public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit, String taskDescription,
             long maxExecutionTimeMs) {
+        logQueue();
         return super.schedule(new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, taskDescription),
                 delay, unit);
     }
 
     public ScheduledFuture<?> scheduleWithFixedDelay(Runnable task, long initialDelay, long delay, TimeUnit unit,
             String taskDescription, long maxExecutionTimeMs) {
+        logQueue();
         return super.scheduleWithFixedDelay(
                 new TimedRunnable(task, getStackTraceElements(), maxExecutionTimeMs, taskDescription), initialDelay,
                 delay, unit);
@@ -114,6 +139,7 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
 
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit,
             String taskDescription, long maxExecutionTimeMs) {
+        logQueue();
         return super.scheduleAtFixedRate(
                 new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, taskDescription), initialDelay,
                 period, unit);

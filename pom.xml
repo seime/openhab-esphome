@@ -56,7 +56,12 @@
       <version>${project.parent.version}</version>
       <scope>compile</scope>
     </dependency>
-
+    <dependency>
+      <groupId>com.jano7</groupId>
+      <artifactId>executor</artifactId>
+      <version>2.0.2</version>
+      <scope>compile</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.slf4j</groupId>

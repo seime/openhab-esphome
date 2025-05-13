@@ -34,6 +34,8 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.jano7.executor.KeySequentialExecutor;
+
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
@@ -66,20 +68,23 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final ThingRegistry thingRegistry;
     private final MonitoredScheduledThreadPoolExecutor scheduler;
+    private final KeySequentialExecutor packetExecutor;
     private final ConnectionSelector connectionSelector;
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry)
             throws IOException {
-        scheduler = new MonitoredScheduledThreadPoolExecutor(6, r -> {
+        scheduler = new MonitoredScheduledThreadPoolExecutor(4, r -> {
             long currentCount = threadCounter.incrementAndGet();
             logger.debug("Creating new worker thread {} for scheduler", currentCount);
             Thread t = new Thread(r);
             t.setDaemon(true);
             t.setName("ESPHome Thing Scheduler " + currentCount);
             return t;
-        }, 2000);
+        }, 500);
+
+        packetExecutor = new KeySequentialExecutor(scheduler);
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         this.eventSubscriber = eventSubscriber;
@@ -93,8 +98,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber,
-                    scheduler);
+            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber, scheduler,
+                    packetExecutor);
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
             ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry);
             registerBluetoothAdapter(handler);
