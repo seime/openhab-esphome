@@ -1,6 +1,6 @@
 # ESPHome Binding for openHAB
 
-### Docs updated 2025-05-04.
+### Docs updated 2025-05-20.
 
 <img src="logo.png" width="200"/>
 
@@ -37,8 +37,7 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
    from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849
 5. Wait for discovery to find your device - or add manually in a thing file.
 
-> **Note:** At the current state of the binding, it is highly recommended to use file based configuration for things and
-> items as channel types etc most likely will change.
+> **Note:** Remember to edit your things and add the `encryptionKey` .
 
 ## Discovery
 
@@ -50,15 +49,16 @@ The binding uses mDNS to automatically discover devices on the network.
 
 | Name                   | Type      | Description                                                                                                                                              | Default  | Required | Advanced |
 |------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
-| `hostname`             | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                                           | N/A      | yes      | no       |
+| `deviceId`             | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device. Use value from `esphome.name` in ESPHome device configuration |          | yes      | no       |
+| `hostname`             | `text`    | Hostname or IP address of the device. Typically something like 'myboard.local'                                                                           |          | yes      | no       |
 | `port`                 | `integer` | IP Port of the device                                                                                                                                    | 6053     | no       | no       |
-| `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables                   | N/A      | no       | no       |
-| `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                            | false    | no       | no       |
+| `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables                   |          | yes      | no       |
 | `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                        | 10       | no       | yes      |
 | `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                       | 4        | no       | yes      |
-| `server`               | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device. Use value from `esphome.name` in ESPHome device configuration |          | no       | yes      |
-| `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                       | hostname | no       | yes      |
+| `reconnectInterval`    | `integer` | Seconds between reconnect attempts when connection is lost or the device restarts.                                                                       | 10       | no       | yes      |
+| `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                       | deviceId | no       | yes      |
 | `deviceLogLevel`       | `text`    | ESPHome device log level to stream from the device.                                                                                                      | NONE     | no       | yes      |
+| `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                            | false    | no       | yes      |
 
 ## Channels
 
@@ -70,15 +70,15 @@ interrogate the device and create channels based on the device configuration.
 ### Thing Configuration for ESPHome device
 
 ```
-esphome:device:esp1  "ESPHome Test card 1" [ hostname="testkort1.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, server="esphomename", logPrefix="esp1", deviceLogLevel="INFO"]
+esphome:device:garage-opener  "Garage ESP32" [deviceId="garage-opener", hostname="garage-opener.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, reconnectInterval=10, logPrefix="garage", deviceLogLevel="INFO"]
 ```
 
 ### Item Configuration
 
 ```
-Number:Temperature ESP1_Temperature "Temperature" <temperature>   {channel="esphome:device:esp1:temperature"}
-Number:Dimensionless ESP1_Humidity "Humidity"     <humidity>      {channel="esphome:device:esp1:humidity"}
-Switch ESP1_Switch "Relay"                        <switch>        {channel="esphome:device:esp1:relay_4"}
+Number:Temperature Garage_Temperature "Temperature" <temperature>   {channel="esphome:device:garage-opener:temperature"}
+Number:Dimensionless Garage_Humidity "Humidity"     <humidity>      {channel="esphome:device:garage-opener:humidity"}
+Switch Garage_Switch "Relay"                        <switch>        {channel="esphome:device:garage-opener:relay_4"}
 ```
 
 ## FAQ
@@ -102,15 +102,8 @@ I get errors like
 
 with log messages like
 `[WARN ] [home.internal.handler.ESPHomeHandler] - [esphome-devicename] Ping responses lacking. Waited 4 times 10 seconds, total of 40. Assuming connection lost and disconnecting`
-> This can be caused by a flaky device or network connection. However, this may also be caused by openHAB is not
-> executing the scheduled check in time.
-> This typically happens on installations with many physical things and bindings doing blocking network I/O. You might
-> already have noticed other things not responding immediately for unknown reasons.
->
-> In the current version the binding is using its own scheduler to avoid this.
->
-> If you for some reason cannot upgrade, adding the following to your `services/runtime.cfg` file might help:
-`org.openhab.threadpool:thingHandler = 50`
+> This can be caused by a flaky device or network connection. It can also be caused by device overload, causing it to
+> drop messages.
 
 > If you have the `uptime` sensor in your ESPHome configuration, you can use that to monitor the device uptime. If the
 > device uptime is increasing while openHAB reports the device as offline, it is likely a network issue.
@@ -141,11 +134,13 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 
 ## Bluetooth proxy support
 
-It is now possible to utilize the built-in Bluetooth proxy in ESPHome. This allows you to use ESPHome devices as proxies
+It is now possible to use the built-in Bluetooth proxy in ESPHome. This allows you to use ESPHome devices as proxies
 for other Bluetooth devices such as BTHome sensors or a range of other Bluetooth devices.
 
 > NOTE: Only beacons / devices broadcasting data are supported at the moment. Connectable devices will be supported in a
 > future release.
+
+> NOTE: The proxy bridge *CANNOT* be created in the UI, you *must* file based configuration!
 
 The feature is still experimental and may not work as expected.
 
@@ -159,7 +154,7 @@ bluetooth_proxy:
 2. Configure the ESPHome `device` in openHAB with `enableBluetoothProxy = true`
 
 ```yaml
-esphome:device:esp1  "ESPHome Test card 1" [ ... enableBluetoothProxy=true ]
+esphome:device:garage-opener  "Garage ESP32" [ ... enableBluetoothProxy=true ]
 ```
 
 3. Configure a Bluetooth Proxy bridge of type `esphome`
@@ -179,8 +174,7 @@ Bridge bluetooth:esphome:proxy "ESPHome BLE Advertisement listener" [backgroundD
 ```
 
 > **NOTE:** Set backgroundDiscovery to true if you want to automatically add discovered devices to the inbox. If not use
-> manual
-> scanning from the inbox.
+> manual scanning from the inbox.
 
 ## Streaming logs from ESPHome device to openHAB
 
