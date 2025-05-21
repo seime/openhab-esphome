@@ -4,9 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +15,6 @@ public class ConnectionSelector {
     private final Logger logger = LoggerFactory.getLogger(ConnectionSelector.class);
 
     private final Selector selector;
-    private final Map<SocketChannel, EncryptedFrameHelper> connectionMap = new ConcurrentHashMap<>();
     private boolean keepRunning = true;
     private boolean selectorOpen;
 
@@ -32,14 +29,14 @@ public class ConnectionSelector {
             logger.debug("Starting selector thread");
             while (keepRunning) {
                 try {
-                    selector.select(10000);
+                    selector.select(1000);
                     // token representing the registration of a SelectableChannel with a Selector
                     Set<SelectionKey> keys = selector.selectedKeys();
                     logger.trace("Num selected keys: {}", keys.size());
                     Iterator<SelectionKey> keyIterator = keys.iterator();
                     while (keyIterator.hasNext()) {
-                        SelectionKey readyKey = keyIterator.next();
-                        processKey(readyKey);
+                        SelectionKey key = keyIterator.next();
+                        processKey(key);
                     }
                     keys.clear();
                 } catch (ClosedSelectorException e) {
@@ -57,13 +54,20 @@ public class ConnectionSelector {
         selectorThread.start();
     }
 
-    private void processKey(SelectionKey readyKey) {
-        EncryptedFrameHelper frameHelper = (EncryptedFrameHelper) readyKey.attachment();
-        logger.trace("Processing key readable={}", readyKey.isReadable());
-        // Tests whether this key's channel is ready to accept a new socket connection
+    private void processKey(SelectionKey key) {
+        EncryptedFrameHelper frameHelper = (EncryptedFrameHelper) key.attachment();
+        logger.trace("Processing key readable={}, connectable={}", key.isReadable(), key.isConnectable());
         try {
-            if (readyKey.isReadable()) {
-                SocketChannel channel = (SocketChannel) readyKey.channel();
+            SocketChannel channel = (SocketChannel) key.channel();
+            if (key.isConnectable() && channel.isConnectionPending()) {
+                boolean connected = channel.finishConnect();
+                if (connected) {
+                    key.interestOps(SelectionKey.OP_READ);
+                    frameHelper.onConnected();
+                }
+            } else if (key.isWritable()) {
+                frameHelper.onConnected();
+            } else if (key.isReadable()) {
                 ByteBuffer buffer = ByteBuffer.allocate(READ_BUFFER_SIZE);
                 int read = channel.read(buffer);
                 if (read == -1) {
@@ -79,8 +83,6 @@ public class ConnectionSelector {
 
                     processReceivedData(frameHelper, buffer, channel);
                 }
-            } else {
-                logger.trace("Key not readable");
             }
         } catch (IOException | CancelledKeyException e) {
             logger.debug("Socket exception", e);
@@ -115,9 +117,9 @@ public class ConnectionSelector {
     }
 
     public void register(SocketChannel socketChannel, EncryptedFrameHelper frameHelper) {
-        connectionMap.put(socketChannel, frameHelper);
         try {
-            SelectionKey key = socketChannel.register(selector, SelectionKey.OP_READ);
+            SelectionKey key = socketChannel.register(selector,
+                    SelectionKey.OP_CONNECT | SelectionKey.OP_READ | SelectionKey.OP_WRITE);
             key.attach(frameHelper);
             selector.wakeup();
         } catch (IOException e) {
@@ -126,8 +128,6 @@ public class ConnectionSelector {
     }
 
     public void unregister(SocketChannel socketChannel) {
-        connectionMap.remove(socketChannel);
-
         try {
             socketChannel.close();
         } catch (IOException e) {

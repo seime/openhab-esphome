@@ -70,7 +70,7 @@ public abstract class AbstractESPHomeDeviceTest {
         deviceConfiguration.hostname = "localhost";
         deviceConfiguration.port = 6053;
         deviceConfiguration.encryptionKey = "TiFvlzL9tNB29cys/ZR4o+YYHvwawrTF8csI13hZaPw=";
-        deviceConfiguration.server = "virtual";
+        deviceConfiguration.deviceId = "virtual";
         deviceConfiguration.deviceLogLevel = LogLevel.VERY_VERBOSE;
         when(configuration.as(ESPHomeConfiguration.class)).thenReturn(deviceConfiguration);
 

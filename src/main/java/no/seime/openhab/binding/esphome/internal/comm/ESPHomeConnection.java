@@ -54,9 +54,9 @@ public class ESPHomeConnection {
     public void connect(InetSocketAddress espDeviceAddress) throws ProtocolAPIError {
         try {
 
-            socketChannel = SocketChannel.open(espDeviceAddress);
+            socketChannel = SocketChannel.open();
             socketChannel.configureBlocking(false);
-            socketChannel.setOption(java.net.StandardSocketOptions.SO_KEEPALIVE, true);
+            socketChannel.connect(espDeviceAddress);
             connectionSelector.register(socketChannel, frameHelper);
 
             logger.info("[{}] Opening socket to {} at port {}.", logPrefix, espDeviceAddress.getHostName(),

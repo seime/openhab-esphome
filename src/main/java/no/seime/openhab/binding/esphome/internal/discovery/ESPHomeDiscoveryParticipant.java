@@ -12,13 +12,12 @@
  */
 package no.seime.openhab.binding.esphome.internal.discovery;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.jmdns.ServiceInfo;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.discovery.DiscoveryResult;
@@ -43,6 +42,8 @@ import no.seime.openhab.binding.esphome.internal.BindingConstants;
 public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
 
     public static final String PROPERTY_HOSTNAME = "hostname";
+    public static final String PROPERTY_DEVICEID = "deviceId";
+    public static final String PROPERTY_PORT = "port";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeDiscoveryParticipant.class);
 
@@ -59,39 +60,30 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
     @Override
     public @Nullable DiscoveryResult createResult(ServiceInfo service) {
         String application = service.getApplication();
-
         if ("esphomelib".equals(application)) {
-            final ThingUID deviceUID = getThingUID(service);
-            if (deviceUID != null) {
+            String friendlyName = service.getPropertyString("friendly_name");
+            if (friendlyName != null) {
+                // Defer discovery until TXT records are available
+                String name = service.getName();
+                String board = service.getPropertyString("board");
+                String label = String.format("%s / %s", friendlyName, board);
 
-                StringBuilder b = new StringBuilder("ESPHome device ");
-                if (service.getName() != null) {
-                    b.append(service.getName());
-                }
-                if (service.getServer() != null) {
-                    b.append(" (").append(service.getServer()).append(")");
-                }
-                if (service.getInet4Addresses().length != 0) {
-                    b.append(" ").append(Arrays.stream(service.getInet4Addresses()).map(e -> e.getHostAddress())
-                            .collect(Collectors.joining()));
-                }
+                final ThingUID deviceUID = getThingUID(service);
+
+                logger.debug("Found ESPHome device via mDNS: {} ", label);
 
                 return DiscoveryResultBuilder.create(deviceUID).withThingType(BindingConstants.THING_TYPE_DEVICE)
-                        .withProperty(PROPERTY_HOSTNAME, service.getServer()).withLabel(b.toString())
-                        .withRepresentationProperty(PROPERTY_HOSTNAME).build();
+                        .withProperty(PROPERTY_HOSTNAME, service.getServer())
+                        .withProperty(PROPERTY_PORT, service.getPort()).withProperty(PROPERTY_DEVICEID, name)
+                        .withLabel(label).withRepresentationProperty(PROPERTY_DEVICEID).build();
             }
         }
         return null;
     }
 
     @Override
-    public @Nullable ThingUID getThingUID(@Nullable ServiceInfo service) {
-        if (service != null) {
-            String serviceName = service.getName();
-            logger.debug("Found ESPHome devices via mDNS:{} v4:{} v6:{}", serviceName, service.getInet4Addresses(),
-                    service.getInet6Addresses());
-            return new ThingUID(BindingConstants.THING_TYPE_DEVICE, "REMOVEMEWHENADDING" + serviceName);
-        }
-        return null;
+    public @NonNull ThingUID getThingUID(ServiceInfo service) {
+        String serviceName = service.getName();
+        return new ThingUID(BindingConstants.THING_TYPE_DEVICE, serviceName);
     }
 }

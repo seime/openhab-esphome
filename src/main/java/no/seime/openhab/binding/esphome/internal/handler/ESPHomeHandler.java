@@ -144,6 +144,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Override
     public void initialize() {
+        disposed = false;
         logger.debug("[{}] Initializing ESPHome handler", thing.getUID());
         config = getConfigAs(ESPHomeConfiguration.class);
 
@@ -184,6 +185,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     @Override
+    public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
+        dispose();
+        initialize();
+        super.handleConfigurationUpdate(configurationParameters);
+    }
+
+    @Override
     public void handleRemoval() {
         dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
         super.handleRemoval();
@@ -197,7 +205,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", config.hostname, config.port));
 
-            frameHelper = new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.server,
+            frameHelper = new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.deviceId,
                     logPrefix, packetProcessor);
 
             frameHelper.connect(new InetSocketAddress(config.hostname, config.port));

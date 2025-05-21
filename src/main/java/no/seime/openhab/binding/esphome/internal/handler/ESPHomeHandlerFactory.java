@@ -82,7 +82,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
             t.setDaemon(true);
             t.setName("ESPHome Thing Scheduler " + currentCount);
             return t;
-        }, 500);
+        }, 300);
 
         packetExecutor = new KeySequentialExecutor(scheduler);
 

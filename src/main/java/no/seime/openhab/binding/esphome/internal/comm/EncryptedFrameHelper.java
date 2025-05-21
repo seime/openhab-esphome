@@ -47,7 +47,7 @@ public class EncryptedFrameHelper {
     private final static String NOISE_PROTOCOL = "Noise_NNpsk0_25519_ChaChaPoly_SHA256";
     protected final Logger logger = LoggerFactory.getLogger(EncryptedFrameHelper.class);
     private final String encryptionKeyBase64;
-    private final String expectedServername;
+    private final String expectedDeviceId;
     private final KeySequentialExecutor scheduler;
     private final MessageTypeToClassConverter messageTypeToClassConverter = new MessageTypeToClassConverter();
     protected CommunicationListener listener;
@@ -60,18 +60,22 @@ public class EncryptedFrameHelper {
     private final String connectionId = UUID.randomUUID().toString();
 
     public EncryptedFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
-            String encryptionKeyBase64, @Nullable String expectedServername, String logPrefix,
+            String encryptionKeyBase64, @Nullable String expectedDeviceId, String logPrefix,
             KeySequentialExecutor packetProcessor) {
         this.logPrefix = logPrefix;
         this.listener = listener;
         this.encryptionKeyBase64 = encryptionKeyBase64;
-        this.expectedServername = expectedServername;
+        this.expectedDeviceId = expectedDeviceId;
         this.scheduler = packetProcessor;
 
         connection = new ESPHomeConnection(connectionSelector, this, logPrefix);
     }
 
     public void connect(InetSocketAddress espHomeAddress) throws ProtocolException {
+        connection.connect(espHomeAddress);
+    }
+
+    public void onConnected() throws ProtocolAPIError {
         try {
             client = new HandshakeState(NOISE_PROTOCOL, HandshakeState.INITIATOR);
 
@@ -88,9 +92,7 @@ public class EncryptedFrameHelper {
 
             client.start();
 
-            connection.connect(espHomeAddress);
             state = NoiseProtocolState.HELLO;
-
             connection.send(createFrame(new byte[0]));
 
         } catch (NoSuchAlgorithmException e) {
@@ -153,11 +155,11 @@ public class EncryptedFrameHelper {
                 nullByteIndex++;
             }
 
-            byte[] serverNameBytes = Arrays.copyOfRange(packetData, 1, nullByteIndex);
-            String serverName = new String(serverNameBytes, StandardCharsets.US_ASCII);
+            byte[] deviceIdBytes = Arrays.copyOfRange(packetData, 1, nullByteIndex);
+            String deviceId = new String(deviceIdBytes, StandardCharsets.US_ASCII);
 
-            if (expectedServername != null && !(expectedServername.equals(serverName))) {
-                logger.warn("[{}] Expected server name '{}' but got '{}'", logPrefix, expectedServername, serverName);
+            if (expectedDeviceId != null && !(expectedDeviceId.equals(deviceId))) {
+                logger.warn("[{}] Expected deviceId '{}' but got '{}'", logPrefix, expectedDeviceId, deviceId);
                 listener.onParseError(CommunicationError.DEVICE_NAME_MISMATCH);
                 return;
             }

@@ -36,13 +36,13 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeBluetoothProxyHandler.class);
 
-    private List<ESPHomeHandler> espHomeHandlers = new ArrayList<>();
+    private final List<ESPHomeHandler> espHomeHandlers = new ArrayList<>();
 
     private final LoadingCache<Long, Optional<BluetoothLEAdvertisementResponse>> cache;
 
-    private Map<Long, SortedSet<DeviceAndRSSI>> knownDevices = new ConcurrentHashMap<>();
+    private final Map<Long, SortedSet<DeviceAndRSSI>> knownDevices = new ConcurrentHashMap<>();
 
-    private Map<ESPHomeBluetoothDevice, ESPHomeHandler> connectionMap = new ConcurrentHashMap<>();
+    private final Map<ESPHomeBluetoothDevice, ESPHomeHandler> connectionMap = new ConcurrentHashMap<>();
 
     /**
      * Creates a new instance of this class for the {@link Thing}.
@@ -67,7 +67,6 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     @Override
     public void initialize() {
-
         super.initialize();
         updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Looking for BLE enabled ESPHome devices");
 
@@ -93,6 +92,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         List<ESPHomeHandler> inactiveHandlers = espHomeHandlers.stream()
                 .filter(handler -> handler.isDisposed() || !handler.getThing().getStatus().equals(ThingStatus.ONLINE))
                 .toList();
+        logger.debug("Found {} inactive handlers to remove", inactiveHandlers.size());
         espHomeHandlers.removeAll(inactiveHandlers);
         inactiveHandlers.stream().forEach(handler -> {
             try {
@@ -123,8 +123,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         }
 
         if (espHomeHandlers.isEmpty()) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String.format(
-                    "Found no ESPHome devices configured for Bluetooth proxy support. Make sure your ESPHome things are online and have the 'enableBluetoothProxy' option set to 'true'"));
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
+                    "Found no ESPHome devices configured for Bluetooth proxy support. Make sure your ESPHome things are online and have the 'enableBluetoothProxy' option set to 'true'");
 
         } else {
             updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, String

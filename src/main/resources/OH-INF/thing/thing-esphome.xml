@@ -4,20 +4,15 @@
 	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
 	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
 
-	<!-- Sample Thing Type -->
 	<thing-type id="device">
-
 		<label>ESPHome Device</label>
-		<description>ESP32 / ESP8266 device flashed with ESPHome. See esphome.io</description>
-		<representation-property>hostname</representation-property>
+		<description>ESP32 / ESP8266 device flashed with ESPHome firmware. See esphome.io</description>
+		<representation-property>deviceId</representation-property>
 
 		<config-description>
-			<parameter-group name="address">
+			<parameter-group name="network">
 				<label>Device address</label>
 				<context>network-address</context>
-			</parameter-group>
-			<parameter-group name="security">
-				<label>Communication security</label>
 			</parameter-group>
 			<parameter-group name="timeout">
 				<label>Connection timeouts</label>
@@ -29,24 +24,23 @@
 				<label>Bluetooth proxy</label>
 			</parameter-group>
 
-			<parameter name="hostname" type="text" required="true" groupName="address">
+			<parameter name="deviceId" type="text" required="true" groupName="network">
+				<label>ESPHome device ID</label>
+				<description>Used to verify that we're talking to the correct device. Use the esphome: -> name: value from the
+					ESPHome device configuration yaml</description>
+			</parameter>
+			<parameter name="hostname" type="text" required="true" groupName="network">
 				<context>network-address</context>
 				<label>Hostname</label>
 				<description>Hostname or IP address of the device</description>
 			</parameter>
-			<parameter name="port" type="integer" min="1" max="65500" required="false" groupName="address">
+			<parameter name="port" type="integer" min="1" max="65500" required="false" groupName="network">
 				<context>network-address</context>
 				<label>Port</label>
 				<default>6053</default>
 				<description>IP Port number of the device</description>
 			</parameter>
-			<parameter name="server" type="text" required="false" groupName="address">
-				<label>ESPHome device name (not hostname)</label>
-				<description>Used to verify that we're talking to the correct device. Use the esphome: -> name: value from the
-					ESPHome device configuration yaml</description>
-			</parameter>
-
-			<parameter name="encryptionKey" type="text" required="true" groupName="security">
+			<parameter name="encryptionKey" type="text" required="true" groupName="network">
 				<context>password</context>
 				<label>Base64 encoded encryption key for encrypted connection</label>
 				<description>Specified in the api: -> encryption: -> key: section of the esphome device config. See
@@ -55,27 +49,19 @@
 
 			<parameter name="reconnectInterval" type="integer" min="0" required="false" groupName="timeout">
 				<label>Reconnect interval in seconds</label>
-				<default>20</default>
-				<description>Seconds between reconnect attempts when connection is lost or device restart.
+				<default>10</default>
+				<description>Seconds between reconnect attempts when connection is lost or the device restarts.
 				</description>
 				<advanced>true</advanced>
 			</parameter>
 			<parameter name="pingInterval" type="integer" min="1" required="false" groupName="timeout">
 				<label>Ping interval in seconds</label>
 				<default>10</default>
-				<description>Seconds between sending ping requests to device to check if alive</description>
-				<advanced>true</advanced>
-			</parameter>
-			<parameter name="enableBluetoothProxy" type="boolean" required="false" groupName="bluetooth">
-				<label>Enable Bluetooth proxying (experimental)</label>
-				<description>Ensure your ESPHome configuration contains the bluetooth_proxy configuration element. Only works for
-					broadcasting devices ie BTHome devices such as Shelly BLU, b-parasite plant sensors etc. 2-way communication is not
-					yet supported. See https://bthome.io/</description>
-				<default>false</default>
+				<description>Seconds between sending ping requests to the device to check if it is alive</description>
 				<advanced>true</advanced>
 			</parameter>
 			<parameter name="maxPingTimeouts" type="integer" min="1" required="false" groupName="timeout">
-				<label>Number of missed ping requests before deeming device unresponsive</label>
+				<label>Number of missed ping requests before deeming the device unresponsive</label>
 				<default>4</default>
 				<description>Ie if pingInterval=10 and this value is 4, the binding will wait a total of 10*4 = 40 seconds before
 					connection is assumed broken, and reconnect starts</description>
@@ -105,6 +91,14 @@
 				</options>
 				<default>NONE</default>
 				<advanced>true</advanced>
+			</parameter>
+			<parameter name="enableBluetoothProxy" type="boolean" required="false" groupName="bluetooth">
+				<label>Enable Bluetooth proxying (experimental)</label>
+				<description>Ensure your ESPHome configuration contains the bluetooth_proxy configuration element. Only works for
+					broadcasting devices ie BTHome devices such as Shelly BLU, b-parasite plant sensors etc. 2-way communication is not
+					yet supported. See https://bthome.io/</description>
+				<default>false</default>
+				<advanced>false</advanced>
 			</parameter>
 
 		</config-description>
