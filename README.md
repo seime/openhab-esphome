@@ -1,6 +1,6 @@
 # ESPHome Binding for openHAB
 
-### Docs updated 2025-05-20.
+### Docs updated 2025-05-24.
 
 <img src="logo.png" width="200"/>
 
@@ -83,27 +83,32 @@ Switch Garage_Switch "Relay"                        <switch>        {channel="es
 
 ## FAQ
 
-### Why does the discovered `Thing` ID start with `REMOVEMEWHENADDING`?
+### My hostname field suddenly changed to xxxx.local?
 
-> This is to avoid openHAB overwriting your `hostname` attribute with mDNS discovery results. **Remove this prefix when
-adding as a managed thing!**
->
-> This problem does *not* occur if you use `Thing` files ("file based") configuration.
->
-> See https://github.com/seime/openhab-esphome/issues/1 . TLDR: A "feature" in openHAB.
+> Openhab updates thing configuration based on mDNS messages. There is currently no way to avoid this, but there are 2
+> workarounds
+> * Use a different thingUID from the one discovered, ie `esphome:device:fridge` -> `esphome:device:fridge-esp`
+> * Use file based configuration as they are read-only
+    > See https://github.com/seime/openhab-esphome/issues/1 . TLDR: A "feature" in openHAB.
 
 ### I cannot connect to my device
 
 I get errors like
-```[WARN ] [phome.internal.handler.ESPHomeHandler] - [REMOVEMEWHENADDINGbewaesserung] Error initial connection no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError: Failed to connect to 'XXXX.local.' port 6053```
+```[WARN ] [phome.internal.handler.ESPHomeHandler] - [mydevice] Error initial connection no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError: Failed to connect to 'XXXX.local.' port 6053```
 > See previous question
 
-### openHAB looses connection to my device
+### openHAB loose connection to my device
 
 with log messages like
-`[WARN ] [home.internal.handler.ESPHomeHandler] - [esphome-devicename] Ping responses lacking. Waited 4 times 10 seconds, total of 40. Assuming connection lost and disconnecting`
+`[WARN ] [home.internal.handler.ESPHomeHandler] - [esphome-deviceId] Ping responses lacking. Waited 4 times 10 seconds, total of 40. Assuming connection lost and disconnecting`
+`[INFO ] [ESPHome Socket Reader] [home.internal.comm.ESPHomeConnection] - [esphome-deviceId] Disconnecting socket.`
+
 > This can be caused by a flaky device or network connection. It can also be caused by device overload, causing it to
-> drop messages.
+> drop messages. If you are using the have a lot of chatty devices or using the bluetooth proxy, the ESP might overload
+> it's TCP
+> send buffer. To check if this is your problem, set the `api` component logger to `VERBOSE` and look for
+`Cannot send message because of TCP buffer space`.
+> If this happens, get a more powerful ESP or reduce how often it sends data.
 
 > If you have the `uptime` sensor in your ESPHome configuration, you can use that to monitor the device uptime. If the
 > device uptime is increasing while openHAB reports the device as offline, it is likely a network issue.
