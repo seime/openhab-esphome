@@ -358,6 +358,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             props.put("name", rsp.getName());
             props.put(Thing.PROPERTY_VENDOR, rsp.getManufacturer());
             props.put("compilationTime", rsp.getCompilationTime());
+            if (!rsp.getProjectName().isEmpty()) {
+                props.put("projectName", rsp.getProjectName());
+            }
+            if (!rsp.getProjectVersion().isEmpty()) {
+                props.put("projectVersion", rsp.getProjectVersion());
+            }
             updateThing(editThing().withProperties(props).build());
         } else if (message instanceof ListEntitiesDoneResponse) {
             updateThing(editThing().withChannels(dynamicChannels).build());
