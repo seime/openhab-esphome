@@ -185,13 +185,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     @Override
-    public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
-        dispose();
-        initialize();
-        super.handleConfigurationUpdate(configurationParameters);
-    }
-
-    @Override
     public void handleRemoval() {
         dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
         super.handleRemoval();
