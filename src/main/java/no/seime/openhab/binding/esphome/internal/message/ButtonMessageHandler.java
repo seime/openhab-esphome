@@ -47,7 +47,8 @@ public class ButtonMessageHandler extends AbstractMessageHandler<ListEntitiesBut
         String icon = getChannelIcon(rsp.getIcon(), "switch");
 
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "Switch", Collections.emptySet(),
-                null, Set.of("Switch"), false, icon, null, null, null, rsp.getEntityCategory());
+                null, Set.of("Switch"), false, icon, null, null, null, rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

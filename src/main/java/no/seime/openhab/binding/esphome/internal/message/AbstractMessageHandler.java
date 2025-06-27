@@ -46,7 +46,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     protected ChannelType addChannelType(final String channelTypePrefix, final String label, final String itemType,
             final Collection<?> options, @Nullable final String pattern, @Nullable final Set<String> tags,
             boolean readOnly, String category, BigDecimal stateDescriptionStep, BigDecimal stateDescriptionMin,
-            BigDecimal stateDescriptionMax, EntityCategory entityCategory) {
+            BigDecimal stateDescriptionMax, EntityCategory entityCategory, boolean disabledByDefault) {
         final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
                 channelTypePrefix + handler.getThing().getUID().getId());
         final List<StateOption> stateOptions = options.stream().map(e -> new StateOption(e.toString(), e.toString()))
@@ -81,7 +81,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
 
         channelTypeBuilder.withAutoUpdatePolicy(AutoUpdatePolicy.VETO);
-        channelTypeBuilder.isAdvanced(entityCategory != EntityCategory.ENTITY_CATEGORY_NONE);
+        channelTypeBuilder.isAdvanced(disabledByDefault || entityCategory != EntityCategory.ENTITY_CATEGORY_NONE);
 
         ChannelType channelType = channelTypeBuilder.build();
 

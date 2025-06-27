@@ -79,7 +79,8 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
                 "%." + accurracyDecimals + "f " + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), tags,
                 false, icon, rsp.getStep() != 0f ? BigDecimal.valueOf(rsp.getStep()) : null,
                 rsp.getMinValue() != 0f ? BigDecimal.valueOf(rsp.getMinValue()) : null,
-                rsp.getMaxValue() != 0f ? BigDecimal.valueOf(rsp.getMaxValue()) : null, rsp.getEntityCategory());
+                rsp.getMaxValue() != 0f ? BigDecimal.valueOf(rsp.getMaxValue()) : null, rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
