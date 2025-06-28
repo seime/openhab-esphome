@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.measure.Unit;
+
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
@@ -14,6 +16,7 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +39,23 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
         Float value = null;
         if (command instanceof DecimalType) {
             value = ((DecimalType) command).floatValue();
-        } else if (command instanceof QuantityType<?>) {
-            value = ((QuantityType<?>) command).floatValue();
+        } else if (command instanceof QuantityType<?> qt) {
+            Configuration configuration = channel.getConfiguration();
+            String unitString = (String) configuration.get("unit");
+            if (unitString != null) {
+                unitString = transformUnit(unitString);
+                Unit<?> unit = UnitUtils.parseUnit(unitString);
+                if (unit != null) {
+                    QuantityType<?> newQt = qt.toUnit(unit);
+                    if (newQt == null) {
+                        logger.warn("Quantity {} incompatible with unit {} on channel '{}'", qt, unit,
+                                channel.getUID());
+                        return;
+                    }
+                    qt = newQt;
+                }
+            }
+            value = qt.floatValue();
         }
         if (value != null) {
             handler.sendMessage(NumberCommandRequest.newBuilder().setKey(key).setState(value).build());
