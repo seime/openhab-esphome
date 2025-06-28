@@ -167,11 +167,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         CoverDeviceClass deviceClass = CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass());
         if (deviceClass == null) {
-            logger.warn("[{}] Cover Device class `{}` unknown, using NONE for {}", handler.getLogPrefix(), deviceClass,
-                    rsp.getUniqueId());
-
             deviceClass = CoverDeviceClass.NONE;
-
         }
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());

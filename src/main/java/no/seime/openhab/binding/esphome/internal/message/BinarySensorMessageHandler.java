@@ -49,8 +49,6 @@ public class BinarySensorMessageHandler
 
         BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
         if (binarySensorDeviceClass == null) {
-            logger.warn("[{}] Binary Sensor Device class `{}` unknown, using GENERIC for {}", handler.getLogPrefix(),
-                    deviceClass, rsp.getUniqueId());
             binarySensorDeviceClass = BinarySensorDeviceClass.GENERIC;
         }
 
