@@ -9,9 +9,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.types.StringType;
+import org.openhab.core.library.unit.SIUnits;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
@@ -92,7 +94,10 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     builder.setMode(ClimateEnumHelper.toClimateMode(command.toString())).setHasMode(true);
                 case CHANNEL_TARGET_TEMPERATURE -> {
                     if (command instanceof QuantityType<?> qt) {
-                        builder.setTargetTemperature(qt.floatValue());
+                        QuantityType<?> celsius = qt.toUnit(SIUnits.CELSIUS);
+                        if (celsius != null) {
+                            builder.setTargetTemperature(celsius.floatValue());
+                        }
                     } else if (command instanceof DecimalType dc) {
                         builder.setTargetTemperature(dc.floatValue());
                     }
@@ -100,7 +105,10 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 }
                 case CHANNEL_TARGET_TEMPERATURE_LOW -> {
                     if (command instanceof QuantityType<?> qt) {
-                        builder.setTargetTemperatureLow(qt.floatValue());
+                        QuantityType<?> celsius = qt.toUnit(SIUnits.CELSIUS);
+                        if (celsius != null) {
+                            builder.setTargetTemperatureLow(celsius.floatValue());
+                        }
                     } else if (command instanceof DecimalType dc) {
                         builder.setTargetTemperatureLow(dc.floatValue());
                     }
@@ -108,7 +116,10 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 }
                 case CHANNEL_TARGET_TEMPERATURE_HIGH -> {
                     if (command instanceof QuantityType<?> qt) {
-                        builder.setTargetTemperatureHigh(qt.floatValue());
+                        QuantityType<?> celsius = qt.toUnit(SIUnits.CELSIUS);
+                        if (celsius != null) {
+                            builder.setTargetTemperatureHigh(celsius.floatValue());
+                        }
                     } else if (command instanceof DecimalType dc) {
                         builder.setTargetTemperatureHigh(dc.floatValue());
                     }
@@ -180,10 +191,12 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                                     : BigDecimal.valueOf(rsp.getVisualMinTemperature()),
                     BigDecimal.valueOf(rsp.getVisualMaxTemperature()), rsp.getEntityCategory());
 
+            Configuration configuration = configuration(rsp.getKey(), CHANNEL_CURRENT_TEMPERATURE, null);
+            configuration.put("unit", "°C"); // ESPHome always uses Celsius for temperature
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_TEMPERATURE))
                     .withLabel(createLabel(rsp.getName(), "Current temperature")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(ITEM_TYPE_TEMPERATURE)
-                    .withConfiguration(configuration(rsp.getKey(), CHANNEL_CURRENT_TEMPERATURE, null)).build();
+                    .withConfiguration(configuration).build();
             super.registerChannel(channel, channelType);
         }
         if (rsp.getSupportsTargetHumidity()) {
@@ -302,10 +315,12 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                                 : BigDecimal.valueOf(rsp.getVisualMinTemperature()),
                 BigDecimal.valueOf(rsp.getVisualMaxTemperature()), rsp.getEntityCategory());
 
+        Configuration configuration = configuration(rsp.getKey(), channelID, COMMAND_CLASS_CLIMATE);
+        configuration.put("unit", "°C"); // ESPHome always uses Celsius for temperature
         Channel channelTargetTemperatureLow = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), channelID))
                 .withLabel(createLabel(rsp.getName(), label)).withKind(ChannelKind.STATE)
                 .withType(channelTypeTargetTemperature.getUID()).withAcceptedItemType(ITEM_TYPE_TEMPERATURE)
-                .withConfiguration(configuration(rsp.getKey(), channelID, COMMAND_CLASS_CLIMATE)).build();
+                .withConfiguration(configuration).build();
         super.registerChannel(channelTargetTemperatureLow, channelTypeTargetTemperature);
     }
 
