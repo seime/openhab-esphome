@@ -289,10 +289,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             if (unit != null) {
                 return new QuantityType<>(state, unit);
             } else {
-                logger.warn("[{}] Unit '{}' unknown to openHAB, returning DecimalType for state '{}' on channel '{}'",
-                        handler.getLogPrefix(), unitString, state, channel.getUID());
                 return new DecimalType(state);
-
             }
         } else {
             return new DecimalType(state);
