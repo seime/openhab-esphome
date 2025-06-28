@@ -3,6 +3,7 @@ package no.seime.openhab.binding.esphome.internal.message;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -46,12 +47,16 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
     public static final String CHANNEL_CURRENT_TEMPERATURE = "current_temperature";
     public static final String CHANNEL_CURRENT_HUMIDITY = "current_humidity";
     public static final String CHANNEL_MODE = "mode";
+    public static final String CHANNEL_ACTION = "action";
     public static final String SEMANTIC_TYPE_SETPOINT = "Setpoint";
     public static final String SEMANTIC_TYPE_CONTROL = "Control";
+    public static final String SEMANTIC_TYPE_STATUS = "Status";
     public static final String SEMANTIC_TYPE_MEASUREMENT = "Measurement";
     public static final String COMMAND_CLASS_CLIMATE = "Climate";
     public static final String ITEM_TYPE_NUMBER_DIMENSIONLESS = "Number:Dimensionless";
     public static final String ITEM_TYPE_TEMPERATURE = "Number:Temperature";
+
+    private static final List<String> ACTIONS = List.of("OFF", "COOLING", "HEATING", "IDLE", "DRYING", "FAN");
 
     private final Logger logger = LoggerFactory.getLogger(ClimateMessageHandler.class);
 
@@ -244,6 +249,17 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_MODE, COMMAND_CLASS_CLIMATE)).build();
             super.registerChannel(channel, channelType);
         }
+        if (rsp.getSupportsAction()) {
+            ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_ACTION, "Action", itemTypeString,
+                    ACTIONS, "%s", Set.of(SEMANTIC_TYPE_STATUS), true, "climate", null, null, null,
+                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+
+            Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_ACTION))
+                    .withLabel(createLabel(rsp.getName(), "Action")).withKind(ChannelKind.STATE)
+                    .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
+                    .withConfiguration(configuration(rsp.getKey(), CHANNEL_ACTION, COMMAND_CLASS_CLIMATE)).build();
+            super.registerChannel(channel, channelType);
+        }
         if (rsp.getSupportedFanModesCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_FAN_MODE, "Fan Mode", itemTypeString,
                     rsp.getSupportedFanModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
@@ -340,6 +356,8 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 .updateState(channel.getUID(), toNumericState(channel, rsp.getCurrentTemperature(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_MODE).ifPresent(channel -> handler.updateState(channel.getUID(),
                 new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getMode()))));
+        findChannelByKeyAndField(rsp.getKey(), CHANNEL_ACTION).ifPresent(channel -> handler
+                .updateState(channel.getUID(), new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getAction()))));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_FAN_MODE).ifPresent(channel -> handler
                 .updateState(channel.getUID(), new StringType(ClimateEnumHelper.stripEnumPrefix(rsp.getFanMode()))));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_CUSTOM_FAN_MODE)
@@ -370,6 +388,11 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         public static String stripEnumPrefix(ClimateMode climateMode) {
             String toRemove = "CLIMATE_MODE";
             return climateMode.toString().substring(toRemove.length() + 1);
+        }
+
+        public static String stripEnumPrefix(ClimateAction action) {
+            String toRemove = "CLIMATE_ACTION";
+            return action.toString().substring(toRemove.length() + 1);
         }
 
         public static String stripEnumPrefix(ClimatePreset climatePreset) {
