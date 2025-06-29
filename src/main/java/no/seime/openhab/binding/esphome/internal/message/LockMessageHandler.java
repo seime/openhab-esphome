@@ -57,7 +57,7 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
         }
 
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "String", validOptions, null,
-                Set.of("Lock"), false, icon, null, null, null, rsp.getEntityCategory());
+                Set.of("Lock"), false, icon, null, null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

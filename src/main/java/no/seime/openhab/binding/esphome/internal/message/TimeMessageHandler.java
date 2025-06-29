@@ -49,7 +49,8 @@ public class TimeMessageHandler extends AbstractMessageHandler<ListEntitiesTimeR
 
         String itemType = "Number:Time";
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptySet(),
-                "%1$tH:%1$tM:%1$tS", Set.of("Status"), false, icon, null, null, null, rsp.getEntityCategory());
+                "%1$tH:%1$tM:%1$tS", Set.of("Status"), false, icon, null, null, null, rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

@@ -178,7 +178,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         if (rsp.getSupportsPosition()) {
             ChannelType channelTypePosition = addChannelType(rsp.getUniqueId() + CHANNEL_POSITION, "Position",
                     deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("OpenLevel"), false, icon, null,
-                    null, null, rsp.getEntityCategory());
+                    null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
                     .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
@@ -189,7 +189,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         if (rsp.getSupportsTilt()) {
             ChannelType channelTypeTilt = addChannelType(rsp.getUniqueId() + CHANNEL_TILT, "Tilt",
                     deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("Tilt"), false, icon, null,
-                    null, null, rsp.getEntityCategory());
+                    null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
                     .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
@@ -201,7 +201,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         // Legacy state
         ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "Legacy State",
                 deviceClass.getItemType(), Collections.emptyList(), "%s", Set.of("OpenClose"), false, icon, null, null,
-                null, rsp.getEntityCategory());
+                null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), LEGACY_CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "Legacy State")).withKind(ChannelKind.STATE)
@@ -212,7 +212,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         // Operation status
         ChannelType channelTypeCurrentOperation = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_OPERATION,
                 "Current operation", "String", Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), "%s", Set.of("Status"), true,
-                "motion", null, null, null, rsp.getEntityCategory());
+                "motion", null, null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channelCurrentOperation = ChannelBuilder
                 .create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_OPERATION))
