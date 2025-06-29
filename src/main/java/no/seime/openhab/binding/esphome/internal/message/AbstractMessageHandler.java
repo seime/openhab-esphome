@@ -161,7 +161,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         return null;
     }
 
-    private String transformUnit(String unitOfMeasurement) {
+    protected String transformUnit(String unitOfMeasurement) {
         return switch (unitOfMeasurement) {
             case "seconds" -> "s";
             default -> unitOfMeasurement;
