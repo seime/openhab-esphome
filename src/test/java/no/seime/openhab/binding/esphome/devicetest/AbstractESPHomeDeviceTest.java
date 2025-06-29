@@ -35,6 +35,7 @@ import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.handler.ESPStateDescriptionProvider;
 import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThreadPoolExecutor;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
@@ -57,6 +58,7 @@ public abstract class AbstractESPHomeDeviceTest {
     private ConnectionSelector selector;
     private @Mock Configuration configuration;
     private @Mock ESPChannelTypeProvider channelTypeProvider;
+    private @Mock ESPStateDescriptionProvider stateDescriptionProvider;
     private ESPHomeDeviceRunner emulator;
 
     @BeforeEach
@@ -83,8 +85,8 @@ public abstract class AbstractESPHomeDeviceTest {
         when(itemRegistry.getItems()).thenReturn(registryItems);
         eventSubscriber = new ESPHomeEventSubscriber(thingRegistry, itemRegistry);
 
-        thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber, executor,
-                new KeySequentialExecutor(executor), null);
+        thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
+                eventSubscriber, executor, new KeySequentialExecutor(executor), null);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
     }

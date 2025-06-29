@@ -1,6 +1,5 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -66,14 +65,13 @@ public class BinarySensorMessageHandler
                 binarySensorDeviceClass != null ? binarySensorDeviceClass.getCategory() : null);
 
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
-                binarySensorDeviceClass.getItemType(), Collections.emptySet(), null, tags, true, icon, null, null, null,
-                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                binarySensorDeviceClass.getItemType(), tags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(binarySensorDeviceClass.getItemType()).withConfiguration(configuration).build();
 
-        super.registerChannel(channel, channelType);
+        super.registerChannel(channel, channelType, readOnlyStateDescription());
     }
 
     public void handleState(BinarySensorStateResponse rsp) {
