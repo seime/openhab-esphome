@@ -51,21 +51,18 @@ public class ESPHomeConnection {
         }
     }
 
-    public void connect(InetSocketAddress espDeviceAddress) throws ProtocolAPIError {
+    public void connect(String hostname, int port) throws ProtocolAPIError {
         try {
+            logger.info("[{}] Opening socket to {} at port {}.", logPrefix, hostname, port);
 
             socketChannel = SocketChannel.open();
             socketChannel.configureBlocking(false);
-            socketChannel.connect(espDeviceAddress);
+            InetSocketAddress espHomeAddress = new InetSocketAddress(hostname, port);
+            socketChannel.connect(espHomeAddress);
             connectionSelector.register(socketChannel, frameHelper);
 
-            logger.info("[{}] Opening socket to {} at port {}.", logPrefix, espDeviceAddress.getHostName(),
-                    espDeviceAddress.getPort());
-
         } catch (Exception e) {
-            throw new ProtocolAPIError(
-                    "Failed to connect to '" + espDeviceAddress.getHostName() + "' port " + espDeviceAddress.getPort(),
-                    e);
+            throw new ProtocolAPIError("Failed to connect to '" + hostname + "' port " + port, e);
         }
     }
 

@@ -13,7 +13,6 @@
 package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.math.BigDecimal;
-import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
@@ -77,7 +76,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private ScheduledFuture<?> pingWatchdogFuture;
     private Instant lastPong = Instant.now();
     @Nullable
-    private ScheduledFuture<?> reconnectFuture;
+    private ScheduledFuture<?> connectFuture;
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private boolean disposed = false;
     private boolean interrogated;
@@ -154,7 +153,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
 
         if (config.hostname != null && !config.hostname.isEmpty()) {
-            scheduleReconnect(0);
+            scheduleConnect(0);
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No hostname configured");
         }
@@ -165,7 +164,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         disposed = true;
         eventSubscriber.removeEventSubscriptions(this);
         setUndefToAllChannels();
-        cancelReconnectFuture();
+        cancelConnectFuture();
         if (frameHelper != null) {
             cancelPingWatchdog();
 
@@ -201,20 +200,23 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         try {
             dynamicChannels.clear();
 
-            logger.info("[{}] Trying to connect to {}:{}", logPrefix, config.hostname, config.port);
+            String hostname = config.hostname;
+            int port = config.port;
+
+            logger.info("[{}] Trying to connect to {}:{}", logPrefix, hostname, port);
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
-                    String.format("Connecting to %s:%d", config.hostname, config.port));
+                    String.format("Connecting to %s:%d", hostname, port));
 
             frameHelper = new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.deviceId,
                     logPrefix, packetProcessor);
 
-            frameHelper.connect(new InetSocketAddress(config.hostname, config.port));
+            frameHelper.connect(hostname, port);
 
         } catch (ProtocolException e) {
             logger.warn("[{}] Error initial connection", logPrefix, e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
             if (!disposed) { // Don't reconnect if we've been disposed
-                scheduleReconnect(config.reconnectInterval);
+                scheduleConnect(config.reconnectInterval);
             }
         }
     }
@@ -308,7 +310,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.close();
             cancelPingWatchdog();
             connectionState = ConnectionState.UNINITIALIZED;
-            scheduleReconnect(config.reconnectInterval);
+            scheduleConnect(config.reconnectInterval);
         }
     }
 
@@ -321,7 +323,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             cancelPingWatchdog();
             frameHelper.close();
             connectionState = ConnectionState.UNINITIALIZED;
-            scheduleReconnect(config.reconnectInterval);
+            scheduleConnect(config.reconnectInterval);
         }
     }
 
@@ -336,7 +338,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             setUndefToAllChannels();
             connectionState = ConnectionState.UNINITIALIZED;
             cancelPingWatchdog();
-            scheduleReconnect(reconnectDelaySeconds);
+            scheduleConnect(reconnectDelaySeconds);
         }
     }
 
@@ -497,7 +499,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                             String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
                                     config.maxPingTimeouts, config.pingInterval));
-                    scheduleReconnect(config.reconnectInterval);
+                    scheduleConnect(config.reconnectInterval);
 
                 } else {
 
@@ -526,9 +528,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
             logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
-            logger.info("[{}] Connected. Device '{}' running '{}' on protocol version '{}.{}'", logPrefix,
-                    helloResponse.getName(), helloResponse.getServerInfo(), helloResponse.getApiVersionMajor(),
-                    helloResponse.getApiVersionMinor());
+            logger.info(
+                    "[{}] Connected, continuing with protocol handshake. Device '{}' running '{}' on protocol version '{}.{}'",
+                    logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
+                    helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
             connectionState = ConnectionState.LOGIN_SENT;
 
             frameHelper.send(ConnectRequest.getDefaultInstance());
@@ -580,17 +583,17 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private void cancelReconnectFuture() {
-        if (reconnectFuture != null) {
-            reconnectFuture.cancel(true);
-            reconnectFuture = null;
+    private void cancelConnectFuture() {
+        if (connectFuture != null) {
+            connectFuture.cancel(true);
+            connectFuture = null;
         }
     }
 
-    private void scheduleReconnect(int delaySeconds) {
-        cancelReconnectFuture();
-        reconnectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS,
-                String.format("[%s] Reconnect", logPrefix), 7000);
+    private void scheduleConnect(int delaySeconds) {
+        cancelConnectFuture();
+        connectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS,
+                String.format("[%s] Connect", logPrefix), 7000);
     }
 
     public boolean isInterrogated() {

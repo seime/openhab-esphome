@@ -16,7 +16,6 @@ import static no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector.
 
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
@@ -71,8 +70,8 @@ public class EncryptedFrameHelper {
         connection = new ESPHomeConnection(connectionSelector, this, logPrefix);
     }
 
-    public void connect(InetSocketAddress espHomeAddress) throws ProtocolException {
-        connection.connect(espHomeAddress);
+    public void connect(String hostname, int port) throws ProtocolException {
+        connection.connect(hostname, port);
     }
 
     public void onConnected() throws ProtocolAPIError {
