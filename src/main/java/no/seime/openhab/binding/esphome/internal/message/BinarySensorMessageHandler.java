@@ -84,7 +84,7 @@ public class BinarySensorMessageHandler
 
     protected State toBinaryState(Channel channel, boolean state, boolean missingState) {
         if (missingState) {
-            return UnDefType.UNDEF;
+            return UnDefType.NULL;
         }
         return convertStateBasedOnDeviceClass((String) channel.getConfiguration().get("deviceClass"), state);
     }
