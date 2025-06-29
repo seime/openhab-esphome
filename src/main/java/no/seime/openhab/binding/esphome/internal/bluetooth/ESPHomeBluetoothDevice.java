@@ -49,7 +49,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
             notification.setManufacturerData(manufacturerData.getData().toByteArray());
         });
         notification.setRssi(packet.getRssi());
-        notification.setDeviceName(packet.getName());
+        notification.setDeviceName(packet.getName().toStringUtf8());
 
         notifyListeners(BluetoothEventType.SCAN_RECORD, notification);
     }

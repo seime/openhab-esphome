@@ -199,7 +199,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
             logger.debug("Received BLE advertisement from device {} via {}", address, handler.getThing().getUID());
             device.setAddressType(rsp.getAddressType());
-            device.setName(rsp.getName());
+            device.setName(rsp.getName().toStringUtf8());
             device.setRssi(rsp.getRssi());
 
             rsp.getManufacturerDataList().stream().findFirst().ifPresent(manufacturerData -> {
