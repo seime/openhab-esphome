@@ -354,12 +354,18 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         if (message instanceof DeviceInfoResponse rsp) {
             Map<String, String> props = new HashMap<>();
-            props.put("esphome_version", rsp.getEsphomeVersion());
-            props.put("mac_address", rsp.getMacAddress());
-            props.put("model", rsp.getModel());
+            props.put(Thing.PROPERTY_FIRMWARE_VERSION, rsp.getEsphomeVersion());
+            props.put(Thing.PROPERTY_MAC_ADDRESS, rsp.getMacAddress());
+            props.put(Thing.PROPERTY_MODEL_ID, rsp.getModel());
             props.put("name", rsp.getName());
-            props.put("manufacturer", rsp.getManufacturer());
-            props.put("compilation_time", rsp.getCompilationTime());
+            props.put(Thing.PROPERTY_VENDOR, rsp.getManufacturer());
+            props.put("compilationTime", rsp.getCompilationTime());
+            if (!rsp.getProjectName().isEmpty()) {
+                props.put("projectName", rsp.getProjectName());
+            }
+            if (!rsp.getProjectVersion().isEmpty()) {
+                props.put("projectVersion", rsp.getProjectVersion());
+            }
             updateThing(editThing().withProperties(props).build());
         } else if (message instanceof ListEntitiesDoneResponse) {
             updateThing(editThing().withChannels(dynamicChannels).build());
