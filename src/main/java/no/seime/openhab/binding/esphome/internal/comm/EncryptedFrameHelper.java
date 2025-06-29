@@ -203,7 +203,14 @@ public class EncryptedFrameHelper {
 
                 cipherStatePair = client.split();
                 state = NoiseProtocolState.READY;
-                listener.onConnect();
+
+                scheduler.execute(new KeyRunnable<>(connectionId, () -> {
+                    try {
+                        listener.onConnect();
+                    } catch (Exception e) {
+                        listener.onParseError(CommunicationError.PACKET_ERROR);
+                    }
+                }));
             } catch (ShortBufferException | BadPaddingException e) {
                 throw new ProtocolAPIError(e.getMessage());
             }
