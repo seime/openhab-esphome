@@ -1,10 +1,8 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.StringType;
@@ -14,6 +12,8 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.State;
+import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,13 +47,17 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
         String icon = getChannelIcon(rsp.getIcon(), "lock");
 
         List<String> validOptions = new ArrayList<>();
-        validOptions.addAll(Arrays.stream(LockState.values()).map(LockMessageHandler::stripEnumPrefix)
-                .collect(Collectors.toList()));
-        validOptions.addAll(Arrays.stream(LockCommand.values()).map(LockMessageHandler::stripEnumPrefix)
-                .collect(Collectors.toList()));
+        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_LOCKED));
+        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_UNLOCKED));
+        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_JAMMED));
+        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_LOCKING));
+        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_UNLOCKING));
 
-        if (!rsp.getSupportsOpen()) {
-            validOptions.remove(stripEnumPrefix(LockCommand.LOCK_OPEN));
+        validOptions.add(LockMessageHandler.stripEnumPrefix(LockCommand.LOCK_UNLOCK));
+        validOptions.add(LockMessageHandler.stripEnumPrefix(LockCommand.LOCK_LOCK));
+
+        if (rsp.getSupportsOpen()) {
+            validOptions.add(stripEnumPrefix(LockCommand.LOCK_OPEN));
         }
 
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "String", validOptions, null,
@@ -67,8 +71,19 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
     }
 
     public void handleState(LockStateResponse rsp) {
-        findChannelByKey(rsp.getKey()).ifPresent(
-                channel -> handler.updateState(channel.getUID(), new StringType(stripEnumPrefix(rsp.getState()))));
+        LockState lockState = rsp.getState();
+        State state;
+        switch (lockState) {
+            case LOCK_STATE_NONE:
+                state = UnDefType.NULL;
+                break;
+            case UNRECOGNIZED:
+                state = UnDefType.UNDEF;
+                break;
+            default:
+                state = new StringType(stripEnumPrefix(lockState));
+        }
+        findChannelByKey(rsp.getKey()).ifPresent(channel -> handler.updateState(channel.getUID(), state));
     }
 
     public static String stripEnumPrefix(LockState lockState) {
