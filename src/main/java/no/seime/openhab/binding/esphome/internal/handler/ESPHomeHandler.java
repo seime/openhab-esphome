@@ -83,7 +83,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private boolean disposed = false;
     private boolean interrogated;
     private boolean bluetoothProxyStarted = false;
-    @Nullable
+
     private String logPrefix;
     @Nullable
     private ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler;
@@ -152,8 +152,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         config = getConfigAs(ESPHomeConfiguration.class);
 
         // Use configured logprefix instead of default thingId
-        if (config.logPrefix != null) {
-            logPrefix = config.logPrefix;
+        if (config.logPrefix != null && !config.logPrefix.isEmpty()) {
+            logPrefix = String.format("%s", config.logPrefix); // To avoid nullness warning
         }
 
         if (config.hostname != null && !config.hostname.isEmpty()) {
@@ -399,17 +399,17 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     .setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build();
             frameHelper.send(getTimeResponse);
         } else if (message instanceof BluetoothLEAdvertisementResponse
-                | message instanceof BluetoothLERawAdvertisementsResponse
-                | message instanceof BluetoothDeviceConnectionResponse
-                | message instanceof BluetoothGATTGetServicesResponse
-                | message instanceof BluetoothGATTGetServicesDoneResponse | message instanceof BluetoothGATTReadResponse
-                | message instanceof BluetoothGATTNotifyDataResponse
-                | message instanceof BluetoothConnectionsFreeResponse | message instanceof BluetoothGATTErrorResponse
-                | message instanceof BluetoothGATTWriteResponse | message instanceof BluetoothGATTNotifyResponse
-                | message instanceof BluetoothDevicePairingResponse
-                | message instanceof BluetoothDeviceUnpairingResponse
-                | message instanceof BluetoothDeviceClearCacheResponse
-                | message instanceof BluetoothScannerStateResponse) {
+                || message instanceof BluetoothLERawAdvertisementsResponse
+                || message instanceof BluetoothDeviceConnectionResponse
+                || message instanceof BluetoothGATTGetServicesResponse
+                || message instanceof BluetoothGATTGetServicesDoneResponse
+                || message instanceof BluetoothGATTReadResponse || message instanceof BluetoothGATTNotifyDataResponse
+                || message instanceof BluetoothConnectionsFreeResponse || message instanceof BluetoothGATTErrorResponse
+                || message instanceof BluetoothGATTWriteResponse || message instanceof BluetoothGATTNotifyResponse
+                || message instanceof BluetoothDevicePairingResponse
+                || message instanceof BluetoothDeviceUnpairingResponse
+                || message instanceof BluetoothDeviceClearCacheResponse
+                || message instanceof BluetoothScannerStateResponse) {
             if (espHomeBluetoothProxyHandler != null) {
                 espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this);
             }
@@ -615,6 +615,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public List<Channel> getDynamicChannels() {
         return dynamicChannels;
+    }
+
+    public String getLogPrefix() {
+        return logPrefix;
     }
 
     private enum ConnectionState {

@@ -73,11 +73,12 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 .removalListener((RemovalListener<Integer, ClimateCommandRequest.Builder>) notification -> {
                     if (notification.getValue() != null) {
                         try {
-                            logger.debug("Sending climate command for key {}", notification.getValue().getKey());
+                            logger.debug("[{}] Sending climate command for key {}", handler.getLogPrefix(),
+                                    notification.getValue().getKey());
                             handler.sendMessage(notification.getValue().build());
                         } catch (ProtocolAPIError e) {
-                            logger.error("Failed to send climate command for key {}", notification.getValue().getKey(),
-                                    e);
+                            logger.error("[{}] Failed to send climate command for key {}", handler.getLogPrefix(),
+                                    notification.getValue().getKey(), e);
                         }
                     }
                 }).build(new CacheLoader<>() {

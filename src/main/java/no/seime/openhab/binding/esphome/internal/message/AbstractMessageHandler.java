@@ -85,7 +85,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
         ChannelType channelType = channelTypeBuilder.build();
 
-        logger.trace("Created new channel type {}", channelType.getUID());
+        logger.trace("[{}] Created new channel type {}", handler.getLogPrefix(), channelType.getUID());
 
         return channelType;
     }
@@ -120,28 +120,28 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
                 // Verify that unit matches device_class as well
                 itemTypeToUse = itemTypeFromUnit;
                 logger.warn(
-                        "Unexpected combination of device_class '{}' and unit '{}'. Returning item type '{}' based on unit",
-                        deviceClass.getDeviceClass(), unitOfMeasurement, itemTypeToUse);
+                        "[{}] Unexpected combination of device_class '{}' and unit '{}' for entity '{}'. Returning item type '{}' based on unit",
+                        handler.getLogPrefix(), deviceClass.getDeviceClass(), unitOfMeasurement, name, itemTypeToUse);
 
             } else {
                 itemTypeToUse = deviceClass.getItemType();
-                logger.debug("Using item type '{}' based on device_class '{}' and unit '{}'", itemTypeToUse,
-                        deviceClass.getDeviceClass(), unitOfMeasurement);
+                logger.debug("[{}] Using item type '{}' based on device_class '{}' and unit '{}'",
+                        handler.getLogPrefix(), itemTypeToUse, deviceClass.getDeviceClass(), unitOfMeasurement);
             }
 
         } else if (itemTypeFromUnit != null) {
             itemTypeToUse = itemTypeFromUnit;
             logger.debug(
-                    "Using item type '{}' based on unit '{}' since device_class is either missing from ESPHome device configuration or openhab mapping is incomplete",
-                    itemTypeToUse, unitOfMeasurement);
+                    "[{}] Using item type '{}' based on unit '{}' for entity '{}' since device_class is either missing from ESPHome device configuration or openhab mapping is incomplete",
+                    handler.getLogPrefix(), itemTypeToUse, unitOfMeasurement, name);
         } else if (deviceClass != null) {
             itemTypeToUse = deviceClass.getItemType();
-            logger.debug("Using item type '{}' based on device_class '{}' ", itemTypeToUse,
+            logger.debug("[{}] Using item type '{}' based on device_class '{}' ", handler.getLogPrefix(), itemTypeToUse,
                     deviceClass.getDeviceClass());
         } else {
             logger.info(
-                    "Could not determine item type for sensor '{}' as neither device_class nor unit_of_measurement is present. Consider augmenting your ESPHome configuration. Using default 'Number'",
-                    name);
+                    "[{}] Could not determine item type for entity '{}' as neither device_class nor unit_of_measurement is present. Consider augmenting your ESPHome configuration. Using default 'Number'",
+                    handler.getLogPrefix(), name);
             itemTypeToUse = "Number";
         }
         return itemTypeToUse;
@@ -172,11 +172,13 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType) {
         if (logger.isDebugEnabled()) {
-            logger.debug("Registering channel {} with channel type {}", channel.getUID(), channelType.getUID());
+            logger.debug("[{}] Registering channel {} with channel type {}", handler.getLogPrefix(), channel.getUID(),
+                    channelType.getUID());
         }
         if (logger.isTraceEnabled()) {
-            logger.trace("Registering channel: {}", Debug.channelToString(channel));
-            logger.trace("Channel type:        {}", Debug.channelTypeToString(channelType));
+            logger.trace("[{}] Registering channel: {}", handler.getLogPrefix(), Debug.channelToString(channel));
+            logger.trace("[{}] Channel type:        {}", handler.getLogPrefix(),
+                    Debug.channelTypeToString(channelType));
         }
         handler.addChannelType(channelType);
         handler.addChannel(channel);
@@ -197,8 +199,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
                         return toDateTimeState((int) state, missingState);
                     } else {
                         logger.warn(
-                                "Expected SensorNumberDeviceClass '{}' to be of item type Number[:Dimension]. Returning undef",
-                                deviceClass);
+                                "[{}] Expected SensorNumberDeviceClass '{}' to be of item type Number[:Dimension]. Returning undef",
+                                handler.getLogPrefix(), deviceClass);
                         return UnDefType.UNDEF;
                     }
                 } else {
@@ -226,8 +228,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             if (unit != null) {
                 return new QuantityType<>(state, unit);
             } else {
-                logger.warn("Unit '{}' unknown to openHAB, returning DecimalType for state '{}' on channel '{}'",
-                        unitString, state, channel.getUID());
+                logger.warn("[{}] Unit '{}' unknown to openHAB, returning DecimalType for state '{}' on channel '{}'",
+                        handler.getLogPrefix(), unitString, state, channel.getUID());
                 return new DecimalType(state);
 
             }
@@ -257,7 +259,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             try {
                 handleState((T) message);
             } catch (Exception e) {
-                logger.warn("Error updating OH state", e);
+                logger.warn("[{}] Error updating OH state", handler.getLogPrefix(), e);
             }
         }
     }

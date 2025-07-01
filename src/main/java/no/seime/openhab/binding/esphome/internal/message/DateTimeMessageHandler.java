@@ -38,7 +38,7 @@ public class DateTimeMessageHandler
             handler.sendMessage(DateTimeCommandRequest.newBuilder().setKey(key)
                     .setEpochSeconds((int) zonedDateTime.toInstant().getEpochSecond()).build());
         } else {
-            logger.warn("Unsupported command type: {}", command);
+            logger.warn("[{}] Unsupported command type: {}", handler.getLogPrefix(), command);
         }
     }
 

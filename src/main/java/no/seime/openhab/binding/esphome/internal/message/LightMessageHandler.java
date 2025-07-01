@@ -78,7 +78,8 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
                     handler.sendMessage(LightCommandRequest.newBuilder().setKey(key).setState(onOffType == OnOffType.ON)
                             .setHasState(true).build());
                 } else {
-                    logger.warn("Unsupported command {} for channel {}", command, channel.getUID());
+                    logger.warn("[{}] Unsupported command {} for channel {}", handler.getLogPrefix(), command,
+                            channel.getUID());
                 }
             }
             case CHANNEL_EFFECTS -> {
@@ -86,7 +87,8 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
                     handler.sendMessage(LightCommandRequest.newBuilder().setKey(key).setEffect(stringType.toString())
                             .setHasEffect(true).setState(true).setHasState(true).build());
                 } else {
-                    logger.warn("Unsupported command {} for channel {}", command, channel.getUID());
+                    logger.warn("[{}] Unsupported command {} for channel {}", handler.getLogPrefix(), command,
+                            channel.getUID());
                 }
             }
         }

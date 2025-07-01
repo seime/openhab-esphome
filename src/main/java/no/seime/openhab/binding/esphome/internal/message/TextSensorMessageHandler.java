@@ -33,8 +33,9 @@ public class TextSensorMessageHandler
     @Override
     public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
         // No command support
-        logger.warn("Cannot send command '{}' to text sensor channel {}, read only. Use a `text` component instead",
-                command, channel.getUID());
+        logger.warn(
+                "[{}] Cannot send command '{}' to text sensor channel {}, read only. Use a `text` component instead",
+                handler.getLogPrefix(), command, channel.getUID());
     }
 
     @Override

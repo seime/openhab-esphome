@@ -59,10 +59,12 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                 .removalListener((RemovalListener<Integer, FanCommandRequest.Builder>) notification -> {
                     if (notification.getValue() != null) {
                         try {
-                            logger.debug("Sending Fan command for key {}", notification.getValue().getKey());
+                            logger.debug("[{}] Sending Fan command for key {}", handler.getLogPrefix(),
+                                    notification.getValue().getKey());
                             handler.sendMessage(notification.getValue().build());
                         } catch (ProtocolAPIError e) {
-                            logger.error("Failed to send Fan command for key {}", notification.getValue().getKey(), e);
+                            logger.error("[{}] Failed to send Fan command for key {}", handler.getLogPrefix(),
+                                    notification.getValue().getKey(), e);
                         }
                     }
                 }).build(new CacheLoader<>() {
@@ -89,7 +91,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                             builder.setState(command == OnOffType.ON);
                             builder.setHasState(true);
                         } else {
-                            logger.warn("Unsupported command type for Fan state: {}",
+                            logger.warn("[{}] Unsupported command type for Fan state: {}", handler.getLogPrefix(),
                                     command.getClass().getSimpleName());
                         }
                     }
@@ -99,7 +101,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                             builder.setOscillating(command == OnOffType.ON);
                             builder.setHasOscillating(true);
                         } else {
-                            logger.warn("Unsupported command type for Fan oscillation: {}",
+                            logger.warn("[{}] Unsupported command type for Fan oscillation: {}", handler.getLogPrefix(),
                                     command.getClass().getSimpleName());
                         }
                     }
@@ -110,10 +112,11 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                                         FanDirection.valueOf("FAN_DIRECTION_" + command.toString().toUpperCase()));
                                 builder.setHasDirection(true);
                             } catch (IllegalArgumentException e) {
-                                logger.warn("Unsupported command value for Fan direction: {}", command);
+                                logger.warn("[{}] Unsupported command value for Fan direction: {}",
+                                        handler.getLogPrefix(), command);
                             }
                         } else {
-                            logger.warn("Unsupported command type for Fan direction: {}",
+                            logger.warn("[{}] Unsupported command type for Fan direction: {}", handler.getLogPrefix(),
                                     command.getClass().getSimpleName());
                         }
                     }
@@ -128,7 +131,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                             builder.setSpeedLevel(((QuantityType) command).intValue());
                             builder.setHasSpeedLevel(true);
                         } else {
-                            logger.warn("Unsupported command type for Fan speed level: {}",
+                            logger.warn("[{}] Unsupported command type for Fan speed level: {}", handler.getLogPrefix(),
                                     command.getClass().getSimpleName());
                         }
                     }
@@ -137,12 +140,12 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                             builder.setPresetMode(command.toString());
                             builder.setHasPresetMode(true);
                         } else {
-                            logger.warn("Unsupported command type for Fan preset: {}",
+                            logger.warn("[{}] Unsupported command type for Fan preset: {}", handler.getLogPrefix(),
                                     command.getClass().getSimpleName());
                         }
                     }
 
-                    default -> logger.warn("Unknown Fan subcommand {}", subCommand);
+                    default -> logger.warn("[{}] Unknown Fan subcommand {}", handler.getLogPrefix(), subCommand);
                 }
             }
             // Start a thread that will clean up the cache (send the pending messages)
@@ -151,7 +154,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                     while (commandAggregatingCache.size() > 0) {
                         try {
                             lock.lock();
-                            logger.debug("Calling cleanup");
+                            logger.debug("[{}] Calling cleanup", handler.getLogPrefix());
                             commandAggregatingCache.cleanUp();
                         } finally {
                             lock.unlock();
@@ -159,7 +162,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                         try {
                             Thread.sleep(200);
                         } catch (InterruptedException e) {
-                            logger.error("Error sleeping", e);
+                            logger.error("[{}] Error sleeping", handler.getLogPrefix(), e);
                         }
 
                     }
@@ -168,7 +171,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             }
 
         } catch (ExecutionException e) {
-            logger.error("Error buffering Fan command", e);
+            logger.error("[{}] Error buffering Fan command", handler.getLogPrefix(), e);
         } finally {
             lock.unlock();
         }

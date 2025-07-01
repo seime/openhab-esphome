@@ -51,8 +51,8 @@ public class BinarySensorMessageHandler
         BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
         if (binarySensorDeviceClass == null) {
             logger.warn(
-                    "ESPHome Binary Sensor Device class `{}` not know to the ESPHome Native API Binding using GENERIC for {}",
-                    deviceClass, rsp.getUniqueId());
+                    "[{}] ESPHome Binary Sensor Device class `{}` not know to the ESPHome Native API Binding using GENERIC for {}",
+                    handler.getLogPrefix(), deviceClass, rsp.getUniqueId());
             binarySensorDeviceClass = BinarySensorDeviceClass.GENERIC;
         }
 

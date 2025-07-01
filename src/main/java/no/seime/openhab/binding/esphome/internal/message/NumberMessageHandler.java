@@ -48,8 +48,8 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
                 if (unit != null) {
                     QuantityType<?> newQt = qt.toUnit(unit);
                     if (newQt == null) {
-                        logger.warn("Quantity {} incompatible with unit {} on channel '{}'", qt, unit,
-                                channel.getUID());
+                        logger.warn("[{}] Quantity {} incompatible with unit {} on channel '{}'",
+                                handler.getLogPrefix(), qt, unit, channel.getUID());
                         return;
                     }
                     qt = newQt;
@@ -60,8 +60,8 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
         if (value != null) {
             handler.sendMessage(NumberCommandRequest.newBuilder().setKey(key).setState(value).build());
         } else {
-            logger.warn("Cannot send command to number channel {}, invalid type {}", channel.getUID(),
-                    command.getClass().getSimpleName());
+            logger.warn("[{}] Cannot send command to number channel {}, invalid type {}", handler.getLogPrefix(),
+                    channel.getUID(), command.getClass().getSimpleName());
         }
     }
 

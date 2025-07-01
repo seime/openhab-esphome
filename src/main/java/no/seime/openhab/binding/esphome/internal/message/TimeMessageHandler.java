@@ -37,7 +37,7 @@ public class TimeMessageHandler extends AbstractMessageHandler<ListEntitiesTimeR
             handler.sendMessage(TimeCommandRequest.newBuilder().setKey(key).setHour(time.intValue() / 3600)
                     .setMinute((time.intValue() % 3600) / 60).setSecond(time.intValue() % 60).build());
         } else {
-            logger.warn("Unsupported command type: {}", command);
+            logger.warn("[{}] Unsupported command type: {}", handler.getLogPrefix(), command);
         }
     }
 

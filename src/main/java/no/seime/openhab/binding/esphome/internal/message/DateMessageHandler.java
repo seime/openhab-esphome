@@ -39,7 +39,7 @@ public class DateMessageHandler extends AbstractMessageHandler<ListEntitiesDateR
             handler.sendMessage(DateCommandRequest.newBuilder().setKey(key).setYear(zonedDateTime.getYear())
                     .setMonth(zonedDateTime.getMonthValue()).setDay(zonedDateTime.getDayOfMonth()).build());
         } else {
-            logger.warn("Unsupported command type: {}", command);
+            logger.warn("[{}] Unsupported command type: {}", handler.getLogPrefix(), command);
         }
     }
 

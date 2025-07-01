@@ -49,11 +49,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                 .removalListener((RemovalListener<Integer, CoverCommandRequest.Builder>) notification -> {
                     if (notification.getValue() != null) {
                         try {
-                            logger.debug("Sending Cover command for key {}", notification.getValue().getKey());
+                            logger.debug("[{}] Sending Cover command for key {}", handler.getLogPrefix(),
+                                    notification.getValue().getKey());
                             handler.sendMessage(notification.getValue().build());
                         } catch (ProtocolAPIError e) {
-                            logger.error("Failed to send Cover command for key {}", notification.getValue().getKey(),
-                                    e);
+                            logger.error("[{}] Failed to send Cover command for key {}", handler.getLogPrefix(),
+                                    notification.getValue().getKey(), e);
                         }
                     }
                 }).build(new CacheLoader<>() {
@@ -112,11 +113,13 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         if (command instanceof QuantityType<?> qt) {
                             builder.setPosition(qt.floatValue() > 0 ? 1 : 0);
                             logger.warn(
-                                    "Use position or tilt channel to set position or tilt, not the legacy state channel");
+                                    "[{}] Use position or tilt channel to set position or tilt, not the legacy state channel",
+                                    handler.getLogPrefix());
                         } else if (command instanceof DecimalType dc) {
                             builder.setPosition(dc.floatValue() > 0 ? 1 : 0);
                             logger.warn(
-                                    "Use position or tilt channel to set position or tilt, not the legacy state channel");
+                                    "[{}] Use position or tilt channel to set position or tilt, not the legacy state channel",
+                                    handler.getLogPrefix());
                         } else if (command == UpDownType.UP) {
                             builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_OPEN);
                             builder.setHasLegacyCommand(true);
@@ -130,7 +133,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     }
 
                     case CHANNEL_CURRENT_OPERATION -> logger.warn("current_operation channel is read-only");
-                    default -> logger.warn("Unknown Cover subcommand {}", subCommand);
+                    default -> logger.warn("[{}] Unknown Cover subcommand {}", handler.getLogPrefix(), subCommand);
                 }
             }
             // Start a thread that will clean up the cache (send the pending messages)
@@ -139,7 +142,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     while (commandAggregatingCache.size() > 0) {
                         try {
                             lock.lock();
-                            logger.debug("Calling cleanup");
+                            logger.debug("[{}] Calling cleanup", handler.getLogPrefix());
                             commandAggregatingCache.cleanUp();
                         } finally {
                             lock.unlock();
@@ -147,7 +150,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         try {
                             Thread.sleep(200);
                         } catch (InterruptedException e) {
-                            logger.error("Error sleeping", e);
+                            logger.error("[{}] Error sleeping", handler.getLogPrefix(), e);
                         }
 
                     }
@@ -156,7 +159,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
             }
 
         } catch (ExecutionException e) {
-            logger.error("Error buffering Cover command", e);
+            logger.error("[{}] Error buffering Cover command", handler.getLogPrefix(), e);
         } finally {
             lock.unlock();
         }
@@ -166,8 +169,9 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         CoverDeviceClass deviceClass = CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass());
         if (deviceClass == null) {
-            logger.warn("ESPHome Cover Device class `{}` not know to the ESPHome Native API Binding using NONE for {}",
-                    deviceClass, rsp.getUniqueId());
+            logger.warn(
+                    "[{}] ESPHome Cover Device class `{}` not know to the ESPHome Native API Binding using NONE for {}",
+                    handler.getLogPrefix(), deviceClass, rsp.getUniqueId());
 
             deviceClass = CoverDeviceClass.NONE;
 

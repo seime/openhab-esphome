@@ -73,7 +73,8 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
                 if (isOHSupportedUnit(unitOfMeasurement)) {
                     configuration.put("unit", unitOfMeasurement);
                 } else {
-                    logger.warn("Unit of measurement '{}' is not supported by openHAB, ignoring", unitOfMeasurement);
+                    logger.warn("[{}] Unit of measurement '{}' is not supported by openHAB, ignoring",
+                            handler.getLogPrefix(), unitOfMeasurement);
                     itemType = "Number";
                 }
             }

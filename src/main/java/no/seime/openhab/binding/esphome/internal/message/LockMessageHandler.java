@@ -36,8 +36,8 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
             handler.sendMessage(LockCommandRequest.newBuilder().setKey(key).setCommand(lockCommand).build());
         } catch (IllegalArgumentException e) {
             logger.warn(
-                    "Cannot send command '{}' to lock channel {}, invalid command. Valid values are LOCK, UNLOCK and if available, OPEN",
-                    command, channel.getUID());
+                    "[{}] Cannot send command '{}' to lock channel {}, invalid command. Valid values are LOCK, UNLOCK and if available, OPEN",
+                    handler.getLogPrefix(), command, channel.getUID());
         }
     }
 

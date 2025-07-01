@@ -37,7 +37,7 @@ public class ButtonMessageHandler extends AbstractMessageHandler<ListEntitiesBut
             handler.updateState(channel.getUID(), OnOffType.OFF);
             handler.sendMessage(ButtonCommandRequest.newBuilder().setKey(key).build());
         } else {
-            logger.warn("Unsupported command type: {}, use OnOffType instead", command);
+            logger.warn("[{}] Unsupported command type: {}, use OnOffType instead", handler.getLogPrefix(), command);
         }
     }
 
