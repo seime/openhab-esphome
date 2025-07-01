@@ -1,6 +1,6 @@
 # ESPHome Binding for openHAB
 
-### Docs updated 2025-05-24.
+### Docs updated 2025-07-01.
 
 <img src="logo.png" width="200"/>
 
@@ -43,6 +43,17 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 
 The binding uses mDNS to automatically discover devices on the network.
 
+## Binding Configuration
+
+It is possible to set a default encryption key for all devices in the binding configuration. This is useful if you
+have a lot of devices using the same encryption key. If you are using file based config, add
+
+```
+binding.esphome:defaultEncryptionKey=<BASE64ENCODEDKEY>
+```
+
+to `$OH_CONFDIR/services/runtime.cfg` .
+
 ## Thing Configuration
 
 ### `device` Thing Configuration
@@ -70,15 +81,20 @@ interrogate the device and create channels based on the device configuration.
 ### Thing Configuration for ESPHome device
 
 ```
-esphome:device:garage-opener  "Garage ESP32" [deviceId="garage-opener", hostname="garage-opener.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, reconnectInterval=10, logPrefix="garage", deviceLogLevel="INFO"]
+
+esphome:device:garage-opener  "Garage
+ESP32" [deviceId="garage-opener", hostname="garage-opener.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, reconnectInterval=10, logPrefix="garage", deviceLogLevel="INFO"]
+
 ```
 
 ### Item Configuration
 
 ```
+
 Number:Temperature Garage_Temperature "Temperature" <temperature>   {channel="esphome:device:garage-opener:temperature"}
 Number:Dimensionless Garage_Humidity "Humidity"     <humidity>      {channel="esphome:device:garage-opener:humidity"}
 Switch Garage_Switch "Relay"                        <switch>        {channel="esphome:device:garage-opener:relay_4"}
+
 ```
 
 ## FAQ
