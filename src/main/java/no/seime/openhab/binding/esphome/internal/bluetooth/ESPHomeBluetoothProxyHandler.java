@@ -19,10 +19,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.protobuf.GeneratedMessage;
 
-import io.esphome.api.BluetoothDeviceConnectionResponse;
-import io.esphome.api.BluetoothGATTGetServicesDoneResponse;
-import io.esphome.api.BluetoothGATTGetServicesResponse;
-import io.esphome.api.BluetoothLEAdvertisementResponse;
+import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -171,9 +168,10 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                     .findFirst();
 
             deviceEntry.ifPresent(device -> device.getKey().handleGattServicesDoneMessage(rsp));
-        } else
-
-        {
+        } else if (message instanceof BluetoothScannerStateResponse rsp) {
+            logger.debug("Received BluetoothScannerStateResponse from {} with status {}, currently ignored",
+                    handler.getThing().getUID(), rsp.getState());
+        } else {
             logger.warn("Received unhandled Bluetooth packet type: {} from {}", message.getClass().getSimpleName(),
                     handler.getThing().getUID());
         }

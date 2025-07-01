@@ -408,7 +408,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 | message instanceof BluetoothGATTWriteResponse | message instanceof BluetoothGATTNotifyResponse
                 | message instanceof BluetoothDevicePairingResponse
                 | message instanceof BluetoothDeviceUnpairingResponse
-                | message instanceof BluetoothDeviceClearCacheResponse) {
+                | message instanceof BluetoothDeviceClearCacheResponse
+                | message instanceof BluetoothScannerStateResponse) {
             if (espHomeBluetoothProxyHandler != null) {
                 espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this);
             }
