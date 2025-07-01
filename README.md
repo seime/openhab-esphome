@@ -307,20 +307,6 @@ time:
     id: openhab_time
 ```
 
-## Iconify support
-
-If you have
-the [Iconify icon provider bundle installed](https://community.openhab.org/t/iconify-icon-provider-4-0-0-0-5-0-0-0/149990),
-try configuring the `icon` field in the ESPHome yaml file. The binding will then use the icon from Iconify instead of
-[ openHAB classic icons ](https://www.openhab.org/docs/configuration/iconsets/classic/).
-
-  ```yaml
-sensor:
-  - platform: uptime
-    name: Uptime
-    icon: "mdi:counter"
-```
-
 ## Limitations
 
 Most entity types and functions are now supported. However, there are some limitations:
@@ -330,6 +316,7 @@ The following entity types are **not** yet supported (please submit a PR of file
 - `camera`
 - `voice`
 - `valve`
+- `siren`
 
 - `light` - not all modes are supported. Please create a PR if you need a specific mode.
 
