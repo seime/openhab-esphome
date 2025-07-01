@@ -84,7 +84,7 @@ public abstract class AbstractESPHomeDeviceTest {
         eventSubscriber = new ESPHomeEventSubscriber(thingRegistry, itemRegistry);
 
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, eventSubscriber, executor,
-                new KeySequentialExecutor(executor));
+                new KeySequentialExecutor(executor), null);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
     }

@@ -13,12 +13,10 @@
 package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
@@ -55,6 +53,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE,
             BindingConstants.THING_TYPE_BLE_PROXY);
+
+    private @Nullable String defaultEncryptionKey;
 
     private final AtomicLong threadCounter = new AtomicLong(0);
 
@@ -99,7 +99,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber, scheduler,
-                    packetExecutor);
+                    packetExecutor, defaultEncryptionKey);
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
             ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry);
             registerBluetoothAdapter(handler);
@@ -113,6 +113,12 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     protected void activate(ComponentContext componentContext) {
         super.activate(componentContext);
         connectionSelector.start();
+        Dictionary<String, Object> properties = componentContext.getProperties();
+        defaultEncryptionKey = StringUtils.trimToNull((String) properties.get("defaultEncryptionKey"));
+        if (defaultEncryptionKey != null) {
+            logger.info(
+                    "Found binding default encryption key for ESPHome devices, will use if not configured on thing");
+        }
     }
 
     @Override

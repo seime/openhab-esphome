@@ -40,7 +40,7 @@
 				<default>6053</default>
 				<description>IP Port number of the device</description>
 			</parameter>
-			<parameter name="encryptionKey" type="text" required="true" groupName="network">
+			<parameter name="encryptionKey" type="text" required="false" groupName="network">
 				<context>password</context>
 				<label>Base64 encoded encryption key for encrypted connection</label>
 				<description>Specified in the api: -> encryption: -> key: section of the esphome device config. See

@@ -70,6 +70,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredScheduledThreadPoolExecutor executorService;
     private final KeySequentialExecutor packetProcessor;
+    @Nullable
+    private final String defaultEncryptionKey;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -88,7 +90,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber,
-            MonitoredScheduledThreadPoolExecutor executorService, KeySequentialExecutor packetProcessor) {
+            MonitoredScheduledThreadPoolExecutor executorService, KeySequentialExecutor packetProcessor,
+            @Nullable String defaultEncryptionKey) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -96,6 +99,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.eventSubscriber = eventSubscriber;
         this.executorService = executorService;
         this.packetProcessor = packetProcessor;
+        this.defaultEncryptionKey = defaultEncryptionKey;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -200,8 +204,17 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
                     String.format("Connecting to %s:%d", hostname, port));
 
-            frameHelper = new EncryptedFrameHelper(connectionSelector, this, config.encryptionKey, config.deviceId,
-                    logPrefix, packetProcessor);
+            // Default to using the default encryption key from the binding if not set in device configuration
+            String encryptionKey = config.encryptionKey;
+            if (encryptionKey == null || encryptionKey.isEmpty()) {
+                if (defaultEncryptionKey != null) {
+                    encryptionKey = defaultEncryptionKey;
+                    logger.info("[{}] Using binding default encryption key", logPrefix);
+                }
+            }
+
+            frameHelper = new EncryptedFrameHelper(connectionSelector, this, encryptionKey, config.deviceId, logPrefix,
+                    packetProcessor);
 
             frameHelper.connect(hostname, port);
 

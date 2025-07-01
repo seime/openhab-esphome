@@ -6,5 +6,15 @@
 	<type>binding</type>
 	<name>ESPHome Binding</name>
 	<description>This is the binding for ESPHome native protocol.</description>
+	<config-description>
+		<parameter name="defaultEncryptionKey" type="text" required="false">
+			<context>password</context>
+			<label>Default Base64 encoded encryption key for encrypted connection</label>
+			<description>Specified in the api: -> encryption: -> key: section of the esphome device config. See
+				https://esphome.io/components/api#configuration-variables. Will be used as default if not configured on the device
+				thing.</description>
+		</parameter>
+
+	</config-description>
 
 </addon:addon>
