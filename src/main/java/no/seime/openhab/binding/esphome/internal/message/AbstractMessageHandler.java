@@ -266,7 +266,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         if (icon.isEmpty()) {
             return defaultCategoryIcon;
         } else {
-            return icon.replace(":", "_"); // ie mdi:thermometer -> mdi_thermometer
+            return "if:" + icon;
         }
     }
 
