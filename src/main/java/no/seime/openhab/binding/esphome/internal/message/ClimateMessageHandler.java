@@ -1,10 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
@@ -56,7 +53,9 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
     public static final String ITEM_TYPE_NUMBER_DIMENSIONLESS = "Number:Dimensionless";
     public static final String ITEM_TYPE_TEMPERATURE = "Number:Temperature";
 
-    private static final List<String> ACTIONS = List.of("OFF", "COOLING", "HEATING", "IDLE", "DRYING", "FAN");
+    private static final List<String> ACTIONS = Arrays.stream(ClimateAction.values())
+            .filter(e -> e != ClimateAction.UNRECOGNIZED).map(action -> ClimateEnumHelper.stripEnumPrefix(action))
+            .toList();
 
     private final Logger logger = LoggerFactory.getLogger(ClimateMessageHandler.class);
 
