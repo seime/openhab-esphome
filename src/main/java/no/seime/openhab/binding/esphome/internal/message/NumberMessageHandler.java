@@ -37,8 +37,8 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
     @Override
     public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
         Float value = null;
-        if (command instanceof DecimalType) {
-            value = ((DecimalType) command).floatValue();
+        if (command instanceof DecimalType decimalType) {
+            value = decimalType.floatValue();
         } else if (command instanceof QuantityType<?> qt) {
             Configuration configuration = channel.getConfiguration();
             String unitString = (String) configuration.get("unit");

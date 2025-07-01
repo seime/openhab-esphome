@@ -85,10 +85,10 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     case CHANNEL_POSITION -> {
                         if (command instanceof QuantityType<?> qt) {
                             builder.setPosition((1 - qt.floatValue()) / 100);
-                        } else if (command instanceof DecimalType dc) {
-                            builder.setPosition((1 - dc.floatValue()) / 100);
                         } else if (command instanceof PercentType dc) {
                             builder.setPosition((1 - dc.floatValue()));
+                        } else if (command instanceof DecimalType dc) {
+                            builder.setPosition((1 - dc.floatValue()) / 100);
                         } else if (command == UpDownType.UP) {
                             builder.setPosition(1);
                         } else if (command == UpDownType.DOWN) {
@@ -126,9 +126,6 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         } else if (command == UpDownType.DOWN) {
                             builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_CLOSE);
                             builder.setHasLegacyCommand(true);
-                        } else if (command == StopMoveType.STOP) {
-                            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_STOP);
-                            builder.setHasLegacyCommand(true);
                         }
                     }
 
@@ -150,6 +147,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         try {
                             Thread.sleep(200);
                         } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
                             logger.error("[{}] Error sleeping", handler.getLogPrefix(), e);
                         }
 
@@ -169,9 +167,8 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         CoverDeviceClass deviceClass = CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass());
         if (deviceClass == null) {
-            logger.warn(
-                    "[{}] ESPHome Cover Device class `{}` not know to the ESPHome Native API Binding using NONE for {}",
-                    handler.getLogPrefix(), deviceClass, rsp.getUniqueId());
+            logger.warn("[{}] Cover Device class `{}` unknown, using NONE for {}", handler.getLogPrefix(), deviceClass,
+                    rsp.getUniqueId());
 
             deviceClass = CoverDeviceClass.NONE;
 

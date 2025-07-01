@@ -5,7 +5,6 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
@@ -149,31 +148,36 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                 default -> logger.warn("Unknown climate subcommand {}", subCommand);
             }
             // Start a thread that will clean up the cache (send the pending messages)
-            if (expiryThread == null || !expiryThread.isAlive()) {
-                expiryThread = new Thread(() -> {
-                    while (commandAggregatingCache.size() > 0) {
-                        try {
-                            lock.lock();
-                            logger.debug("Calling cleanup");
-                            commandAggregatingCache.cleanUp();
-                        } finally {
-                            lock.unlock();
-                        }
-                        try {
-                            Thread.sleep(200);
-                        } catch (InterruptedException e) {
-                            logger.error("Error sleeping", e);
-                        }
-
-                    }
-                });
-                expiryThread.start();
-            }
+            flushCommandBuffer();
 
         } catch (ExecutionException e) {
             logger.error("Error buffering climate command", e);
         } finally {
             lock.unlock();
+        }
+    }
+
+    private void flushCommandBuffer() {
+        if (expiryThread == null || !expiryThread.isAlive()) {
+            expiryThread = new Thread(() -> {
+                while (commandAggregatingCache.size() > 0) {
+                    try {
+                        lock.lock();
+                        logger.debug("Calling cleanup");
+                        commandAggregatingCache.cleanUp();
+                    } finally {
+                        lock.unlock();
+                    }
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt(); // Restore interrupted status
+                        logger.error("Error sleeping", e);
+                    }
+
+                }
+            });
+            expiryThread.start();
         }
     }
 
@@ -238,9 +242,8 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         String itemTypeString = "String";
         if (rsp.getSupportedModesCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_MODE, "Mode", itemTypeString,
-                    rsp.getSupportedModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
-                            .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null, rsp.getEntityCategory(),
+                    rsp.getSupportedModesList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList(), "%s",
+                    Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null, rsp.getEntityCategory(),
                     rsp.getDisabledByDefault());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_MODE))
@@ -262,10 +265,9 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         }
         if (rsp.getSupportedFanModesCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_FAN_MODE, "Fan Mode", itemTypeString,
-                    rsp.getSupportedFanModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
-                            .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), false, "fan", null, null, null,
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    rsp.getSupportedFanModesList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList(), "%s",
+                    Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), false, "fan", null, null, null, rsp.getEntityCategory(),
+                    rsp.getDisabledByDefault());
 
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_FAN_MODE))
                     .withLabel(createLabel(rsp.getName(), "Fan Mode")).withKind(ChannelKind.STATE)
@@ -288,9 +290,8 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         }
         if (rsp.getSupportedPresetsCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_PRESET, "Preset", itemTypeString,
-                    rsp.getSupportedPresetsList().stream().map(ClimateEnumHelper::stripEnumPrefix)
-                            .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null, rsp.getEntityCategory(),
+                    rsp.getSupportedPresetsList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList(), "%s",
+                    Set.of(SEMANTIC_TYPE_CONTROL), false, "climate", null, null, null, rsp.getEntityCategory(),
                     rsp.getDisabledByDefault());
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_PRESET))
                     .withLabel(createLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
@@ -313,10 +314,9 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         if (rsp.getSupportedSwingModesCount() > 0) {
             ChannelType channelType = addChannelType(rsp.getUniqueId() + CHANNEL_SWING_MODE, "Swing Mode",
                     itemTypeString,
-                    rsp.getSupportedSwingModesList().stream().map(ClimateEnumHelper::stripEnumPrefix)
-                            .collect(Collectors.toList()),
-                    "%s", Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), false, "fan", null, null, null,
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    rsp.getSupportedSwingModesList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList(), "%s",
+                    Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), false, "fan", null, null, null, rsp.getEntityCategory(),
+                    rsp.getDisabledByDefault());
             Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_SWING_MODE))
                     .withAcceptedItemType(itemTypeString).withLabel(createLabel(rsp.getName(), "Swing Mode"))
                     .withKind(ChannelKind.STATE).withType(channelType.getUID())
@@ -375,6 +375,9 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
     }
 
     public static class ClimateEnumHelper {
+        private ClimateEnumHelper() {
+        }
+
         public static String stripEnumPrefix(ClimateSwingMode mode) {
             String toRemove = "CLIMATE_SWING";
             return mode.toString().substring(toRemove.length() + 1);
