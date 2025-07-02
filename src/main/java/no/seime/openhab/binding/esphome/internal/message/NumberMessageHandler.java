@@ -1,7 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -16,6 +15,7 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.StateDescription;
 import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,17 +93,18 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
 
         String icon = getChannelIcon(rsp.getIcon(), numberDeviceClass != null ? numberDeviceClass.getCategory() : null);
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptyList(),
-                "%." + accurracyDecimals + "f " + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), tags,
-                false, icon, rsp.getStep() != 0f ? BigDecimal.valueOf(rsp.getStep()) : null,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, tags, icon,
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        StateDescription stateDescription = addStateDescription(
+                "%." + accurracyDecimals + "f " + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement),
+                rsp.getStep() != 0f ? BigDecimal.valueOf(rsp.getStep()) : null,
                 rsp.getMinValue() != 0f ? BigDecimal.valueOf(rsp.getMinValue()) : null,
-                rsp.getMaxValue() != 0f ? BigDecimal.valueOf(rsp.getMaxValue()) : null, rsp.getEntityCategory(),
-                rsp.getDisabledByDefault());
+                rsp.getMaxValue() != 0f ? BigDecimal.valueOf(rsp.getMaxValue()) : null);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
-        super.registerChannel(channel, channelType);
+        super.registerChannel(channel, channelType, stateDescription);
     }
 
     @Override

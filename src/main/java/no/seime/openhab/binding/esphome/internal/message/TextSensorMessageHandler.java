@@ -1,6 +1,5 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
-import java.util.Collections;
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
@@ -45,15 +44,14 @@ public class TextSensorMessageHandler
         String icon = getChannelIcon(rsp.getIcon(), "text");
 
         String itemType = "String";
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptySet(),
-                null, Set.of("Status"), true, icon, null, null, null, rsp.getEntityCategory(),
-                rsp.getDisabledByDefault());
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
 
-        super.registerChannel(channel, channelType);
+        super.registerChannel(channel, channelType, readOnlyStateDescription());
     }
 
     @Override

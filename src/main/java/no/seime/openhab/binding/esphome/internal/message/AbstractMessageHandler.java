@@ -44,34 +44,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     }
 
     protected ChannelType addChannelType(final String channelTypePrefix, final String label, final String itemType,
-            final Collection<?> options, @Nullable final String pattern, @Nullable final Set<String> tags,
-            boolean readOnly, String category, BigDecimal stateDescriptionStep, BigDecimal stateDescriptionMin,
-            BigDecimal stateDescriptionMax, EntityCategory entityCategory, boolean disabledByDefault) {
+            @Nullable final Set<String> tags, String category, EntityCategory entityCategory,
+            boolean disabledByDefault) {
         final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
                 channelTypePrefix + handler.getThing().getUID().getId());
-        final List<StateOption> stateOptions = options.stream().map(e -> new StateOption(e.toString(), e.toString()))
-                .collect(Collectors.toList());
 
-        StateDescriptionFragmentBuilder stateDescription = StateDescriptionFragmentBuilder.create()
-                .withReadOnly(readOnly).withOptions(stateOptions);
-        if (pattern != null) {
-            stateDescription = stateDescription.withPattern(pattern);
-        }
-
-        if (stateDescriptionStep != null) {
-            stateDescription = stateDescription.withStep(stateDescriptionStep);
-        }
-
-        if (stateDescriptionMin != null) {
-            stateDescription = stateDescription.withMinimum(stateDescriptionMin);
-        }
-
-        if (stateDescriptionMax != null) {
-            stateDescription = stateDescription.withMaximum(stateDescriptionMax);
-        }
-
-        final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID, label, itemType)
-                .withStateDescriptionFragment(stateDescription.build());
+        final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID, label, itemType);
         if (tags != null && !tags.isEmpty()) {
             channelTypeBuilder.withTags(tags);
         }
@@ -88,6 +66,73 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         logger.trace("[{}] Created new channel type {}", handler.getLogPrefix(), channelType.getUID());
 
         return channelType;
+    }
+
+    protected StateDescription readOnlyStateDescription() {
+        return StateDescriptionFragmentBuilder.create().withReadOnly(true).build().toStateDescription();
+    }
+
+    protected StateDescription addStateDescription(String pattern) {
+        return addStateDescription(pattern, false);
+    }
+
+    protected StateDescription addStateDescription(String pattern, boolean readOnly) {
+        return StateDescriptionFragmentBuilder.create().withPattern(pattern).withReadOnly(readOnly).build()
+                .toStateDescription();
+    }
+
+    protected StateDescription addStateDescription(@Nullable String pattern, @Nullable BigDecimal step,
+            @Nullable BigDecimal min, @Nullable BigDecimal max) {
+        return addStateDescription(pattern, step, min, max, false);
+    }
+
+    protected StateDescription addStateDescription(@Nullable String pattern, @Nullable BigDecimal step,
+            @Nullable BigDecimal min, @Nullable BigDecimal max, boolean readOnly) {
+        StateDescriptionFragmentBuilder builder = StateDescriptionFragmentBuilder.create().withReadOnly(readOnly);
+
+        if (pattern != null) {
+            builder.withPattern(pattern);
+        }
+
+        if (step != null) {
+            builder.withStep(step);
+        }
+
+        if (min != null) {
+            builder.withMinimum(min);
+        }
+
+        if (max != null) {
+            builder.withMaximum(max);
+        }
+
+        return builder.build().toStateDescription();
+    }
+
+    protected StateDescription addStateDescription(final Collection<?> options) {
+        return addStateDescription(options, false);
+    }
+
+    protected StateDescription addStateDescription(final Collection<?> options, boolean readOnly) {
+
+        StateDescriptionFragmentBuilder builder = StateDescriptionFragmentBuilder.create().withPattern("%s")
+                .withReadOnly(readOnly);
+
+        final List<StateOption> stateOptions = options.stream().map(e -> new StateOption(e.toString(), e.toString()))
+                .collect(Collectors.toList());
+        builder.withOptions(stateOptions);
+
+        return builder.build().toStateDescription();
+    }
+
+    protected CommandDescription addCommandDescription(Collection<?> options) {
+        CommandDescriptionBuilder builder = CommandDescriptionBuilder.create();
+
+        final List<CommandOption> commandOptions = options.stream()
+                .map(e -> new CommandOption(e.toString(), e.toString())).collect(Collectors.toList());
+        builder.withCommandOptions(commandOptions);
+
+        return builder.build();
     }
 
     protected Configuration configuration(int key, String subCommand, String commandClass) {
@@ -171,6 +216,16 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     public abstract void handleState(T rsp);
 
     protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType) {
+        registerChannel(channel, channelType, null, null);
+    }
+
+    protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType,
+            @NotNull StateDescription stateDescription) {
+        registerChannel(channel, channelType, stateDescription, null);
+    }
+
+    protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType,
+            StateDescription stateDescription, CommandDescription commandDescription) {
         if (logger.isDebugEnabled()) {
             logger.debug("[{}] Registering channel {} with channel type {}", handler.getLogPrefix(), channel.getUID(),
                     channelType.getUID());
@@ -182,6 +237,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
         handler.addChannelType(channelType);
         handler.addChannel(channel);
+        if (stateDescription != null) {
+            handler.addDescription(channel.getUID(), stateDescription);
+        }
+        if (commandDescription != null) {
+            handler.addDescription(channel.getUID(), commandDescription);
+        }
     }
 
     protected State toNumericState(Channel channel, float state, boolean missingState) {

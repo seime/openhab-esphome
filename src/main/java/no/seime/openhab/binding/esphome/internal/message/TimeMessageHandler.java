@@ -1,6 +1,5 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
-import java.util.Collections;
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
@@ -13,6 +12,7 @@ import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
+import org.openhab.core.types.StateDescription;
 import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,15 +48,15 @@ public class TimeMessageHandler extends AbstractMessageHandler<ListEntitiesTimeR
         String icon = getChannelIcon(rsp.getIcon(), "time");
 
         String itemType = "Number:Time";
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Collections.emptySet(),
-                "%1$tH:%1$tM:%1$tS", Set.of("Status"), false, icon, null, null, null, rsp.getEntityCategory(),
-                rsp.getDisabledByDefault());
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        StateDescription stateDescription = addStateDescription("%1$tH:%1$tM:%1$tS");
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
 
-        super.registerChannel(channel, channelType);
+        super.registerChannel(channel, channelType, stateDescription);
     }
 
     @Override

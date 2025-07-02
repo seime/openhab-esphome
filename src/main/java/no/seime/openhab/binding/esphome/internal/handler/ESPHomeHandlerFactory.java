@@ -64,6 +64,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     }
 
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
+    private final ESPStateDescriptionProvider stateDescriptionProvider;
     private final ESPHomeEventSubscriber eventSubscriber;
 
     private final ThingRegistry thingRegistry;
@@ -73,6 +74,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
+            @Reference ESPStateDescriptionProvider stateDescriptionProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry)
             throws IOException {
         scheduler = new MonitoredScheduledThreadPoolExecutor(4, r -> {
@@ -87,6 +89,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         packetExecutor = new KeySequentialExecutor(scheduler);
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
+        this.stateDescriptionProvider = stateDescriptionProvider;
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
 
@@ -98,8 +101,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, eventSubscriber, scheduler,
-                    packetExecutor, defaultEncryptionKey);
+            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, stateDescriptionProvider,
+                    eventSubscriber, scheduler, packetExecutor, defaultEncryptionKey);
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
             ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry);
             registerBluetoothAdapter(handler);
