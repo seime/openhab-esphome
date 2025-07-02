@@ -81,20 +81,16 @@ interrogate the device and create channels based on the device configuration.
 ### Thing Configuration for ESPHome device
 
 ```
-
-esphome:device:garage-opener  "Garage
-ESP32" [deviceId="garage-opener", hostname="garage-opener.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=", pingInterval=10, maxPingTimeouts=4, reconnectInterval=10, logPrefix="garage", deviceLogLevel="INFO"]
-
+esphome:device:garage-opener  "Garage ESP32" [deviceId="garage-opener", hostname="garage-opener.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=",
+                                              pingInterval=10, maxPingTimeouts=4, reconnectInterval=10, logPrefix="garage", deviceLogLevel="INFO"]
 ```
 
 ### Item Configuration
 
 ```
-
 Number:Temperature Garage_Temperature "Temperature" <temperature>   {channel="esphome:device:garage-opener:temperature"}
 Number:Dimensionless Garage_Humidity "Humidity"     <humidity>      {channel="esphome:device:garage-opener:humidity"}
 Switch Garage_Switch "Relay"                        <switch>        {channel="esphome:device:garage-opener:relay_4"}
-
 ```
 
 ## FAQ
@@ -102,10 +98,10 @@ Switch Garage_Switch "Relay"                        <switch>        {channel="es
 ### My hostname field suddenly changed to xxxx.local?
 
 > Openhab updates thing configuration based on mDNS messages. There is currently no way to avoid this, but there are 2
-> workarounds
+> workarounds:
 > * Use a different thingUID from the one discovered, ie `esphome:device:fridge` -> `esphome:device:fridge-esp`
 > * Use file based configuration as they are read-only
-    > See https://github.com/seime/openhab-esphome/issues/1 . TLDR: A "feature" in openHAB.
+> See https://github.com/seime/openhab-esphome/issues/1 . TLDR: A "feature" in openHAB.
 
 ### I cannot connect to my device
 
