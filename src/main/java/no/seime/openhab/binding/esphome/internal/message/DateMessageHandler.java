@@ -69,7 +69,7 @@ public class DateMessageHandler extends AbstractMessageHandler<ListEntitiesDateR
 
     protected State toDateState(int year, int month, int date, boolean missingState) {
         if (missingState) {
-            return UnDefType.UNDEF;
+            return UnDefType.NULL;
         } else {
             return new DateTimeType(ZonedDateTime.of(year, month, date, 0, 0, 0, 0, ZoneId.systemDefault()));
         }
