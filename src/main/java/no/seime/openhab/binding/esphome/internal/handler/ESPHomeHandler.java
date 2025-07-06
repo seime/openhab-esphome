@@ -171,8 +171,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             eventSubscriber.removeEventSubscriptions(this);
             setUndefToAllChannels();
             cancelConnectFuture();
+            cancelPingWatchdog();
             if (frameHelper != null) {
-                cancelPingWatchdog();
                 if (connectionState == ConnectionState.CONNECTED) {
                     try {
                         frameHelper.send(DisconnectRequest.getDefaultInstance());
@@ -228,9 +228,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             } catch (ProtocolException e) {
                 logger.warn("[{}] Error initial connection", logPrefix, e);
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-                if (!disposed) { // Don't reconnect if we've been disposed
-                    scheduleConnect(config.reconnectInterval);
-                }
+                scheduleConnect(config.reconnectInterval);
             }
         }
     }
@@ -322,48 +320,47 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Override
     public void onEndOfStream(String message) {
-        eventSubscriber.removeEventSubscriptions(this);
-        synchronized (connectionStateLock) {
-            if (!disposed) {
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                        "ESPHome device abruptly closed connection: " + message);
-                setUndefToAllChannels();
-                frameHelper.close();
-                cancelPingWatchdog();
-                connectionState = ConnectionState.UNINITIALIZED;
-                scheduleConnect(config.reconnectInterval);
-            }
-        }
+        String reason = "ESPHome device abruptly closed connection: " + message;
+        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason, true);
     }
 
     @Override
     public void onParseError(CommunicationError error) {
-        eventSubscriber.removeEventSubscriptions(this);
-        synchronized (connectionStateLock) {
-            if (!disposed) {
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, error.toString());
-                setUndefToAllChannels();
-                cancelPingWatchdog();
-                frameHelper.close();
-                connectionState = ConnectionState.UNINITIALIZED;
-                scheduleConnect(config.reconnectInterval);
-            }
-        }
+        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, error.toString(), true);
     }
 
     private void remoteDisconnect() {
-        eventSubscriber.removeEventSubscriptions(this);
-        synchronized (connectionStateLock) {
-            if (!disposed) {
-                int reconnectDelaySeconds = config.reconnectInterval;
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String.format(
-                        "ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelaySeconds));
+        String reason = "ESPHome device requested disconnect";
+        handleDisconnection(ThingStatusDetail.NONE, reason, true);
+    }
 
+    private void handleDisconnection(ThingStatusDetail detail, String message, boolean scheduleReconnect) {
+        synchronized (connectionStateLock) {
+            if (connectionState == ConnectionState.UNINITIALIZED || disposed) {
+                return;
+            }
+
+            String finalMessage = message;
+            if (scheduleReconnect) {
+                finalMessage = String.format("%s. Will reconnect in %d seconds", message, config.reconnectInterval);
+            }
+
+            logger.warn("[{}] Disconnecting. Reason: {}", logPrefix, finalMessage);
+            updateStatus(ThingStatus.OFFLINE, detail, finalMessage);
+
+            eventSubscriber.removeEventSubscriptions(this);
+            setUndefToAllChannels();
+            cancelPingWatchdog();
+
+            if (frameHelper != null) {
                 frameHelper.close();
-                setUndefToAllChannels();
-                connectionState = ConnectionState.UNINITIALIZED;
-                cancelPingWatchdog();
-                scheduleConnect(reconnectDelaySeconds);
+                frameHelper = null;
+            }
+
+            connectionState = ConnectionState.UNINITIALIZED;
+
+            if (scheduleReconnect) {
+                scheduleConnect(config.reconnectInterval);
             }
         }
     }
@@ -408,7 +405,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
-            frameHelper.close();
+            if (frameHelper != null) {
+                frameHelper.close();
+                frameHelper = null;
+            }
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage());
         } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
@@ -507,10 +507,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
 
                 if (connectResponse.getInvalidPassword()) {
-                    logger.error("[{}] Invalid password", logPrefix);
-                    frameHelper.close();
-                    connectionState = ConnectionState.UNINITIALIZED;
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
+                    handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password", false);
                     return;
                 }
                 connectionState = ConnectionState.CONNECTED;
@@ -537,14 +534,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                                     "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
                                     logPrefix, config.maxPingTimeouts, config.pingInterval,
                                     config.maxPingTimeouts * config.pingInterval, lastPong);
-                            pingWatchdogFuture.cancel(false);
-                            frameHelper.close();
-                            connectionState = ConnectionState.UNINITIALIZED;
-                            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                                    String.format(
-                                            "ESPHome did not respond to ping requests. %d pings sent with %d s delay",
-                                            config.maxPingTimeouts, config.pingInterval));
-                            scheduleConnect(config.reconnectInterval);
+
+                            String reason = String.format(
+                                    "ESPHome did not respond to ping requests. %d pings sent with %d s delay",
+                                    config.maxPingTimeouts, config.pingInterval);
+                            handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason, true);
                         }
 
                     } else {
