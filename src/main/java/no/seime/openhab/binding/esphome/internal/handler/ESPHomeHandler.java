@@ -58,6 +58,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 9;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
+    private static final int CONNECTION_TIMEOUT_SECONDS = 60;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
@@ -76,10 +77,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
     private ScheduledFuture<?> pingWatchdogFuture;
+    @Nullable
+    private ScheduledFuture<?> connectionTimeoutFuture;
     private Instant lastPong = Instant.now();
     @Nullable
     private ScheduledFuture<?> connectFuture;
-    private Object connectionStateLock = new Object();
+    private final Object connectionStateLock = new Object();
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private boolean disposed = false;
     private boolean interrogated;
@@ -172,6 +175,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             setUndefToAllChannels();
             cancelConnectFuture();
             cancelPingWatchdog();
+            cancelConnectionTimeoutWatchdog();
             if (frameHelper != null) {
                 if (connectionState == ConnectionState.CONNECTED) {
                     try {
@@ -202,6 +206,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 if (disposed) {
                     return;
                 }
+                connectionState = ConnectionState.CONNECTING;
+
                 dynamicChannels.clear();
 
                 String hostname = config.hostname;
@@ -224,6 +230,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         logPrefix, packetProcessor);
 
                 frameHelper.connect(hostname, port);
+
+                cancelConnectionTimeoutWatchdog();
+                connectionTimeoutFuture = executorService.schedule(() -> {
+                    logger.warn("[{}] Connection attempt timed out after {} seconds.", logPrefix,
+                            CONNECTION_TIMEOUT_SECONDS);
+                    handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, "Connection attempt timed out", true);
+                }, CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
 
             } catch (ProtocolException e) {
                 logger.warn("[{}] Error initial connection", logPrefix, e);
@@ -291,6 +304,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void onConnect() throws ProtocolAPIError {
         synchronized (connectionStateLock) {
+            cancelConnectionTimeoutWatchdog();
             logger.debug("[{}] Connection established", logPrefix);
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
                     .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
@@ -351,6 +365,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             eventSubscriber.removeEventSubscriptions(this);
             setUndefToAllChannels();
             cancelPingWatchdog();
+            cancelConnectionTimeoutWatchdog();
 
             if (frameHelper != null) {
                 frameHelper.close();
@@ -526,10 +541,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 lastPong = Instant.now();
 
                 pingWatchdogFuture = executorService.scheduleAtFixedRate(() -> {
-
-                    if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval)
-                            .isBefore(Instant.now())) {
-                        synchronized (connectionStateLock) {
+                    synchronized (connectionStateLock) {
+                        if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval)
+                                .isBefore(Instant.now())) {
                             logger.warn(
                                     "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
                                     logPrefix, config.maxPingTimeouts, config.pingInterval,
@@ -539,10 +553,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                                     "ESPHome did not respond to ping requests. %d pings sent with %d s delay",
                                     config.maxPingTimeouts, config.pingInterval);
                             handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason, true);
-                        }
-
-                    } else {
-                        synchronized (connectionStateLock) {
+                        } else {
                             if (connectionState == ConnectionState.CONNECTED) {
                                 try {
                                     logger.debug("[{}] Sending ping", logPrefix);
@@ -638,6 +649,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    private void cancelConnectionTimeoutWatchdog() {
+        if (connectionTimeoutFuture != null) {
+            connectionTimeoutFuture.cancel(true);
+            connectionTimeoutFuture = null;
+        }
+    }
+
     private void scheduleConnect(int delaySeconds) {
         cancelConnectFuture();
         connectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS,
@@ -659,6 +677,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private enum ConnectionState {
         // Initial state, no connection
         UNINITIALIZED,
+        // TCP connect ongoing
+        CONNECTING,
         // TCP connected to ESPHome, first handshake sent
         HELLO_SENT,
 
