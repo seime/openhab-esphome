@@ -58,7 +58,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 9;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
-    private static final int CONNECTION_TIMEOUT_SECONDS = 60;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
@@ -234,9 +233,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 cancelConnectionTimeoutWatchdog();
                 connectionTimeoutFuture = executorService.schedule(() -> {
                     logger.warn("[{}] Connection attempt timed out after {} seconds.", logPrefix,
-                            CONNECTION_TIMEOUT_SECONDS);
+                            config.connectTimeout);
                     handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, "Connection attempt timed out", true);
-                }, CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
+                }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
 
             } catch (ProtocolException e) {
                 logger.warn("[{}] Error initial connection", logPrefix, e);
@@ -305,7 +304,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void onConnect() throws ProtocolAPIError {
         synchronized (connectionStateLock) {
             cancelConnectionTimeoutWatchdog();
-            logger.debug("[{}] Connection established", logPrefix);
+            logger.debug("[{}] Encrypted connection established. Starting API handshake.", logPrefix);
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
                     .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
             connectionState = ConnectionState.HELLO_SENT;
@@ -585,7 +584,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             synchronized (connectionStateLock) {
                 logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
                 logger.info(
-                        "[{}] Connected, continuing with protocol handshake. Device '{}' running '{}' on protocol version '{}.{}'",
+                        "[{}] API handshake successful. Device '{}' running '{}' on protocol version '{}.{}'. Logging in.",
                         logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
                         helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
                 connectionState = ConnectionState.LOGIN_SENT;

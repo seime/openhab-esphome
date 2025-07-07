@@ -32,6 +32,8 @@ public class ESPHomeConfiguration {
 
     public int maxPingTimeouts = 4;
 
+    public int connectTimeout = 60;
+
     public String encryptionKey;
 
     public String deviceId;

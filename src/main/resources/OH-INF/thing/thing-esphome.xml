@@ -67,6 +67,13 @@
 					connection is assumed broken, and reconnect starts</description>
 				<advanced>true</advanced>
 			</parameter>
+			<parameter name="connectTimeout" type="integer" min="1" required="false" groupName="timeout">
+				<label>Seconds till a connection attempt to an device is declared as failed</label>
+				<default>60</default>
+				<description>The connection attempt is aborted if it could not be completed after the given number
+					of seconds.</description>
+				<advanced>true</advanced>
+			</parameter>
 
 			<parameter name="logPrefix" type="text" required="false" groupName="logging">
 				<label>Prefix to use in logging for this particular device. Defaults to Thing ID</label>

@@ -58,18 +58,19 @@ to `$OH_CONFDIR/services/runtime.cfg` .
 
 ### `device` Thing Configuration
 
-| Name                   | Type      | Description                                                                                                                                              | Default  | Required | Advanced |
-|------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
-| `deviceId`             | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device. Use value from `esphome.name` in ESPHome device configuration |          | yes      | no       |
-| `hostname`             | `text`    | Hostname or IP address of the device. Typically something like `myboard.local` or `192.168.0.123`. *It is recommended to configure your ESP with a static IP address and use that here, it will allow for quicker reconnects*                                                                          |          | yes      | no       |
-| `port`                 | `integer` | IP Port of the device                                                                                                                                    | 6053     | no       | no       |
-| `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables. *Can also be set on the binding level if your ESPs all use the same key.*                |          | no      | no       |
-| `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                        | 10       | no       | yes      |
-| `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                       | 4        | no       | yes      |
-| `reconnectInterval`    | `integer` | Seconds between reconnect attempts when connection is lost or the device restarts.                                                                       | 10       | no       | yes      |
-| `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                       | deviceId | no       | yes      |
-| `deviceLogLevel`       | `text`    | ESPHome device log level to stream from the device.                                                                                                      | NONE     | no       | yes      |
-| `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                            | false    | no       | yes      |
+| Name                   | Type      | Description                                                                                                                                                                                                                   | Default  | Required | Advanced |
+|------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|----------|----------|
+| `deviceId`             | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device. Use value from `esphome.name` in ESPHome device configuration                                                                      |          | yes      | no       |
+| `hostname`             | `text`    | Hostname or IP address of the device. Typically something like `myboard.local` or `192.168.0.123`. *It is recommended to configure your ESP with a static IP address and use that here, it will allow for quicker reconnects* |          | yes      | no       |
+| `port`                 | `integer` | IP Port of the device                                                                                                                                                                                                         | 6053     | no       | no       |
+| `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables. *Can also be set on the binding level if your ESPs all use the same key.*             |          | no      | no       |
+| `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                                                                                             | 10       | no       | yes      |
+| `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                                                                                            | 4        | no       | yes      |
+| `reconnectInterval`    | `integer` | Seconds between reconnect attempts when connection is lost or the device restarts.                                                                                                                                            | 10       | no       | yes      |
+| `connectTimeout`       | `integer` | Seconds till a connection attempt to an device is declared as failed.                                                                                                                                                         | 60       | no       | yes      |
+| `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                                                                                            | deviceId | no       | yes      |
+| `deviceLogLevel`       | `text`    | ESPHome device log level to stream from the device.                                                                                                                                                                           | NONE     | no       | yes      |
+| `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                                                                                                 | false    | no       | yes      |
 
 ## Channels
 
@@ -82,7 +83,7 @@ interrogate the device and create channels based on the device configuration.
 
 ```
 esphome:device:garage-opener  "Garage ESP32" [deviceId="garage-opener", hostname="garage-opener.local", encryptionKey="JVWAgubY1nCe3x/5xeyMBfaN9y68OOUMh5dACIeVmjk=",
-                                              pingInterval=10, maxPingTimeouts=4, reconnectInterval=10, logPrefix="garage", deviceLogLevel="INFO"]
+                                              pingInterval=10, maxPingTimeouts=4, reconnectInterval=10, connectTimeout=60, logPrefix="garage", deviceLogLevel="INFO"]
 ```
 
 ### Item Configuration
