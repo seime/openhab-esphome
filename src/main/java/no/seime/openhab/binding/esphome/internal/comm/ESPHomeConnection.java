@@ -66,7 +66,7 @@ public class ESPHomeConnection {
         }
     }
 
-    public void close() {
+    public synchronized void close() {
         logger.info("[{}] Disconnecting socket.", logPrefix);
         try {
             if (socketChannel != null) {
