@@ -65,7 +65,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
             itemType = "DateTime";
             channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            stateDescription = addStateDescription("%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS", true);
+            stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS", true);
         } else {
             String unitOfMeasurement = rsp.getUnitOfMeasurement();
             itemType = resolveNumericItemType(unitOfMeasurement, rsp.getName(), sensorDeviceClass);
@@ -82,7 +82,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
             channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, tags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            stateDescription = addStateDescription("%." + rsp.getAccuracyDecimals() + "f "
+            stateDescription = patternStateDescription("%." + rsp.getAccuracyDecimals() + "f "
                     + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), true);
         }
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))

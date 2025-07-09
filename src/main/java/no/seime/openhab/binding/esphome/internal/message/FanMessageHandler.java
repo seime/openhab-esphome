@@ -211,7 +211,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
             ChannelType channelTypeDirection = addChannelType(rsp.getUniqueId() + CHANNEL_DIRECTION, "Direction",
                     "String", null, "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            StateDescription stateDescription = addStateDescription(
+            StateDescription stateDescription = optionListStateDescription(
                     Arrays.stream(FanDirection.values()).filter(e -> e != FanDirection.UNRECOGNIZED)
                             .map(e -> stripEnumPrefix(e)).collect(Collectors.toList()));
 
@@ -229,7 +229,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
             ChannelType channelTypeSpeed = addChannelType(rsp.getUniqueId() + CHANNEL_SPEED_LEVEL, "Speed", "Dimmer",
                     Set.of("Speed"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            StateDescription stateDescription = addStateDescription(null,
+            StateDescription stateDescription = numericStateDescription(null,
                     BigDecimal.valueOf(100 / supportedSpeedLevels), BigDecimal.ZERO, BigDecimal.valueOf(100));
 
             Channel channelSpeed = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_SPEED_LEVEL))
@@ -243,7 +243,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         if (rsp.getSupportedPresetModesCount() > 0) {
             ChannelType channelTypePreset = addChannelType(rsp.getUniqueId() + CHANNEL_PRESET, "Preset", "String",
                     Set.of("Setpoint"), "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            StateDescription stateDescription = addStateDescription(rsp.getSupportedPresetModesList());
+            StateDescription stateDescription = optionListStateDescription(rsp.getSupportedPresetModesList());
             Channel channelPreset = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_PRESET))
                     .withLabel(createLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
                     .withType(channelTypePreset.getUID()).withAcceptedItemType("String")

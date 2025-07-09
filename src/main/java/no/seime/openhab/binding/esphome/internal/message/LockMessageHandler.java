@@ -11,11 +11,7 @@ import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
-import org.openhab.core.types.Command;
-import org.openhab.core.types.CommandDescription;
-import org.openhab.core.types.State;
-import org.openhab.core.types.StateDescription;
-import org.openhab.core.types.UnDefType;
+import org.openhab.core.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,8 +61,8 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
 
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "String", Set.of("Lock"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
-        StateDescription stateDescription = addStateDescription(stateOptions);
-        CommandDescription commandDescription = addCommandDescription(commandOptions);
+        StateDescription stateDescription = optionListStateDescription(stateOptions);
+        CommandDescription commandDescription = optionListCommandDescription(commandOptions);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())

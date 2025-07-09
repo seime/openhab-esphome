@@ -68,25 +68,25 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         return channelType;
     }
 
-    protected StateDescription readOnlyStateDescription() {
+    protected static StateDescription readOnlyStateDescription() {
         return StateDescriptionFragmentBuilder.create().withReadOnly(true).build().toStateDescription();
     }
 
-    protected StateDescription addStateDescription(String pattern) {
-        return addStateDescription(pattern, false);
+    protected static StateDescription patternStateDescription(String pattern) {
+        return patternStateDescription(pattern, false);
     }
 
-    protected StateDescription addStateDescription(String pattern, boolean readOnly) {
+    protected static StateDescription patternStateDescription(String pattern, boolean readOnly) {
         return StateDescriptionFragmentBuilder.create().withPattern(pattern).withReadOnly(readOnly).build()
                 .toStateDescription();
     }
 
-    protected StateDescription addStateDescription(@Nullable String pattern, @Nullable BigDecimal step,
+    protected static StateDescription numericStateDescription(@Nullable String pattern, @Nullable BigDecimal step,
             @Nullable BigDecimal min, @Nullable BigDecimal max) {
-        return addStateDescription(pattern, step, min, max, false);
+        return numericStateDescription(pattern, step, min, max, false);
     }
 
-    protected StateDescription addStateDescription(@Nullable String pattern, @Nullable BigDecimal step,
+    protected static StateDescription numericStateDescription(@Nullable String pattern, @Nullable BigDecimal step,
             @Nullable BigDecimal min, @Nullable BigDecimal max, boolean readOnly) {
         StateDescriptionFragmentBuilder builder = StateDescriptionFragmentBuilder.create().withReadOnly(readOnly);
 
@@ -109,11 +109,11 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         return builder.build().toStateDescription();
     }
 
-    protected StateDescription addStateDescription(final Collection<?> options) {
-        return addStateDescription(options, false);
+    protected static StateDescription optionListStateDescription(final Collection<?> options) {
+        return optionListStateDescription(options, false);
     }
 
-    protected StateDescription addStateDescription(final Collection<?> options, boolean readOnly) {
+    protected static StateDescription optionListStateDescription(final Collection<?> options, boolean readOnly) {
 
         StateDescriptionFragmentBuilder builder = StateDescriptionFragmentBuilder.create().withPattern("%s")
                 .withReadOnly(readOnly);
@@ -125,7 +125,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         return builder.build().toStateDescription();
     }
 
-    protected CommandDescription addCommandDescription(Collection<?> options) {
+    protected static CommandDescription optionListCommandDescription(Collection<?> options) {
         CommandDescriptionBuilder builder = CommandDescriptionBuilder.create();
 
         final List<CommandOption> commandOptions = options.stream()

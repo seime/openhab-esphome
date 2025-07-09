@@ -1,6 +1,9 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.openhab.core.config.core.Configuration;
@@ -138,7 +141,7 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
             // Create effects channel
             ChannelType channelType = addChannelType(rsp.getUniqueId() + "-effects", rsp.getName(), "String",
                     Set.of("Setpoint"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            StateDescription stateDescription = addStateDescription(rsp.getEffectsList());
+            StateDescription stateDescription = optionListStateDescription(rsp.getEffectsList());
 
             Channel channel = ChannelBuilder
                     .create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId() + "-effects"))

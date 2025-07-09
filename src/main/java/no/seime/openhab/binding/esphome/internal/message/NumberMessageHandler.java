@@ -95,7 +95,7 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
 
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, tags, icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
-        StateDescription stateDescription = addStateDescription(
+        StateDescription stateDescription = numericStateDescription(
                 "%." + accurracyDecimals + "f " + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement),
                 rsp.getStep() != 0f ? BigDecimal.valueOf(rsp.getStep()) : null,
                 rsp.getMinValue() != 0f ? BigDecimal.valueOf(rsp.getMinValue()) : null,
