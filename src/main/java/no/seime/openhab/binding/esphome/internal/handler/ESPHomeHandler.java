@@ -25,12 +25,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.type.ChannelType;
-import org.openhab.core.types.Command;
-import org.openhab.core.types.CommandDescription;
-import org.openhab.core.types.RefreshType;
-import org.openhab.core.types.State;
-import org.openhab.core.types.StateDescription;
-import org.openhab.core.types.UnDefType;
+import org.openhab.core.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +167,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         disposed = true;
         eventSubscriber.removeEventSubscriptions(this);
         stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
+        setUndefToAllChannels();
         cancelConnectFuture();
         if (frameHelper != null) {
             cancelPingWatchdog();
