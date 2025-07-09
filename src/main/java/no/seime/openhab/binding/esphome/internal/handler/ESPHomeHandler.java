@@ -74,9 +74,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
     private ScheduledFuture<?> pingWatchdogFuture;
+    @Nullable
+    private ScheduledFuture<?> connectionTimeoutFuture;
     private Instant lastPong = Instant.now();
     @Nullable
     private ScheduledFuture<?> connectFuture;
+    private final Object connectionStateLock = new Object();
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private boolean disposed = false;
     private boolean interrogated;
@@ -164,26 +167,29 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Override
     public void dispose() {
-        disposed = true;
-        eventSubscriber.removeEventSubscriptions(this);
-        stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
-        setUndefToAllChannels();
-        cancelConnectFuture();
-        if (frameHelper != null) {
+        synchronized (connectionStateLock) {
+            disposed = true;
+            eventSubscriber.removeEventSubscriptions(this);
+            stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
+            setUndefToAllChannels();
+            cancelConnectFuture();
             cancelPingWatchdog();
-
-            if (connectionState == ConnectionState.CONNECTED) {
-                try {
-                    frameHelper.send(DisconnectRequest.getDefaultInstance());
-                } catch (ProtocolAPIError e) {
-                    // Quietly ignore
+            cancelConnectionTimeoutWatchdog();
+            if (frameHelper != null) {
+                if (connectionState == ConnectionState.CONNECTED) {
+                    try {
+                        frameHelper.send(DisconnectRequest.getDefaultInstance());
+                    } catch (ProtocolAPIError e) {
+                        // Quietly ignore
+                    }
                 }
-            } else {
+                // ALWAYS close the connection to ensure the socket and I/O threads
+                // are terminated and resources are released.
                 frameHelper.close();
+                frameHelper = null;
             }
+            connectionState = ConnectionState.UNINITIALIZED;
         }
-        connectionState = ConnectionState.UNINITIALIZED;
-
         super.dispose();
     }
 
@@ -194,34 +200,46 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void connect() {
-        try {
-            dynamicChannels.clear();
-
-            String hostname = config.hostname;
-            int port = config.port;
-
-            logger.info("[{}] Trying to connect to {}:{}", logPrefix, hostname, port);
-            updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
-                    String.format("Connecting to %s:%d", hostname, port));
-
-            // Default to using the default encryption key from the binding if not set in device configuration
-            String encryptionKey = config.encryptionKey;
-            if (encryptionKey == null || encryptionKey.isEmpty()) {
-                if (defaultEncryptionKey != null) {
-                    encryptionKey = defaultEncryptionKey;
-                    logger.info("[{}] Using binding default encryption key", logPrefix);
+        synchronized (connectionStateLock) {
+            try {
+                if (disposed) {
+                    return;
                 }
-            }
+                connectionState = ConnectionState.CONNECTING;
 
-            frameHelper = new EncryptedFrameHelper(connectionSelector, this, encryptionKey, config.deviceId, logPrefix,
-                    packetProcessor);
+                dynamicChannels.clear();
 
-            frameHelper.connect(hostname, port);
+                String hostname = config.hostname;
+                int port = config.port;
 
-        } catch (ProtocolException e) {
-            logger.warn("[{}] Error initial connection", logPrefix, e);
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-            if (!disposed) { // Don't reconnect if we've been disposed
+                logger.info("[{}] Trying to connect to {}:{}", logPrefix, hostname, port);
+                updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
+                        String.format("Connecting to %s:%d", hostname, port));
+
+                // Default to using the default encryption key from the binding if not set in device configuration
+                String encryptionKey = config.encryptionKey;
+                if (encryptionKey == null || encryptionKey.isEmpty()) {
+                    if (defaultEncryptionKey != null) {
+                        encryptionKey = defaultEncryptionKey;
+                        logger.info("[{}] Using binding default encryption key", logPrefix);
+                    }
+                }
+
+                frameHelper = new EncryptedFrameHelper(connectionSelector, this, encryptionKey, config.deviceId,
+                        logPrefix, packetProcessor);
+
+                frameHelper.connect(hostname, port);
+
+                cancelConnectionTimeoutWatchdog();
+                connectionTimeoutFuture = executorService.schedule(() -> {
+                    logger.warn("[{}] Connection attempt timed out after {} seconds.", logPrefix,
+                            config.connectTimeout);
+                    handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, "Connection attempt timed out", true);
+                }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
+
+            } catch (ProtocolException e) {
+                logger.warn("[{}] Error initial connection", logPrefix, e);
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
                 scheduleConnect(config.reconnectInterval);
             }
         }
@@ -237,114 +255,127 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     @Override
-    public synchronized void handleCommand(ChannelUID channelUID, Command command) {
-
-        if (connectionState != ConnectionState.CONNECTED) {
-            logger.warn("[{}] Not connected, ignoring command {}", logPrefix, command);
-            return;
-        }
-
-        if (command == RefreshType.REFRESH) {
-            try {
-                frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
-            } catch (ProtocolAPIError e) {
-                logger.error("[{}] Error sending command {} to channel {}: {}", logPrefix, command, channelUID,
-                        e.getMessage());
+    public void handleCommand(ChannelUID channelUID, Command command) {
+        synchronized (connectionStateLock) {
+            if (connectionState != ConnectionState.CONNECTED) {
+                logger.warn("[{}] Not connected, ignoring command {}", logPrefix, command);
+                return;
             }
-            return;
-        }
 
-        Optional<Channel> optionalChannel = thing.getChannels().stream().filter(e -> e.getUID().equals(channelUID))
-                .findFirst();
-        optionalChannel.ifPresent(channel -> {
-            try {
-                String commandClass = (String) channel.getConfiguration().get(BindingConstants.COMMAND_CLASS);
-                if (commandClass == null) {
-                    logger.warn("[{}] No command class for channel {}", logPrefix, channelUID);
-                    return;
+            if (command == RefreshType.REFRESH) {
+                try {
+                    frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
+                } catch (ProtocolAPIError e) {
+                    logger.error("[{}] Error sending command {} to channel {}: {}", logPrefix, command, channelUID,
+                            e.getMessage());
                 }
-
-                AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = commandTypeToHandlerMap
-                        .get(commandClass);
-                if (abstractMessageHandler == null) {
-                    logger.warn("[{}] No message handler for command class {}", logPrefix, commandClass);
-                } else {
-                    int key = ((BigDecimal) channel.getConfiguration().get(BindingConstants.COMMAND_KEY)).intValue();
-                    abstractMessageHandler.handleCommand(channel, command, key);
-                }
-
-            } catch (Exception e) {
-                logger.error("[{}] Error sending command {} to channel {}: {}", logPrefix, command, channelUID,
-                        e.getMessage(), e);
+                return;
             }
-        });
+
+            Optional<Channel> optionalChannel = thing.getChannels().stream().filter(e -> e.getUID().equals(channelUID))
+                    .findFirst();
+            optionalChannel.ifPresent(channel -> {
+                try {
+                    String commandClass = (String) channel.getConfiguration().get(BindingConstants.COMMAND_CLASS);
+                    if (commandClass == null) {
+                        logger.warn("[{}] No command class for channel {}", logPrefix, channelUID);
+                        return;
+                    }
+
+                    AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = commandTypeToHandlerMap
+                            .get(commandClass);
+                    if (abstractMessageHandler == null) {
+                        logger.warn("[{}] No message handler for command class {}", logPrefix, commandClass);
+                    } else {
+                        int key = ((BigDecimal) channel.getConfiguration().get(BindingConstants.COMMAND_KEY))
+                                .intValue();
+                        abstractMessageHandler.handleCommand(channel, command, key);
+                    }
+
+                } catch (Exception e) {
+                    logger.error("[{}] Error sending command {} to channel {}: {}", logPrefix, command, channelUID,
+                            e.getMessage(), e);
+                }
+            });
+        }
     }
 
     @Override
     public void onConnect() throws ProtocolAPIError {
-        logger.debug("[{}] Connection established", logPrefix);
-        HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
-                .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
-        connectionState = ConnectionState.HELLO_SENT;
-        frameHelper.send(helloRequest);
+        synchronized (connectionStateLock) {
+            cancelConnectionTimeoutWatchdog();
+            logger.debug("[{}] Encrypted connection established. Starting API handshake.", logPrefix);
+            HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
+                    .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
+            connectionState = ConnectionState.HELLO_SENT;
+            frameHelper.send(helloRequest);
+        }
     }
 
     @Override
     public void onPacket(@NonNull GeneratedMessage message) {
-        try {
-            switch (connectionState) {
-                case UNINITIALIZED -> logger.debug(
-                        "[{}] Received packet {} while uninitialized, this can happen when the socket is closed while unprocessed packets exists. Ignoring",
-                        logPrefix, message.getClass().getSimpleName());
-                case HELLO_SENT -> handleHelloResponse(message);
-                case LOGIN_SENT -> handleLoginResponse(message);
-                case CONNECTED -> handleConnected(message);
+        synchronized (connectionStateLock) {
+            try {
+                switch (connectionState) {
+                    case UNINITIALIZED -> logger.debug(
+                            "[{}] Received packet {} while uninitialized, this can happen when the socket is closed while unprocessed packets exists. Ignoring",
+                            logPrefix, message.getClass().getSimpleName());
+                    case HELLO_SENT -> handleHelloResponse(message);
+                    case LOGIN_SENT -> handleLoginResponse(message);
+                    case CONNECTED -> handleConnected(message);
+                }
+            } catch (ProtocolAPIError e) {
+                logger.warn("[{}] Error parsing packet", logPrefix, e);
+                onParseError(CommunicationError.PACKET_ERROR);
             }
-        } catch (ProtocolAPIError e) {
-            logger.warn("[{}] Error parsing packet", logPrefix, e);
-            onParseError(CommunicationError.PACKET_ERROR);
         }
     }
 
     @Override
     public void onEndOfStream(String message) {
-        eventSubscriber.removeEventSubscriptions(this);
-        if (!disposed) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                    "ESPHome device abruptly closed connection: " + message);
-            setUndefToAllChannels();
-            frameHelper.close();
-            cancelPingWatchdog();
-            connectionState = ConnectionState.UNINITIALIZED;
-            scheduleConnect(config.reconnectInterval);
-        }
+        String reason = "ESPHome device abruptly closed connection: " + message;
+        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason, true);
     }
 
     @Override
     public void onParseError(CommunicationError error) {
-        eventSubscriber.removeEventSubscriptions(this);
-        if (!disposed) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, error.toString());
-            setUndefToAllChannels();
-            cancelPingWatchdog();
-            frameHelper.close();
-            connectionState = ConnectionState.UNINITIALIZED;
-            scheduleConnect(config.reconnectInterval);
-        }
+        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, error.toString(), true);
     }
 
     private void remoteDisconnect() {
-        eventSubscriber.removeEventSubscriptions(this);
-        if (!disposed) {
-            int reconnectDelaySeconds = config.reconnectInterval;
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, String.format(
-                    "ESPHome device requested disconnect. Will reconnect in %d seconds", reconnectDelaySeconds));
+        String reason = "ESPHome device requested disconnect";
+        handleDisconnection(ThingStatusDetail.NONE, reason, true);
+    }
 
-            frameHelper.close();
+    private void handleDisconnection(ThingStatusDetail detail, String message, boolean scheduleReconnect) {
+        synchronized (connectionStateLock) {
+            if (connectionState == ConnectionState.UNINITIALIZED || disposed) {
+                return;
+            }
+
+            String finalMessage = message;
+            if (scheduleReconnect) {
+                finalMessage = String.format("%s. Will reconnect in %d seconds", message, config.reconnectInterval);
+            }
+
+            logger.warn("[{}] Disconnecting. Reason: {}", logPrefix, finalMessage);
+            updateStatus(ThingStatus.OFFLINE, detail, finalMessage);
+
+            eventSubscriber.removeEventSubscriptions(this);
             setUndefToAllChannels();
-            connectionState = ConnectionState.UNINITIALIZED;
             cancelPingWatchdog();
-            scheduleConnect(reconnectDelaySeconds);
+            cancelConnectionTimeoutWatchdog();
+
+            if (frameHelper != null) {
+                frameHelper.close();
+                frameHelper = null;
+            }
+
+            connectionState = ConnectionState.UNINITIALIZED;
+
+            if (scheduleReconnect) {
+                scheduleConnect(config.reconnectInterval);
+            }
         }
     }
 
@@ -388,7 +419,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
-            frameHelper.close();
+            if (frameHelper != null) {
+                frameHelper.close();
+                frameHelper = null;
+            }
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage());
         } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
@@ -427,14 +461,16 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     public void sendBluetoothCommand(GeneratedMessage message) {
-        try {
-            if (connectionState == ConnectionState.CONNECTED) {
-                frameHelper.send(message);
-            } else {
-                logger.warn("[{}] Not connected, ignoring bluetooth command {}", logPrefix, message);
+        synchronized (connectionStateLock) {
+            try {
+                if (connectionState == ConnectionState.CONNECTED) {
+                    frameHelper.send(message);
+                } else {
+                    logger.warn("[{}] Not connected, ignoring bluetooth command {}", logPrefix, message);
+                }
+            } catch (ProtocolAPIError e) {
+                logger.error("[{}] Error sending bluetooth command", logPrefix, e);
             }
-        } catch (ProtocolAPIError e) {
-            logger.error("[{}] Error sending bluetooth command", logPrefix, e);
         }
     }
 
@@ -462,74 +498,79 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     public void handleOpenHABEvent(EventSubscription subscription, String esphomeState) {
-        HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
-                .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute())
-                .setState(esphomeState).build();
-        try {
-            frameHelper.send(ohStateUpdate);
-        } catch (ProtocolAPIError e) {
-            logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
+        synchronized (connectionStateLock) {
+            if (disposed || connectionState != ConnectionState.CONNECTED) {
+                logger.debug("[{}] Not connected, skipping OpenHAB event for {}", logPrefix,
+                        subscription.getEntityId());
+                return;
+            }
+            HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
+                    .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute())
+                    .setState(esphomeState).build();
+            try {
+                frameHelper.send(ohStateUpdate);
+            } catch (ProtocolAPIError e) {
+                logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
+            }
         }
     }
 
     private void handleLoginResponse(GeneratedMessage message) throws ProtocolAPIError {
         if (message instanceof ConnectResponse connectResponse) {
-            logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
+            synchronized (connectionStateLock) {
+                logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
 
-            if (connectResponse.getInvalidPassword()) {
-                logger.error("[{}] Invalid password", logPrefix);
-                frameHelper.close();
-                connectionState = ConnectionState.UNINITIALIZED;
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
-                return;
-            }
-            connectionState = ConnectionState.CONNECTED;
-
-            if (config.deviceLogLevel != LogLevel.NONE) {
-                logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
-
-                frameHelper.send(SubscribeLogsRequest.newBuilder()
-                        .setLevel(io.esphome.api.LogLevel.valueOf("LOG_LEVEL_" + config.deviceLogLevel.name()))
-                        .build());
-            }
-
-            updateStatus(ThingStatus.ONLINE);
-            logger.debug("[{}] Device login complete, starting device interrogation", logPrefix);
-
-            // Reset last pong
-            lastPong = Instant.now();
-
-            pingWatchdogFuture = executorService.scheduleAtFixedRate(() -> {
-
-                if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval).isBefore(Instant.now())) {
-                    logger.warn(
-                            "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
-                            logPrefix, config.maxPingTimeouts, config.pingInterval,
-                            config.maxPingTimeouts * config.pingInterval, lastPong);
-                    pingWatchdogFuture.cancel(false);
-                    frameHelper.close();
-                    connectionState = ConnectionState.UNINITIALIZED;
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                            String.format("ESPHome did not respond to ping requests. %d pings sent with %d s delay",
-                                    config.maxPingTimeouts, config.pingInterval));
-                    scheduleConnect(config.reconnectInterval);
-
-                } else {
-
-                    try {
-                        logger.debug("[{}] Sending ping", logPrefix);
-                        frameHelper.send(PingRequest.getDefaultInstance());
-                    } catch (ProtocolAPIError e) {
-                        logger.warn("[{}] Error sending ping request", logPrefix, e);
-                    }
+                if (connectResponse.getInvalidPassword()) {
+                    handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password", false);
+                    return;
                 }
-            }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS,
-                    String.format("[%s] Ping watchdog", logPrefix));
+                connectionState = ConnectionState.CONNECTED;
 
-            // Start interrogation
-            frameHelper.send(DeviceInfoRequest.getDefaultInstance());
-            frameHelper.send(ListEntitiesRequest.getDefaultInstance());
-            frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
+                if (config.deviceLogLevel != LogLevel.NONE) {
+                    logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
+
+                    frameHelper.send(SubscribeLogsRequest.newBuilder()
+                            .setLevel(io.esphome.api.LogLevel.valueOf("LOG_LEVEL_" + config.deviceLogLevel.name()))
+                            .build());
+                }
+
+                updateStatus(ThingStatus.ONLINE);
+                logger.debug("[{}] Device login complete, starting device interrogation", logPrefix);
+                // Reset last pong
+                lastPong = Instant.now();
+
+                pingWatchdogFuture = executorService.scheduleAtFixedRate(() -> {
+                    synchronized (connectionStateLock) {
+                        if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval)
+                                .isBefore(Instant.now())) {
+                            logger.warn(
+                                    "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
+                                    logPrefix, config.maxPingTimeouts, config.pingInterval,
+                                    config.maxPingTimeouts * config.pingInterval, lastPong);
+
+                            String reason = String.format(
+                                    "ESPHome did not respond to ping requests. %d pings sent with %d s delay",
+                                    config.maxPingTimeouts, config.pingInterval);
+                            handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason, true);
+                        } else {
+                            if (connectionState == ConnectionState.CONNECTED) {
+                                try {
+                                    logger.debug("[{}] Sending ping", logPrefix);
+                                    frameHelper.send(PingRequest.getDefaultInstance());
+                                } catch (ProtocolAPIError e) {
+                                    logger.warn("[{}] Error sending ping request", logPrefix, e);
+                                }
+                            }
+                        }
+                    }
+                }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS,
+                        String.format("[%s] Ping watchdog", logPrefix));
+
+                // Start interrogation
+                frameHelper.send(DeviceInfoRequest.getDefaultInstance());
+                frameHelper.send(ListEntitiesRequest.getDefaultInstance());
+                frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
+            }
         }
     }
 
@@ -540,14 +581,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
-            logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
-            logger.info(
-                    "[{}] Connected, continuing with protocol handshake. Device '{}' running '{}' on protocol version '{}.{}'",
-                    logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
-                    helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
-            connectionState = ConnectionState.LOGIN_SENT;
-
-            frameHelper.send(ConnectRequest.getDefaultInstance());
+            synchronized (connectionStateLock) {
+                logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
+                logger.info(
+                        "[{}] API handshake successful. Device '{}' running '{}' on protocol version '{}.{}'. Logging in.",
+                        logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
+                        helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
+                connectionState = ConnectionState.LOGIN_SENT;
+                frameHelper.send(ConnectRequest.getDefaultInstance());
+            }
         }
     }
 
@@ -572,29 +614,32 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     public void listenForBLEAdvertisements(ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler) {
-        this.espHomeBluetoothProxyHandler = espHomeBluetoothProxyHandler;
-        if (config.enableBluetoothProxy && !bluetoothProxyStarted && connectionState == ConnectionState.CONNECTED) {
-            try {
-                frameHelper.send(SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
-                bluetoothProxyStarted = true;
-            } catch (Exception e) {
-                logger.error("[{}] Error starting BLE proxy", logPrefix, e);
+        synchronized (connectionStateLock) {
+            this.espHomeBluetoothProxyHandler = espHomeBluetoothProxyHandler;
+            if (config.enableBluetoothProxy && !bluetoothProxyStarted && connectionState == ConnectionState.CONNECTED) {
+                try {
+                    frameHelper.send(SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+                    bluetoothProxyStarted = true;
+                } catch (Exception e) {
+                    logger.error("[{}] Error starting BLE proxy", logPrefix, e);
+                }
             }
         }
     }
 
     public void stopListeningForBLEAdvertisements() {
-
-        if (connectionState == ConnectionState.CONNECTED) {
-            try {
-                frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
-            } catch (Exception e) {
-                logger.warn("[{}] Error stopping BLE proxy", logPrefix, e);
+        synchronized (connectionStateLock) {
+            if (connectionState == ConnectionState.CONNECTED) {
+                try {
+                    frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+                } catch (Exception e) {
+                    logger.warn("[{}] Error stopping BLE proxy", logPrefix, e);
+                }
             }
-        }
 
-        bluetoothProxyStarted = false;
-        espHomeBluetoothProxyHandler = null;
+            bluetoothProxyStarted = false;
+            espHomeBluetoothProxyHandler = null;
+        }
     }
 
     private void cancelPingWatchdog() {
@@ -608,6 +653,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         if (connectFuture != null) {
             connectFuture.cancel(true);
             connectFuture = null;
+        }
+    }
+
+    private void cancelConnectionTimeoutWatchdog() {
+        if (connectionTimeoutFuture != null) {
+            connectionTimeoutFuture.cancel(true);
+            connectionTimeoutFuture = null;
         }
     }
 
@@ -632,6 +684,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private enum ConnectionState {
         // Initial state, no connection
         UNINITIALIZED,
+        // TCP connect ongoing
+        CONNECTING,
         // TCP connected to ESPHome, first handshake sent
         HELLO_SENT,
 
