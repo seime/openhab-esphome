@@ -25,10 +25,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.type.ChannelType;
-import org.openhab.core.types.Command;
-import org.openhab.core.types.RefreshType;
-import org.openhab.core.types.State;
-import org.openhab.core.types.UnDefType;
+import org.openhab.core.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +61,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
+    private final ESPStateDescriptionProvider stateDescriptionProvider;
     private final Map<String, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> commandTypeToHandlerMap = new HashMap<>();
     private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
     private final List<Channel> dynamicChannels = new ArrayList<>();
@@ -89,12 +87,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
-            ESPChannelTypeProvider dynamicChannelTypeProvider, ESPHomeEventSubscriber eventSubscriber,
-            MonitoredScheduledThreadPoolExecutor executorService, KeySequentialExecutor packetProcessor,
-            @Nullable String defaultEncryptionKey) {
+            ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
+            ESPHomeEventSubscriber eventSubscriber, MonitoredScheduledThreadPoolExecutor executorService,
+            KeySequentialExecutor packetProcessor, @Nullable String defaultEncryptionKey) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
+        this.stateDescriptionProvider = stateDescriptionProvider;
         logPrefix = thing.getUID().getId();
         this.eventSubscriber = eventSubscriber;
         this.executorService = executorService;
@@ -167,6 +166,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void dispose() {
         disposed = true;
         eventSubscriber.removeEventSubscriptions(this);
+        stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
         setUndefToAllChannels();
         cancelConnectFuture();
         if (frameHelper != null) {
@@ -553,6 +553,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public void addChannelType(ChannelType channelType) {
         dynamicChannelTypeProvider.putChannelType(channelType);
+    }
+
+    public void addDescription(ChannelUID channelUID, StateDescription stateDescription) {
+        stateDescriptionProvider.setDescription(channelUID, stateDescription);
+    }
+
+    public void addDescription(ChannelUID channelUID, CommandDescription commandDescription) {
+        stateDescriptionProvider.setDescription(channelUID, commandDescription);
     }
 
     public void addChannel(Channel channel) {

@@ -1,6 +1,5 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -12,6 +11,7 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.StateDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,49 +178,53 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         if (rsp.getSupportsPosition()) {
             ChannelType channelTypePosition = addChannelType(rsp.getUniqueId() + CHANNEL_POSITION, "Position",
-                    deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("OpenLevel"), false, icon, null,
-                    null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    deviceClass.getItemType(), Set.of("OpenLevel"), icon, rsp.getEntityCategory(),
+                    rsp.getDisabledByDefault());
+            StateDescription stateDescription = patternStateDescription("%d %%");
 
             Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
                     .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                     .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_POSITION, COMMAND_CLASS_COVER)).build();
-            super.registerChannel(channelPosition, channelTypePosition);
+            super.registerChannel(channelPosition, channelTypePosition, stateDescription);
         }
         if (rsp.getSupportsTilt()) {
             ChannelType channelTypeTilt = addChannelType(rsp.getUniqueId() + CHANNEL_TILT, "Tilt",
-                    deviceClass.getItemType(), Collections.emptyList(), "%d %%", Set.of("Tilt"), false, icon, null,
-                    null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    deviceClass.getItemType(), Set.of("Tilt"), icon, rsp.getEntityCategory(),
+                    rsp.getDisabledByDefault());
+            StateDescription stateDescription = patternStateDescription("%d %%");
 
             Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
                     .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_TILT, COMMAND_CLASS_COVER)).build();
-            super.registerChannel(channelTilt, channelTypeTilt);
+            super.registerChannel(channelTilt, channelTypeTilt, stateDescription);
         }
 
         // Legacy state
         ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "Legacy State",
-                deviceClass.getItemType(), Collections.emptyList(), "%s", Set.of("OpenClose"), false, icon, null, null,
-                null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                deviceClass.getItemType(), Set.of("OpenClose"), icon, rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
+        StateDescription stateDescription = patternStateDescription("%s");
 
         Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), LEGACY_CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "Legacy State")).withKind(ChannelKind.STATE)
                 .withType(channelTypeState.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(rsp.getKey(), LEGACY_CHANNEL_STATE, COMMAND_CLASS_COVER)).build();
-        super.registerChannel(channelState, channelTypeState);
+        super.registerChannel(channelState, channelTypeState, stateDescription);
 
         // Operation status
         ChannelType channelTypeCurrentOperation = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_OPERATION,
-                "Current operation", "String", Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), "%s", Set.of("Status"), true,
-                "motion", null, null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                "Current operation", "String", Set.of("Status"), "motion", rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
+        stateDescription = optionListStateDescription(Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), true);
 
         Channel channelCurrentOperation = ChannelBuilder
                 .create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_OPERATION))
                 .withLabel(createLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType("String")
                 .withConfiguration(configuration(rsp.getKey(), CHANNEL_CURRENT_OPERATION, COMMAND_CLASS_COVER)).build();
-        super.registerChannel(channelCurrentOperation, channelTypeCurrentOperation);
+        super.registerChannel(channelCurrentOperation, channelTypeCurrentOperation, stateDescription);
     }
 
     public void handleState(CoverStateResponse rsp) {

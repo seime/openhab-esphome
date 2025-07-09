@@ -2,7 +2,6 @@ package no.seime.openhab.binding.esphome.internal.message;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -15,6 +14,7 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.StateDescription;
 import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,8 +187,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         String icon = getChannelIcon(rsp.getIcon(), "fan");
 
         ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + CHANNEL_STATE, "State", "Switch",
-                Collections.emptySet(), null, Set.of("Switch"), false, icon, null, null, null, rsp.getEntityCategory(),
-                rsp.getDisabledByDefault());
+                Set.of("Switch"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "State")).withKind(ChannelKind.STATE)
@@ -199,8 +198,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
         if (rsp.getSupportsOscillation()) {
             ChannelType channelTypeOscillation = addChannelType(rsp.getUniqueId() + CHANNEL_OSCILLATION, "Oscillation",
-                    "Switch", Collections.emptySet(), null, Set.of("Switch"), false, icon, null, null, null,
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    "Switch", Set.of("Switch"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channelOscillation = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_OSCILLATION))
                     .withLabel(createLabel(rsp.getName(), "Oscillation")).withKind(ChannelKind.STATE)
@@ -212,16 +210,16 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         if (rsp.getSupportsDirection()) {
 
             ChannelType channelTypeDirection = addChannelType(rsp.getUniqueId() + CHANNEL_DIRECTION, "Direction",
-                    "String",
+                    "String", null, "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            StateDescription stateDescription = optionListStateDescription(
                     Arrays.stream(FanDirection.values()).filter(e -> e != FanDirection.UNRECOGNIZED)
-                            .map(e -> stripEnumPrefix(e)).collect(Collectors.toList()),
-                    "%s", null, false, "fan", null, null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                            .map(e -> stripEnumPrefix(e)).collect(Collectors.toList()));
 
             Channel channelDirection = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_DIRECTION))
                     .withLabel(createLabel(rsp.getName(), "Direction")).withKind(ChannelKind.STATE)
                     .withType(channelTypeDirection.getUID()).withAcceptedItemType("String")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_DIRECTION, COMMAND_CLASS_FAN)).build();
-            super.registerChannel(channelDirection, channelTypeDirection);
+            super.registerChannel(channelDirection, channelTypeDirection, stateDescription);
 
         }
 
@@ -230,27 +228,27 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             int supportedSpeedLevels = rsp.getSupportedSpeedCount();
 
             ChannelType channelTypeSpeed = addChannelType(rsp.getUniqueId() + CHANNEL_SPEED_LEVEL, "Speed", "Dimmer",
-                    Collections.emptySet(), null, Set.of("Speed"), false, icon,
-                    BigDecimal.valueOf(100 / supportedSpeedLevels), BigDecimal.ZERO, BigDecimal.valueOf(100),
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    Set.of("Speed"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            StateDescription stateDescription = numericStateDescription(null,
+                    BigDecimal.valueOf(100 / supportedSpeedLevels), BigDecimal.ZERO, BigDecimal.valueOf(100));
 
             Channel channelSpeed = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_SPEED_LEVEL))
                     .withLabel(createLabel(rsp.getName(), "Speed")).withKind(ChannelKind.STATE)
                     .withType(channelTypeSpeed.getUID()).withAcceptedItemType("Dimmer")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_SPEED_LEVEL, COMMAND_CLASS_FAN)).build();
-            super.registerChannel(channelSpeed, channelTypeSpeed);
+            super.registerChannel(channelSpeed, channelTypeSpeed, stateDescription);
 
         }
 
         if (rsp.getSupportedPresetModesCount() > 0) {
             ChannelType channelTypePreset = addChannelType(rsp.getUniqueId() + CHANNEL_PRESET, "Preset", "String",
-                    rsp.getSupportedPresetModesList(), "%s", Set.of("Setpoint"), false, "fan", null, null, null,
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    Set.of("Setpoint"), "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            StateDescription stateDescription = optionListStateDescription(rsp.getSupportedPresetModesList());
             Channel channelPreset = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_PRESET))
                     .withLabel(createLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
                     .withType(channelTypePreset.getUID()).withAcceptedItemType("String")
                     .withConfiguration(configuration(rsp.getKey(), CHANNEL_PRESET, COMMAND_CLASS_FAN)).build();
-            super.registerChannel(channelPreset, channelTypePreset);
+            super.registerChannel(channelPreset, channelTypePreset, stateDescription);
         }
     }
 

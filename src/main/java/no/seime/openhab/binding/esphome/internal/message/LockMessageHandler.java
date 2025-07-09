@@ -11,9 +11,7 @@ import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
-import org.openhab.core.types.Command;
-import org.openhab.core.types.State;
-import org.openhab.core.types.UnDefType;
+import org.openhab.core.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,28 +44,31 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
 
         String icon = getChannelIcon(rsp.getIcon(), "lock");
 
-        List<String> validOptions = new ArrayList<>();
-        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_LOCKED));
-        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_UNLOCKED));
-        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_JAMMED));
-        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_LOCKING));
-        validOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_UNLOCKING));
+        List<String> stateOptions = new ArrayList<>();
+        stateOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_LOCKED));
+        stateOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_UNLOCKED));
+        stateOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_JAMMED));
+        stateOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_LOCKING));
+        stateOptions.add(LockMessageHandler.stripEnumPrefix(LockState.LOCK_STATE_UNLOCKING));
 
-        validOptions.add(LockMessageHandler.stripEnumPrefix(LockCommand.LOCK_UNLOCK));
-        validOptions.add(LockMessageHandler.stripEnumPrefix(LockCommand.LOCK_LOCK));
+        List<String> commandOptions = new ArrayList<>();
+        commandOptions.add(LockMessageHandler.stripEnumPrefix(LockCommand.LOCK_UNLOCK));
+        commandOptions.add(LockMessageHandler.stripEnumPrefix(LockCommand.LOCK_LOCK));
 
         if (rsp.getSupportsOpen()) {
-            validOptions.add(stripEnumPrefix(LockCommand.LOCK_OPEN));
+            commandOptions.add(stripEnumPrefix(LockCommand.LOCK_OPEN));
         }
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "String", validOptions, null,
-                Set.of("Lock"), false, icon, null, null, null, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "String", Set.of("Lock"), icon,
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        StateDescription stateDescription = optionListStateDescription(stateOptions);
+        CommandDescription commandDescription = optionListCommandDescription(commandOptions);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType("String").withConfiguration(configuration).build();
 
-        super.registerChannel(channel, channelType);
+        super.registerChannel(channel, channelType, stateDescription, commandDescription);
     }
 
     public void handleState(LockStateResponse rsp) {
