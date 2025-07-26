@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.STRING;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -16,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -40,7 +43,7 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
     }
 
     public void buildChannels(ListEntitiesLockResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, "Lock");
+        Configuration configuration = configuration(EntityTypes.LOCK, rsp.getKey(), null);
 
         String icon = getChannelIcon(rsp.getIcon(), "lock");
 
@@ -59,14 +62,14 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
             commandOptions.add(stripEnumPrefix(LockCommand.LOCK_OPEN));
         }
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "String", Set.of("Lock"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), STRING, Set.of("Lock"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = optionListStateDescription(stateOptions);
         CommandDescription commandDescription = optionListCommandDescription(commandOptions);
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withAcceptedItemType("String").withConfiguration(configuration).build();
+                .withAcceptedItemType(STRING).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType, stateDescription, commandDescription);
     }

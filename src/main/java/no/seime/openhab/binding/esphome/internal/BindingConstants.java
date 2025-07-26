@@ -30,7 +30,7 @@ public class BindingConstants {
     public static final ThingTypeUID THING_TYPE_DEVICE = new ThingTypeUID(BINDING_ID, "device");
     public static final ThingTypeUID THING_TYPE_BLE_PROXY = new ThingTypeUID("bluetooth", "esphome");
 
-    public static final String COMMAND_KEY = "command_key";
-    public static final String COMMAND_CLASS = "command_class";
-    public static final String COMMAND_FIELD = "command_field";
+    public static final String CHANNEL_CONFIGURATION_ENTITY_KEY = "entity_key";
+    public static final String CHANNEL_CONFIGURATION_ENTITY_TYPE = "entity_type";
+    public static final String CHANNEL_CONFIGURATION_ENTITY_FIELD = "entity_field";
 }

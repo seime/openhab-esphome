@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import io.esphome.api.ListEntitiesTimeResponse;
 import io.esphome.api.TimeCommandRequest;
 import io.esphome.api.TimeStateResponse;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -43,7 +44,7 @@ public class TimeMessageHandler extends AbstractMessageHandler<ListEntitiesTimeR
 
     @Override
     public void buildChannels(ListEntitiesTimeResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, "Time");
+        Configuration configuration = configuration(EntityTypes.TIME, rsp.getKey(), null);
 
         String icon = getChannelIcon(rsp.getIcon(), "time");
 

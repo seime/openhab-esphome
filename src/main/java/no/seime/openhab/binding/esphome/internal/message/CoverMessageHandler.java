@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.STRING;
+
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -22,6 +24,7 @@ import com.google.common.cache.RemovalListener;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -31,7 +34,6 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     public static final String LEGACY_CHANNEL_STATE = "legacy_state";
     public static final String CHANNEL_TILT = "tilt";
     public static final String CHANNEL_CURRENT_OPERATION = "current_operation";
-    public static final String COMMAND_CLASS_COVER = "Cover";
 
     private final Logger logger = LoggerFactory.getLogger(CoverMessageHandler.class);
 
@@ -80,7 +82,8 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                 builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_STOP);
             } else {
 
-                String subCommand = (String) channel.getConfiguration().get(BindingConstants.COMMAND_FIELD);
+                String subCommand = (String) channel.getConfiguration()
+                        .get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD);
                 switch (subCommand) {
                     case CHANNEL_POSITION -> {
                         if (command instanceof QuantityType<?> qt) {
@@ -185,7 +188,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
             Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
                     .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                     .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                    .withConfiguration(configuration(rsp.getKey(), CHANNEL_POSITION, COMMAND_CLASS_COVER)).build();
+                    .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_POSITION)).build();
             super.registerChannel(channelPosition, channelTypePosition, stateDescription);
         }
         if (rsp.getSupportsTilt()) {
@@ -197,7 +200,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
             Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
                     .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                    .withConfiguration(configuration(rsp.getKey(), CHANNEL_TILT, COMMAND_CLASS_COVER)).build();
+                    .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
             super.registerChannel(channelTilt, channelTypeTilt, stateDescription);
         }
 
@@ -210,20 +213,20 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), LEGACY_CHANNEL_STATE))
                 .withLabel(createLabel(rsp.getName(), "Legacy State")).withKind(ChannelKind.STATE)
                 .withType(channelTypeState.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                .withConfiguration(configuration(rsp.getKey(), LEGACY_CHANNEL_STATE, COMMAND_CLASS_COVER)).build();
+                .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), LEGACY_CHANNEL_STATE)).build();
         super.registerChannel(channelState, channelTypeState, stateDescription);
 
         // Operation status
         ChannelType channelTypeCurrentOperation = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_OPERATION,
-                "Current operation", "String", Set.of("Status"), "motion", rsp.getEntityCategory(),
+                "Current operation", STRING, Set.of("Status"), "motion", rsp.getEntityCategory(),
                 rsp.getDisabledByDefault());
         stateDescription = optionListStateDescription(Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), true);
 
         Channel channelCurrentOperation = ChannelBuilder
                 .create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_OPERATION))
                 .withLabel(createLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
-                .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType("String")
-                .withConfiguration(configuration(rsp.getKey(), CHANNEL_CURRENT_OPERATION, COMMAND_CLASS_COVER)).build();
+                .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType(STRING)
+                .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_CURRENT_OPERATION)).build();
         super.registerChannel(channelCurrentOperation, channelTypeCurrentOperation, stateDescription);
     }
 

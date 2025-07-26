@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.STRING;
+
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
@@ -17,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import io.esphome.api.ListEntitiesTextSensorResponse;
 import io.esphome.api.TextSensorStateResponse;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -39,17 +42,16 @@ public class TextSensorMessageHandler
 
     @Override
     public void buildChannels(ListEntitiesTextSensorResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, null);
+        Configuration configuration = configuration(EntityTypes.TEXT_SENSOR, rsp.getKey(), null);
 
         String icon = getChannelIcon(rsp.getIcon(), "text");
 
-        String itemType = "String";
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), STRING, Set.of("Status"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withAcceptedItemType(itemType).withConfiguration(configuration).build();
+                .withAcceptedItemType(STRING).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType, readOnlyStateDescription());
     }

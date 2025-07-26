@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import io.esphome.api.ListEntitiesNumberResponse;
 import io.esphome.api.NumberCommandRequest;
 import io.esphome.api.NumberStateResponse;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -67,7 +68,7 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
 
     @Override
     public void buildChannels(ListEntitiesNumberResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, "Number");
+        Configuration configuration = configuration(EntityTypes.NUMBER, rsp.getKey(), null);
         String unitOfMeasurement = rsp.getUnitOfMeasurement();
         if (!"None".equals(unitOfMeasurement) && !"".equals(unitOfMeasurement)) {
             configuration.put("unit", unitOfMeasurement);

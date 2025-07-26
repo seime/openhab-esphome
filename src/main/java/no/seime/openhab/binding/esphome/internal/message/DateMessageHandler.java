@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.DATETIME;
+
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Set;
@@ -21,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import io.esphome.api.DateCommandRequest;
 import io.esphome.api.DateStateResponse;
 import io.esphome.api.ListEntitiesDateResponse;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -45,18 +48,17 @@ public class DateMessageHandler extends AbstractMessageHandler<ListEntitiesDateR
 
     @Override
     public void buildChannels(ListEntitiesDateResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, "Date");
+        Configuration configuration = configuration(EntityTypes.DATE, rsp.getKey(), null);
 
         String icon = getChannelIcon(rsp.getIcon(), "time");
 
-        String itemType = "DateTime";
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), DATETIME, Set.of("Status"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td");
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withAcceptedItemType(itemType).withConfiguration(configuration).build();
+                .withAcceptedItemType(DATETIME).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType, stateDescription);
     }

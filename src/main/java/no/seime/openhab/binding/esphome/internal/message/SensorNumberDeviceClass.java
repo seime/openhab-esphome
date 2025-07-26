@@ -1,12 +1,14 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.*;
+
 public enum SensorNumberDeviceClass {
 
-    GENERIC_NUMBER("generic_number", "Number", "zoom", null),
-    ENUM("enum", "String", "text", null),
-    TIMESTAMP("timestamp", "DateTime", "time", null),
+    GENERIC_NUMBER("generic_number", NUMBER, "zoom", null),
+    ENUM("enum", STRING, "text", null),
+    TIMESTAMP("timestamp", DATETIME, "time", null),
     APPARENT_POWER("apparent_power", "Number:Power", "energy", null),
-    AQI("aqi", "Number", "smoke", null),
+    AQI("aqi", NUMBER, "smoke", null),
     ATMOSPHERIC_PRESSURE("atmospheric_pressure", "Number:Pressure", "pressure", null),
     BATTERY("battery", "Number:Dimensionless", "batterylevel", null),
     CO("carbon_monoxide", "Number:Dimensionless", "smoke", "CO"),
@@ -26,17 +28,17 @@ public enum SensorNumberDeviceClass {
     ILLUMINANCE("illuminance", "Number:Illuminance", "lightbulb", "Light"),
     IRRADIANCE("irradiance", "Number:Itensity", null, null),
     MOISTURE("moisture", "Number:Dimensionless", "water", "Humidity"),
-    MONETARY("monetary", "Number", null, null), // TODO: Add Monetary type
-                                                // https://github.com/openhab/openhab-core/issues/3408
+    MONETARY("monetary", NUMBER, null, null), // TODO: Add Monetary type
+                                              // https://github.com/openhab/openhab-core/issues/3408
     NITROGEN_DIOXIDE("nitrogen_dioxide", "Number:Dimensionless", "smoke", "null"),
-    NITROGEN_MONOXIDE("nitrogen_monoxide", "Number", "smoke", null),
-    NITROUS_OXIDE("nitrous_oxide", "Number", "smoke", null),
+    NITROGEN_MONOXIDE("nitrogen_monoxide", NUMBER, "smoke", null),
+    NITROUS_OXIDE("nitrous_oxide", NUMBER, "smoke", null),
 
-    OZONE("ozone", "Number", "smoke", null),
-    PH("ph", "Number", null, null),
-    PM1("pm1", "Number", "smoke", null),
-    PM10("pm10", "Number", "smoke", null),
-    PM25("pm25", "Number", "smoke", null),
+    OZONE("ozone", NUMBER, "smoke", null),
+    PH("ph", NUMBER, null, null),
+    PM1("pm1", NUMBER, "smoke", null),
+    PM10("pm10", NUMBER, "smoke", null),
+    PM25("pm25", NUMBER, "smoke", null),
     POWER_FACTOR("power_factor", "Number:Dimensionless", "energy", "Power"),
     POWER("power", "Number:Power", "energy", "Power"),
     PRECIPITATION("precipitation", "Number:Length", "rain", "Rain"),
@@ -47,9 +49,9 @@ public enum SensorNumberDeviceClass {
 
     SOUND_PRESSURE("sound_pressure", "Number:Dimensionless", "soundvolume", "SoundVolume"),
     SPEED("speed", "Number:Speed", "motion", null),
-    SULPHUR_DIOXIDE("sulphur_dioxide", "Number", "smoke", null),
+    SULPHUR_DIOXIDE("sulphur_dioxide", NUMBER, "smoke", null),
     TEMPERATURE("temperature", "Number:Temperature", "temperature", "Temperature"),
-    VOLATILE_ORGANIC_COMPOUNDS("volatile_organic_compounds", "Number", "smoke", null),
+    VOLATILE_ORGANIC_COMPOUNDS("volatile_organic_compounds", NUMBER, "smoke", null),
     VOLATILE_ORGANIC_COMPOUNDS_PARTS("volatile_organic_compounds_parts", "Number:Dimensionless", "smoke", null),
     VOLTAGE("voltage", "Number:ElectricPotential", "energy", "Voltage"),
     VOLUME("volume", "Number:Volume", null, null),

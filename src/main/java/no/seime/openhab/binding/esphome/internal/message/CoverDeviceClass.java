@@ -1,18 +1,20 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.ROLLERSHUTTER;
+
 public enum CoverDeviceClass {
 
-    NONE("None", "Rollershutter", "rollershutter", "OpenLevel"),
-    AWNING("awning", "Rollershutter", "terrace", "OpenLevel"),
-    BLIND("blind", "Rollershutter", "blinds", "OpenLevel"),
-    CURTAIN("curtain", "Rollershutter", "rollershutter", "OpenLevel"),
-    DAMPER("damper", "Rollershutter", "rollershutter", "OpenLevel"),
-    DOOR("door", "Rollershutter", "door", "OpenLevel"),
-    GARAGE("garage", "Rollershutter", "garagedoor", "OpenLevel"),
-    GATE("gate", "Rollershutter", "door", "OpenLevel"),
-    SHADE("shade", "Rollershutter", "rollershutter", "OpenLevel"),
-    SHUTTER("shutter", "Rollershutter", "rollershutter", "OpenLevel"),
-    WINDOW("window", "Rollershutter", "window", "OpenLevel");
+    NONE("None", ROLLERSHUTTER, "rollershutter", "OpenLevel"),
+    AWNING("awning", ROLLERSHUTTER, "terrace", "OpenLevel"),
+    BLIND("blind", ROLLERSHUTTER, "blinds", "OpenLevel"),
+    CURTAIN("curtain", ROLLERSHUTTER, "rollershutter", "OpenLevel"),
+    DAMPER("damper", ROLLERSHUTTER, "rollershutter", "OpenLevel"),
+    DOOR("door", ROLLERSHUTTER, "door", "OpenLevel"),
+    GARAGE("garage", ROLLERSHUTTER, "garagedoor", "OpenLevel"),
+    GATE("gate", ROLLERSHUTTER, "door", "OpenLevel"),
+    SHADE("shade", ROLLERSHUTTER, "rollershutter", "OpenLevel"),
+    SHUTTER("shutter", ROLLERSHUTTER, "rollershutter", "OpenLevel"),
+    WINDOW("window", ROLLERSHUTTER, "window", "OpenLevel");
 
     private final String deviceClass;
 

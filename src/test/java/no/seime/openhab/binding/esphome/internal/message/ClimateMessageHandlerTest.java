@@ -30,14 +30,15 @@ public class ClimateMessageHandlerTest {
         ClimateMessageHandler messageHandler = new ClimateMessageHandler(handler);
 
         Configuration fanModeConfig = new Configuration();
-        fanModeConfig.put(BindingConstants.COMMAND_KEY, 1);
-        fanModeConfig.put(BindingConstants.COMMAND_FIELD, "custom_fan_mode");
+        fanModeConfig.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_KEY, 1);
+        fanModeConfig.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD, "custom_fan_mode");
         Channel customFanModeChannel = ChannelBuilder.create(new ChannelUID("esphome:device:1:custom_fan_mode"))
                 .withConfiguration(fanModeConfig).build();
 
         Configuration presetConfig = new Configuration();
-        presetConfig.put(BindingConstants.COMMAND_KEY, 1);
-        presetConfig.put(BindingConstants.COMMAND_FIELD, ClimateMessageHandler.CHANNEL_CUSTOM_PRESET);
+        presetConfig.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_KEY, 1);
+        presetConfig.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD,
+                ClimateMessageHandler.CHANNEL_CUSTOM_PRESET);
         Channel customPresetChannel = ChannelBuilder.create(new ChannelUID("esphome:device:1:custom_preset"))
                 .withConfiguration(presetConfig).build();
 

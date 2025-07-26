@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.STRING;
+
 import java.util.Set;
 
 import org.openhab.core.library.types.StringType;
@@ -15,6 +17,7 @@ import org.openhab.core.types.UnDefType;
 import io.esphome.api.ListEntitiesSelectResponse;
 import io.esphome.api.SelectCommandRequest;
 import io.esphome.api.SelectStateResponse;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -30,17 +33,17 @@ public class SelectMessageHandler extends AbstractMessageHandler<ListEntitiesSel
     }
 
     public void buildChannels(ListEntitiesSelectResponse rsp) {
-        String itemType = "String";
 
         String icon = getChannelIcon(rsp.getIcon(), null);
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Setpoint"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), STRING, Set.of("Setpoint"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = optionListStateDescription(rsp.getOptionsList());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withAcceptedItemType(itemType).withConfiguration(configuration(rsp.getKey(), null, "Select")).build();
+                .withAcceptedItemType(STRING).withConfiguration(configuration(EntityTypes.SELECT, rsp.getKey(), null))
+                .build();
 
         super.registerChannel(channel, channelType, stateDescription);
     }

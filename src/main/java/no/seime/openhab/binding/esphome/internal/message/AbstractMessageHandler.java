@@ -1,5 +1,8 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.DATETIME;
+import static org.openhab.core.library.CoreItemFactory.NUMBER;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -135,15 +138,15 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         return builder.build();
     }
 
-    protected Configuration configuration(int key, String subCommand, String commandClass) {
+    protected Configuration configuration(String entityType, int entityKey, String entityField) {
         Configuration configuration = new Configuration();
-        configuration.put(BindingConstants.COMMAND_KEY, key);
-        if (subCommand != null) {
-            configuration.put(BindingConstants.COMMAND_FIELD, subCommand);
+        configuration.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_KEY, entityKey);
+        if (entityField != null) {
+            configuration.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD, entityField);
         }
 
-        if (commandClass != null) {
-            configuration.put(BindingConstants.COMMAND_CLASS, commandClass);
+        if (entityType != null) {
+            configuration.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_TYPE, entityType);
         }
 
         return configuration;
@@ -187,7 +190,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             logger.info(
                     "[{}] Could not determine item type for entity '{}' as neither device_class nor unit_of_measurement is present. Consider augmenting your ESPHome configuration. Using default 'Number'",
                     handler.getLogPrefix(), name);
-            itemTypeToUse = "Number";
+            itemTypeToUse = NUMBER;
         }
         return itemTypeToUse;
     }
@@ -200,7 +203,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         if (unit != null) {
             String dimensionName = UnitUtils.getDimensionName(unit);
             if (dimensionName != null) {
-                return "Number:" + dimensionName;
+                return String.format("%s:%s", NUMBER, dimensionName);
             }
         }
         return null;
@@ -254,9 +257,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             if (deviceClass != null) {
                 SensorNumberDeviceClass sensorDeviceClass = SensorNumberDeviceClass.fromDeviceClass(deviceClass);
                 if (sensorDeviceClass != null) {
-                    if (sensorDeviceClass.getItemType().startsWith("Number")) {
+                    if (sensorDeviceClass.getItemType().startsWith(NUMBER)) {
                         return toNumericState(channel, state);
-                    } else if (sensorDeviceClass.getItemType().startsWith("DateTime")) {
+                    } else if (sensorDeviceClass.getItemType().startsWith(DATETIME)) {
                         return toDateTimeState((int) state, missingState);
                     } else {
                         logger.warn(
@@ -301,14 +304,15 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     public Optional<Channel> findChannelByKey(int key) {
         return handler.getThing().getChannels().stream()
-                .filter(e -> BigDecimal.valueOf(key).equals(e.getConfiguration().get(BindingConstants.COMMAND_KEY)))
+                .filter(e -> BigDecimal.valueOf(key)
+                        .equals(e.getConfiguration().get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_KEY)))
                 .findFirst();
     }
 
     public Optional<Channel> findChannelByKeyAndField(int key, String field) {
-        return handler.getThing().getChannels().stream().filter(
-                channel -> BigDecimal.valueOf(key).equals(channel.getConfiguration().get(BindingConstants.COMMAND_KEY))
-                        && field.equals(channel.getConfiguration().get(BindingConstants.COMMAND_FIELD)))
+        return handler.getThing().getChannels().stream().filter(channel -> BigDecimal.valueOf(key)
+                .equals(channel.getConfiguration().get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_KEY))
+                && field.equals(channel.getConfiguration().get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD)))
                 .findFirst();
     }
 

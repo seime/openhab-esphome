@@ -1,5 +1,8 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.DATETIME;
+import static org.openhab.core.library.CoreItemFactory.NUMBER;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import io.esphome.api.ListEntitiesSensorResponse;
 import io.esphome.api.SensorStateClass;
 import io.esphome.api.SensorStateResponse;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -36,7 +40,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
     @Override
     public void buildChannels(ListEntitiesSensorResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, null);
+        Configuration configuration = configuration(EntityTypes.SENSOR, rsp.getKey(), null);
         String deviceClass = rsp.getDeviceClass();
         if (deviceClass != null && !"".equals(deviceClass)) {
             configuration.put("deviceClass", deviceClass);
@@ -61,8 +65,8 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         ChannelType channelType;
         StateDescription stateDescription;
 
-        if (sensorDeviceClass != null && "DateTime".equals(sensorDeviceClass.getItemType())) {
-            itemType = "DateTime";
+        if (sensorDeviceClass != null && DATETIME.equals(sensorDeviceClass.getItemType())) {
+            itemType = DATETIME;
             channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS", true);
@@ -76,7 +80,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
                 } else {
                     logger.warn("[{}] Unit of measurement '{}' is not supported by openHAB, ignoring",
                             handler.getLogPrefix(), unitOfMeasurement);
-                    itemType = "Number";
+                    itemType = NUMBER;
                 }
             }
 

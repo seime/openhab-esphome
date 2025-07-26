@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.SWITCH;
+
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
@@ -14,6 +16,7 @@ import org.openhab.core.types.Command;
 import io.esphome.api.ListEntitiesSwitchResponse;
 import io.esphome.api.SwitchCommandRequest;
 import io.esphome.api.SwitchStateResponse;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -29,16 +32,16 @@ public class SwitchMessageHandler extends AbstractMessageHandler<ListEntitiesSwi
     }
 
     public void buildChannels(ListEntitiesSwitchResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, "Switch");
+        Configuration configuration = configuration(EntityTypes.SWITCH, rsp.getKey(), null);
 
         String icon = getChannelIcon(rsp.getIcon(), "switch");
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), "Switch", Set.of("Switch"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), SWITCH, Set.of("Switch"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withAcceptedItemType("Switch").withConfiguration(configuration).build();
+                .withAcceptedItemType(SWITCH).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType);
     }

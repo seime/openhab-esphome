@@ -33,9 +33,7 @@ import com.google.protobuf.GeneratedMessage;
 import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.*;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.CommunicationListener;
-import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
+import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
@@ -104,45 +102,45 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.defaultEncryptionKey = defaultEncryptionKey;
 
         // Register message handlers for each type of message pairs
-        registerMessageHandler("Select", new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
+        registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
                 SelectStateResponse.class);
-        registerMessageHandler("Sensor", new SensorMessageHandler(this), ListEntitiesSensorResponse.class,
+        registerMessageHandler(EntityTypes.SENSOR, new SensorMessageHandler(this), ListEntitiesSensorResponse.class,
                 SensorStateResponse.class);
-        registerMessageHandler("BinarySensor", new BinarySensorMessageHandler(this),
+        registerMessageHandler(EntityTypes.BINARY_SENSOR, new BinarySensorMessageHandler(this),
                 ListEntitiesBinarySensorResponse.class, BinarySensorStateResponse.class);
-        registerMessageHandler("TextSensor", new TextSensorMessageHandler(this), ListEntitiesTextSensorResponse.class,
-                TextSensorStateResponse.class);
-        registerMessageHandler("Text", new TextMessageHandler(this), ListEntitiesTextResponse.class,
+        registerMessageHandler(EntityTypes.TEXT_SENSOR, new TextSensorMessageHandler(this),
+                ListEntitiesTextSensorResponse.class, TextSensorStateResponse.class);
+        registerMessageHandler(EntityTypes.TEXT, new TextMessageHandler(this), ListEntitiesTextResponse.class,
                 TextStateResponse.class);
-        registerMessageHandler("Switch", new SwitchMessageHandler(this), ListEntitiesSwitchResponse.class,
+        registerMessageHandler(EntityTypes.SWITCH, new SwitchMessageHandler(this), ListEntitiesSwitchResponse.class,
                 SwitchStateResponse.class);
-        registerMessageHandler("Climate", new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,
+        registerMessageHandler(EntityTypes.CLIMATE, new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,
                 ClimateStateResponse.class);
-        registerMessageHandler("Number", new NumberMessageHandler(this), ListEntitiesNumberResponse.class,
+        registerMessageHandler(EntityTypes.NUMBER, new NumberMessageHandler(this), ListEntitiesNumberResponse.class,
                 NumberStateResponse.class);
-        registerMessageHandler("Light", new LightMessageHandler(this), ListEntitiesLightResponse.class,
+        registerMessageHandler(EntityTypes.LIGHT, new LightMessageHandler(this), ListEntitiesLightResponse.class,
                 LightStateResponse.class);
-        registerMessageHandler("Button", new ButtonMessageHandler(this), ListEntitiesButtonResponse.class,
+        registerMessageHandler(EntityTypes.BUTTON, new ButtonMessageHandler(this), ListEntitiesButtonResponse.class,
                 ButtonCommandRequest.class);
-        registerMessageHandler("Cover", new CoverMessageHandler(this), ListEntitiesCoverResponse.class,
+        registerMessageHandler(EntityTypes.COVER, new CoverMessageHandler(this), ListEntitiesCoverResponse.class,
                 CoverStateResponse.class);
-        registerMessageHandler("Fan", new FanMessageHandler(this), ListEntitiesFanResponse.class,
+        registerMessageHandler(EntityTypes.FAN, new FanMessageHandler(this), ListEntitiesFanResponse.class,
                 FanStateResponse.class);
-        registerMessageHandler("Date", new DateMessageHandler(this), ListEntitiesDateResponse.class,
+        registerMessageHandler(EntityTypes.DATE, new DateMessageHandler(this), ListEntitiesDateResponse.class,
                 DateStateResponse.class);
-        registerMessageHandler("DateTime", new DateTimeMessageHandler(this), ListEntitiesDateTimeResponse.class,
-                DateTimeStateResponse.class);
-        registerMessageHandler("Time", new TimeMessageHandler(this), ListEntitiesTimeResponse.class,
+        registerMessageHandler(EntityTypes.DATE_TIME, new DateTimeMessageHandler(this),
+                ListEntitiesDateTimeResponse.class, DateTimeStateResponse.class);
+        registerMessageHandler(EntityTypes.TIME, new TimeMessageHandler(this), ListEntitiesTimeResponse.class,
                 TimeStateResponse.class);
-        registerMessageHandler("Lock", new LockMessageHandler(this), ListEntitiesLockResponse.class,
+        registerMessageHandler(EntityTypes.LOCK, new LockMessageHandler(this), ListEntitiesLockResponse.class,
                 LockStateResponse.class);
     }
 
-    private void registerMessageHandler(String select,
+    private void registerMessageHandler(String entityType,
             AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> messageHandler,
             Class<? extends GeneratedMessage> listEntitiesClass, Class<? extends GeneratedMessage> stateClass) {
 
-        commandTypeToHandlerMap.put(select, messageHandler);
+        commandTypeToHandlerMap.put(entityType, messageHandler);
         classToHandlerMap.put(listEntitiesClass, messageHandler);
         classToHandlerMap.put(stateClass, messageHandler);
     }
@@ -276,19 +274,20 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     .findFirst();
             optionalChannel.ifPresent(channel -> {
                 try {
-                    String commandClass = (String) channel.getConfiguration().get(BindingConstants.COMMAND_CLASS);
-                    if (commandClass == null) {
-                        logger.warn("[{}] No command class for channel {}", logPrefix, channelUID);
+                    String entityType = (String) channel.getConfiguration()
+                            .get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_TYPE);
+                    if (entityType == null) {
+                        logger.warn("[{}] No entity type configuration found for channel {}", logPrefix, channelUID);
                         return;
                     }
 
                     AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = commandTypeToHandlerMap
-                            .get(commandClass);
+                            .get(entityType);
                     if (abstractMessageHandler == null) {
-                        logger.warn("[{}] No message handler for command class {}", logPrefix, commandClass);
+                        logger.warn("[{}] No message handler for entity type {}", logPrefix, entityType);
                     } else {
-                        int key = ((BigDecimal) channel.getConfiguration().get(BindingConstants.COMMAND_KEY))
-                                .intValue();
+                        int key = ((BigDecimal) channel.getConfiguration()
+                                .get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_KEY)).intValue();
                         abstractMessageHandler.handleCommand(channel, command, key);
                     }
 

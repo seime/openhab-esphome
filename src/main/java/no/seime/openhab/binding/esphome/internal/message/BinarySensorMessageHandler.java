@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
+import static org.openhab.core.library.CoreItemFactory.CONTACT;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -20,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import io.esphome.api.BinarySensorStateResponse;
 import io.esphome.api.ListEntitiesBinarySensorResponse;
 import io.esphome.api.SelectCommandRequest;
+import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -38,7 +41,7 @@ public class BinarySensorMessageHandler
 
     @Override
     public void buildChannels(ListEntitiesBinarySensorResponse rsp) {
-        Configuration configuration = configuration(rsp.getKey(), null, null);
+        Configuration configuration = configuration(EntityTypes.BINARY_SENSOR, rsp.getKey(), null);
 
         String deviceClass = rsp.getDeviceClass();
         if (!deviceClass.isEmpty()) {
@@ -93,7 +96,7 @@ public class BinarySensorMessageHandler
     private static boolean isDeviceClassContact(String deviceClass) {
         if (deviceClass != null) {
             BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
-            return binarySensorDeviceClass != null && "Contact".equals(binarySensorDeviceClass.getItemType());
+            return binarySensorDeviceClass != null && CONTACT.equals(binarySensorDeviceClass.getItemType());
         }
         return false;
     }
