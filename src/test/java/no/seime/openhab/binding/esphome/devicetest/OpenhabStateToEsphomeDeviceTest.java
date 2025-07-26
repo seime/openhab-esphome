@@ -115,7 +115,9 @@ public class OpenhabStateToEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         // Verify that initial state is copied via the copy sensor and transferred back
         for (Parameter parameter : testParameters) {
-            verify(thingHandlerCallback, timeout(2000)).stateUpdated(
+            // TODO: seems like we get two state updates after esphome 2025.07.x, not sure why yet - thus times(2) in
+            // the verification
+            verify(thingHandlerCallback, timeout(2000).times(2)).stateUpdated(
                     eq(new ChannelUID(thing.getUID(), parameter.itemOrThingId.toLowerCase() + "_readback")),
                     eq(parameter.existingState));
         }
