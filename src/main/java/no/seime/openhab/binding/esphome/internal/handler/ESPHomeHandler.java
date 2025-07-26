@@ -319,6 +319,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     case UNINITIALIZED -> logger.debug(
                             "[{}] Received packet {} while uninitialized, this can happen when the socket is closed while unprocessed packets exists. Ignoring",
                             logPrefix, message.getClass().getSimpleName());
+                    case CONNECTING -> {
+                        // We are still connecting, so we ignore any packets
+                        logger.debug("[{}] Received packet {} while connecting, ignoring", logPrefix,
+                                message.getClass().getSimpleName());
+                    }
                     case HELLO_SENT -> handleHelloResponse(message);
                     case LOGIN_SENT -> handleLoginResponse(message);
                     case CONNECTED -> handleConnected(message);
