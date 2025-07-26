@@ -428,7 +428,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper = null;
             }
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
-            deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage());
+            deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
         } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
             initializeStateSubscription(subscribeHomeAssistantStateResponse);
         } else if (message instanceof GetTimeRequest) {
