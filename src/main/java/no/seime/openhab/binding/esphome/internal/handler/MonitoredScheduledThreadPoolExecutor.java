@@ -19,7 +19,7 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
     }
 
     private void logQueue() {
-        if (getQueue().size() > 20)
+        if (getQueue().size() > 100)
             logger.warn(
                     "Queue size for processing packets from ESP device as well as maintaining the watchdog is high: {}",
                     getQueue().size());
