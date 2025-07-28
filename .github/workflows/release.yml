@@ -43,12 +43,14 @@ jobs:
             ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
       - name: Build
         run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=17 clean verify
+
   release_oh4:
+    needs: build_oh4
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     steps:
       - name: Create release
-        needs: build_oh4
-        if: github.ref == 'refs/heads/master'
-        uses: "marvinpinto/action-automatic-releases@latest"
+        uses: marvinpinto/action-automatic-releases@latest
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest_oh4"
