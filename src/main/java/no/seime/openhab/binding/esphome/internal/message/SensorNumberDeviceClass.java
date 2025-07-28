@@ -4,22 +4,32 @@ import static org.openhab.core.library.CoreItemFactory.*;
 
 public enum SensorNumberDeviceClass {
 
+    // https://www.openhab.org/docs/concepts/units-of-measurement.html
+    // https://www.home-assistant.io/integrations/sensor#device-class
+    // https://www.openhab.org/docs/configuration/iconsets/classic/
+    // Updated as of HA 2025.7.3
+
     GENERIC_NUMBER("generic_number", NUMBER, "zoom", null),
     ENUM("enum", STRING, "text", null),
     TIMESTAMP("timestamp", DATETIME, "time", null),
     APPARENT_POWER("apparent_power", toItem("Power"), "energy", null),
     AQI("aqi", NUMBER, "smoke", null),
+    AREA("area", toItem("Area"), "none", null),
+
     ATMOSPHERIC_PRESSURE("atmospheric_pressure", toItem("Pressure"), "pressure", null),
     BATTERY("battery", toItem("Dimensionless"), "batterylevel", null),
+    BLOOD_GLUCOSE_CONCENTRATION("blood_glucose_concentration", NUMBER, null, null), // No dimension in OH?
     CO("carbon_monoxide", toItem("Dimensionless"), "smoke", "CO"),
     CO2("carbon_dioxide", toItem("Dimensionless"), "carbondioxide", "CO2"),
     CURRENT("current", toItem("ElectricCurrent"), "energy", "Current"),
 
     DATA_RATE("data_rate", toItem("DataTransferRate"), null, null),
     DATA_SIZE("data_size", toItem("DataAmount"), null, null),
+    DATE("date", DATETIME, "time", null),
     DISTANCE("distance", toItem("Length"), null, null),
     DURATION("duration", toItem("Time"), "time", null),
     ENERGY("energy", toItem("Energy"), "energy", "Energy"),
+    ENERGY_DISTANCE("energy_distance", toItem("Energy"), "energy", "Energy"), // Not sure which dimension to use
     ENERGY_STORAGE("energy_storage", toItem("Energy"), "energy", "Energy"),
     FREQUENCY("frequency", toItem("Frequency"), null, "Frequency"),
 
@@ -42,8 +52,10 @@ public enum SensorNumberDeviceClass {
     POWER_FACTOR("power_factor", toItem("Dimensionless"), "energy", "Power"),
     POWER("power", toItem("Power"), "energy", "Power"),
     PRECIPITATION("precipitation", toItem("Length"), "rain", "Rain"),
-    PRECIPITATION_RATE("precipitation_rate", toItem("Speed"), "rain", "Rain"),
+    PRECIPITATION_RATE("precipitation_rate", toItem("Speed"), "rain", "Rain"), // No longer in HA?
+    PRECIPITATION_INTENSITY("precipitation_intensity", toItem("Speed"), "rain", "Rain"),
     PRESSURE("pressure", toItem("Pressure"), "pressure", "Pressure"),
+    REACTIVE_ENERGY("reactive_energy", toItem("Energy"), "energy", "Energy"),
     REACTIVE_POWER("reactive_power", toItem("Power"), "energy", "Power"),
     SIGNAL_STRENGTH("signal_strength", toItem("Power"), "qualityofservice", null),
 
@@ -58,6 +70,7 @@ public enum SensorNumberDeviceClass {
     VOLUME_STORAGE("volume_storage", toItem("Volume"), null, null),
     WATER("water", toItem("Volume"), "water", "Water"),
     WEIGHT("weight", toItem("Force"), null, null),
+    WIND_DIRECTION("wind_direction", toItem("Angle"), "wind", "Wind"),
     WIND_SPEED("wind_speed", toItem("Speed"), "wind", "Wind");
 
     private static String toItem(String dimension) {
