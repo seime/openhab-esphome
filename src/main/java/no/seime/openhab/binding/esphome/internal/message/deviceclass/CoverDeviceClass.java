@@ -1,10 +1,10 @@
-package no.seime.openhab.binding.esphome.internal.message;
+package no.seime.openhab.binding.esphome.internal.message.deviceclass;
 
 import static org.openhab.core.library.CoreItemFactory.ROLLERSHUTTER;
 
-public enum CoverDeviceClass {
+public enum CoverDeviceClass implements DeviceClass {
 
-    NONE("None", ROLLERSHUTTER, "rollershutter", "OpenLevel"),
+    NONE("None", ROLLERSHUTTER, "rollershutter", "OpenLevel", true),
     AWNING("awning", ROLLERSHUTTER, "terrace", "OpenLevel"),
     BLIND("blind", ROLLERSHUTTER, "blinds", "OpenLevel"),
     CURTAIN("curtain", ROLLERSHUTTER, "rollershutter", "OpenLevel"),
@@ -21,8 +21,12 @@ public enum CoverDeviceClass {
     private final String itemType;
     private final String category;
     private final String semanticType;
+    private final boolean defaultDeviceClass;
 
     public static CoverDeviceClass fromDeviceClass(String deviceClass) {
+        if ("".equals(deviceClass)) {
+            return NONE; // Default to NONE if deviceClass is empty
+        }
         for (CoverDeviceClass sensorDeviceClass : CoverDeviceClass.values()) {
             if (sensorDeviceClass.getDeviceClass().equals(deviceClass)) {
                 return sensorDeviceClass;
@@ -31,19 +35,34 @@ public enum CoverDeviceClass {
         return null;
     }
 
-    public String getDeviceClass() {
-        return deviceClass;
-    }
-
     CoverDeviceClass(String deviceClass, String itemType, String category, String semanticType) {
         this.deviceClass = deviceClass;
         this.itemType = itemType;
         this.category = category;
         this.semanticType = semanticType;
+        this.defaultDeviceClass = false;
+    }
+
+    CoverDeviceClass(String deviceClass, String itemType, String category, String semanticType,
+            boolean defaultDeviceClass) {
+        this.deviceClass = deviceClass;
+        this.itemType = itemType;
+        this.category = category;
+        this.semanticType = semanticType;
+        this.defaultDeviceClass = defaultDeviceClass;
+    }
+
+    public String getDeviceClass() {
+        return deviceClass;
     }
 
     public String getSemanticType() {
         return semanticType;
+    }
+
+    @Override
+    public boolean isDefault() {
+        return defaultDeviceClass;
     }
 
     public String getItemType() {

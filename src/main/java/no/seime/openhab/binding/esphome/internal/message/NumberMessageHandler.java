@@ -1,7 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
 import java.util.Set;
 
 import javax.measure.Unit;
@@ -26,6 +25,8 @@ import io.esphome.api.NumberStateResponse;
 import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.DeviceClass;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.SensorNumberDeviceClass;
 
 public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNumberResponse, NumberStateResponse> {
 
@@ -70,20 +71,11 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
     public void buildChannels(ListEntitiesNumberResponse rsp) {
         Configuration configuration = configuration(EntityTypes.NUMBER, rsp.getKey(), null);
 
-        SensorNumberDeviceClass deviceClass = SensorNumberDeviceClass.fromDeviceClass(rsp.getDeviceClass());
-        if (deviceClass == null) {
-            logger.info(
-                    "[{}] Device class `{}` unknown, using 'None' for entity '{}'. To get rid of this log message, add a 'device_class' attribute with a value from this list: https://www.home-assistant.io/integrations/number/#device-class",
-                    handler.getLogPrefix(), rsp.getDeviceClass(), rsp.getName());
-            deviceClass = SensorNumberDeviceClass.GENERIC_NUMBER;
-        }
+        DeviceClass deviceClass = resolveDeviceClassAndSetInConfiguration(configuration,
+                SensorNumberDeviceClass.fromDeviceClass(rsp.getDeviceClass()), SensorNumberDeviceClass.NONE,
+                rsp.getDeviceClass(), rsp.getName(), "https://www.home-assistant.io/integrations/number/#device-class");
 
-        Set<String> tags = new HashSet<>();
-        tags.add("Setpoint");
-        if (deviceClass.getSemanticType() != null) {
-            tags.add(deviceClass.getSemanticType());
-        }
-
+        Set<String> semanticTags = createSemanticTags("Setpoint", deviceClass);
         String unit = rsp.getUnitOfMeasurement();
         String itemType = resolveNumericItemType(unit, rsp.getName(), deviceClass);
         String step = "" + rsp.getStep();
@@ -91,7 +83,7 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, tags, icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, semanticTags, icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         StateDescription stateDescription = numericStateDescription(

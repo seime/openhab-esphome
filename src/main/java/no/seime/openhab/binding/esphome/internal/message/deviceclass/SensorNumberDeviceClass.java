@@ -1,15 +1,15 @@
-package no.seime.openhab.binding.esphome.internal.message;
+package no.seime.openhab.binding.esphome.internal.message.deviceclass;
 
 import static org.openhab.core.library.CoreItemFactory.*;
 
-public enum SensorNumberDeviceClass {
+public enum SensorNumberDeviceClass implements DeviceClass {
 
     // https://www.openhab.org/docs/concepts/units-of-measurement.html
     // https://www.home-assistant.io/integrations/sensor#device-class
     // https://www.openhab.org/docs/configuration/iconsets/classic/
     // Updated as of HA 2025.7.3
 
-    GENERIC_NUMBER("generic_number", NUMBER, "zoom", null),
+    NONE("generic_number", NUMBER, "zoom", null, true),
     ENUM("enum", STRING, "text", null),
     TIMESTAMP("timestamp", DATETIME, "time", null),
     APPARENT_POWER("apparent_power", toItem("Power"), "energy", null),
@@ -40,7 +40,7 @@ public enum SensorNumberDeviceClass {
     MOISTURE("moisture", toItem("Dimensionless"), "water", "Humidity"),
     MONETARY("monetary", NUMBER, null, null), // TODO: Add Monetary type
                                               // https://github.com/openhab/openhab-core/issues/3408
-    NITROGEN_DIOXIDE("nitrogen_dioxide", toItem("Dimensionless"), "smoke", "null"),
+    NITROGEN_DIOXIDE("nitrogen_dioxide", toItem("Dimensionless"), "smoke", null),
     NITROGEN_MONOXIDE("nitrogen_monoxide", NUMBER, "smoke", null),
     NITROUS_OXIDE("nitrous_oxide", NUMBER, "smoke", null),
 
@@ -81,8 +81,12 @@ public enum SensorNumberDeviceClass {
     private final String itemType;
     private final String category;
     private final String semanticType;
+    private final boolean defaultDeviceClass;
 
     public static SensorNumberDeviceClass fromDeviceClass(String deviceClass) {
+        if ("".equals(deviceClass)) {
+            return NONE; // Default to NONE if deviceClass is empty
+        }
         for (SensorNumberDeviceClass sensorDeviceClass : SensorNumberDeviceClass.values()) {
             if (sensorDeviceClass.getDeviceClass().equals(deviceClass)) {
                 return sensorDeviceClass;
@@ -91,25 +95,45 @@ public enum SensorNumberDeviceClass {
         return null;
     }
 
-    public String getDeviceClass() {
-        return deviceClass;
-    }
-
     SensorNumberDeviceClass(String deviceClass, String itemType, String category, String semanticType) {
         this.deviceClass = deviceClass;
         this.itemType = itemType;
         this.category = category;
         this.semanticType = semanticType;
+        this.defaultDeviceClass = false;
     }
 
+    SensorNumberDeviceClass(String deviceClass, String itemType, String category, String semanticType,
+            boolean defaultDeviceClass) {
+        this.deviceClass = deviceClass;
+        this.itemType = itemType;
+        this.category = category;
+        this.semanticType = semanticType;
+
+        this.defaultDeviceClass = defaultDeviceClass;
+    }
+
+    @Override
+    public String getDeviceClass() {
+        return deviceClass;
+    }
+
+    @Override
     public String getSemanticType() {
         return semanticType;
     }
 
+    @Override
+    public boolean isDefault() {
+        return defaultDeviceClass;
+    }
+
+    @Override
     public String getItemType() {
         return itemType;
     }
 
+    @Override
     public String getCategory() {
         return category;
     }

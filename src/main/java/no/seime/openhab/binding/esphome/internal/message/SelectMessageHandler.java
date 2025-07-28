@@ -36,7 +36,7 @@ public class SelectMessageHandler extends AbstractMessageHandler<ListEntitiesSel
 
         String icon = getChannelIcon(rsp.getIcon(), null);
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), STRING, Set.of("Setpoint"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), STRING, Set.of("Control"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = optionListStateDescription(rsp.getOptionsList());
 

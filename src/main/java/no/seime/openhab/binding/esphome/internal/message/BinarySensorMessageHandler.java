@@ -25,6 +25,8 @@ import io.esphome.api.SelectCommandRequest;
 import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.BinarySensorDeviceClass;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.DeviceClass;
 
 public class BinarySensorMessageHandler
         extends AbstractMessageHandler<ListEntitiesBinarySensorResponse, BinarySensorStateResponse> {
@@ -43,14 +45,10 @@ public class BinarySensorMessageHandler
     public void buildChannels(ListEntitiesBinarySensorResponse rsp) {
         Configuration configuration = configuration(EntityTypes.BINARY_SENSOR, rsp.getKey(), null);
 
-        BinarySensorDeviceClass deviceClass = BinarySensorDeviceClass.fromDeviceClass(rsp.getDeviceClass());
-        if (deviceClass == null) {
-            logger.info(
-                    "[{}] Device class `{}` unknown, using 'None' for entity '{}'. To get rid of this log message, add a 'device_class' attribute with a value from this list: https://www.home-assistant.io/integrations/binary_sensor/#device-class",
-                    handler.getLogPrefix(), rsp.getDeviceClass(), rsp.getName());
-            deviceClass = BinarySensorDeviceClass.GENERIC;
-        }
-        configuration.put("deviceClass", deviceClass.getDeviceClass());
+        DeviceClass deviceClass = resolveDeviceClassAndSetInConfiguration(configuration,
+                BinarySensorDeviceClass.fromDeviceClass(rsp.getDeviceClass()), BinarySensorDeviceClass.NONE,
+                rsp.getDeviceClass(), rsp.getName(),
+                "https://www.home-assistant.io/integrations/binary_sensor/#device-class");
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 

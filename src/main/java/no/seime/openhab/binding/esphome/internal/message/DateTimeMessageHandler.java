@@ -51,7 +51,7 @@ public class DateTimeMessageHandler
 
         String icon = getChannelIcon(rsp.getIcon(), "time");
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), DATETIME, Set.of("Status"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), DATETIME, Set.of("Control"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS");
 

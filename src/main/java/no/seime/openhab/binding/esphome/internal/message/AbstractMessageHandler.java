@@ -7,15 +7,13 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import javax.measure.Unit;
 import javax.validation.constraints.NotNull;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DateTimeType;
@@ -35,6 +33,8 @@ import io.esphome.api.EntityCategory;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.DeviceClass;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.SensorNumberDeviceClass;
 import no.seime.openhab.binding.esphome.internal.util.Debug;
 
 public abstract class AbstractMessageHandler<S extends GeneratedMessage, T extends GeneratedMessage> {
@@ -156,7 +156,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     public abstract void buildChannels(S rsp);
 
-    protected String resolveNumericItemType(String unit, String name, SensorNumberDeviceClass deviceClass) {
+    protected String resolveNumericItemType(String unit, String name, @NonNull DeviceClass deviceClass) {
 
         String itemTypeFromUnit = getItemTypeBaseOnUnit(unit);
         String itemTypeToUse;
@@ -165,10 +165,11 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             if (!deviceClass.getItemType().equals(itemTypeFromUnit)) {
                 // Verify that unit matches device_class as well
                 itemTypeToUse = itemTypeFromUnit;
-                logger.warn(
-                        "[{}] Unexpected combination of device_class '{}' and unit '{}' for entity '{}'. Returning item type '{}' based on unit",
-                        handler.getLogPrefix(), deviceClass.getDeviceClass(), unit, name, itemTypeToUse);
-
+                if (!deviceClass.isDefault()) {
+                    logger.warn(
+                            "[{}] Unexpected combination of device_class '{}' and unit '{}' for entity '{}'. Returning item type '{}' based on unit",
+                            handler.getLogPrefix(), deviceClass.getDeviceClass(), unit, name, itemTypeToUse);
+                }
             } else {
                 itemTypeToUse = deviceClass.getItemType();
                 logger.debug("[{}] Using item type '{}' based on device_class '{}' and unit '{}'",
@@ -180,15 +181,10 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             logger.debug(
                     "[{}] Using item type '{}' based on unit '{}' for entity '{}' since device_class is either missing from ESPHome device configuration or openhab mapping is incomplete",
                     handler.getLogPrefix(), itemTypeToUse, unit, name);
-        } else if (deviceClass != null) {
+        } else {
             itemTypeToUse = deviceClass.getItemType();
             logger.debug("[{}] Using item type '{}' based on device_class '{}' ", handler.getLogPrefix(), itemTypeToUse,
                     deviceClass.getDeviceClass());
-        } else {
-            logger.info(
-                    "[{}] Could not determine item type for entity '{}' as neither device_class nor unit_of_measurement is present. Consider augmenting your ESPHome configuration. Using default 'Number'",
-                    handler.getLogPrefix(), name);
-            itemTypeToUse = NUMBER;
         }
         return itemTypeToUse;
     }
@@ -347,5 +343,30 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             return new DateTimeType(
                     ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZoneId.systemDefault()));
         }
+    }
+
+    @NonNull
+    protected DeviceClass resolveDeviceClassAndSetInConfiguration(Configuration configuration, DeviceClass deviceClass,
+            DeviceClass defaultDeviceClass, String rawDeviceClass, String entity, String documentationLink) {
+
+        if (deviceClass == null) {
+            logger.warn(
+                    "[{}] Device class '{}' unknown, using 'None' for entity '{}'. To get rid of this log message, set 'device_class' attribute to '' or a value from this list: {}",
+                    handler.getLogPrefix(), rawDeviceClass, entity, documentationLink);
+            deviceClass = defaultDeviceClass;
+        }
+        if (configuration != null)
+            configuration.put("deviceClass", deviceClass.getDeviceClass());
+        return defaultDeviceClass;
+    }
+
+    protected Set<String> createSemanticTags(String point, DeviceClass deviceClass) {
+        Set<String> semanticTags = new HashSet<>();
+        semanticTags.add(point);
+        if (deviceClass.getSemanticType() != null) {
+            semanticTags.add(deviceClass.getSemanticType());
+        }
+
+        return semanticTags;
     }
 }

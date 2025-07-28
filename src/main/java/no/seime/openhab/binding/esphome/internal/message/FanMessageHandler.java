@@ -201,7 +201,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
         if (rsp.getSupportsOscillation()) {
             ChannelType channelTypeOscillation = addChannelType(rsp.getUniqueId() + CHANNEL_OSCILLATION, "Oscillation",
-                    SWITCH, Set.of("Switch"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    SWITCH, Set.of("Control"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channelOscillation = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_OSCILLATION))
                     .withLabel(createLabel(rsp.getName(), "Oscillation")).withKind(ChannelKind.STATE)
@@ -213,7 +213,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         if (rsp.getSupportsDirection()) {
 
             ChannelType channelTypeDirection = addChannelType(rsp.getUniqueId() + CHANNEL_DIRECTION, "Direction",
-                    STRING, null, "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    STRING, Set.of("Control"), "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(
                     Arrays.stream(FanDirection.values()).filter(e -> e != FanDirection.UNRECOGNIZED)
                             .map(e -> stripEnumPrefix(e)).collect(Collectors.toList()));
@@ -231,7 +231,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             int supportedSpeedLevels = rsp.getSupportedSpeedCount();
 
             ChannelType channelTypeSpeed = addChannelType(rsp.getUniqueId() + CHANNEL_SPEED_LEVEL, "Speed", DIMMER,
-                    Set.of("Speed"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+                    Set.of("Setpoint", "Speed"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = numericStateDescription(null,
                     BigDecimal.valueOf(100 / supportedSpeedLevels), BigDecimal.ZERO, BigDecimal.valueOf(100));
 

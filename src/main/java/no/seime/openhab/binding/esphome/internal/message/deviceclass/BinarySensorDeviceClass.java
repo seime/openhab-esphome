@@ -1,11 +1,11 @@
-package no.seime.openhab.binding.esphome.internal.message;
+package no.seime.openhab.binding.esphome.internal.message.deviceclass;
 
 import static org.openhab.core.library.CoreItemFactory.CONTACT;
 import static org.openhab.core.library.CoreItemFactory.SWITCH;
 
-public enum BinarySensorDeviceClass {
+public enum BinarySensorDeviceClass implements DeviceClass {
     // Generic binary sensor with no specific context. 0: Off, 1: On.
-    GENERIC("generic", SWITCH, "none", null),
+    NONE("None", SWITCH, "none", null, true),
 
     // Indicates low battery status. 0: Battery not low, 1: Battery low.
     BATTERY("battery", SWITCH, "battery", "LowBattery"),
@@ -95,8 +95,12 @@ public enum BinarySensorDeviceClass {
     private final String itemType;
     private final String category;
     private final String semanticType;
+    private final boolean defaultDeviceClass;
 
     public static BinarySensorDeviceClass fromDeviceClass(String deviceClass) {
+        if ("".equals(deviceClass)) {
+            return NONE; // Default to NONE if deviceClass is empty
+        }
         for (BinarySensorDeviceClass sensorDeviceClass : BinarySensorDeviceClass.values()) {
             if (sensorDeviceClass.getDeviceClass().equals(deviceClass)) {
                 return sensorDeviceClass;
@@ -105,25 +109,44 @@ public enum BinarySensorDeviceClass {
         return null;
     }
 
-    public String getDeviceClass() {
-        return deviceClass;
-    }
-
     BinarySensorDeviceClass(String deviceClass, String itemType, String category, String semanticType) {
         this.deviceClass = deviceClass;
         this.itemType = itemType;
         this.category = category;
         this.semanticType = semanticType;
+        this.defaultDeviceClass = false;
     }
 
+    BinarySensorDeviceClass(String deviceClass, String itemType, String category, String semanticType,
+            boolean defaultDeviceClass) {
+        this.deviceClass = deviceClass;
+        this.itemType = itemType;
+        this.category = category;
+        this.semanticType = semanticType;
+        this.defaultDeviceClass = defaultDeviceClass;
+    }
+
+    @Override
+    public String getDeviceClass() {
+        return deviceClass;
+    }
+
+    @Override
     public String getSemanticType() {
         return semanticType;
     }
 
+    @Override
+    public boolean isDefault() {
+        return defaultDeviceClass;
+    }
+
+    @Override
     public String getItemType() {
         return itemType;
     }
 
+    @Override
     public String getCategory() {
         return category;
     }

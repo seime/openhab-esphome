@@ -2,7 +2,6 @@ package no.seime.openhab.binding.esphome.internal.message;
 
 import static org.openhab.core.library.CoreItemFactory.*;
 
-import java.util.HashSet;
 import java.util.Set;
 
 import org.openhab.core.config.core.Configuration;
@@ -22,6 +21,8 @@ import io.esphome.api.SensorStateResponse;
 import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.DeviceClass;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.SensorNumberDeviceClass;
 
 public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSensorResponse, SensorStateResponse> {
 
@@ -40,20 +41,11 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
     public void buildChannels(ListEntitiesSensorResponse rsp) {
         Configuration configuration = configuration(EntityTypes.SENSOR, rsp.getKey(), null);
 
-        SensorNumberDeviceClass deviceClass = SensorNumberDeviceClass.fromDeviceClass(rsp.getDeviceClass());
-        if (deviceClass == null) {
-            logger.info(
-                    "[{}] Device class `{}` unknown, assuming 'None' for entity '{}'. To get rid of this log message, add a device_class attribute with a value from this list: https://www.home-assistant.io/integrations/sensor#device-class",
-                    handler.getLogPrefix(), rsp.getDeviceClass(), rsp.getName());
-            deviceClass = SensorNumberDeviceClass.GENERIC_NUMBER;
-        }
+        DeviceClass deviceClass = resolveDeviceClassAndSetInConfiguration(configuration,
+                SensorNumberDeviceClass.fromDeviceClass(rsp.getDeviceClass()), SensorNumberDeviceClass.NONE,
+                rsp.getDeviceClass(), rsp.getName(), "https://www.home-assistant.io/integrations/sensor/#device-class");
 
-        Set<String> tags = new HashSet<>();
-        tags.add("Measurement");
-        if (deviceClass.getSemanticType() != null) {
-            tags.add(deviceClass.getSemanticType());
-        }
-
+        Set<String> semanticTags = createSemanticTags("Measurement", deviceClass);
         String itemType = deviceClass.getItemType();
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
@@ -83,7 +75,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
                 }
             }
 
-            channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, tags, icon,
+            channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%." + rsp.getAccuracyDecimals() + "f "
                     + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), true);

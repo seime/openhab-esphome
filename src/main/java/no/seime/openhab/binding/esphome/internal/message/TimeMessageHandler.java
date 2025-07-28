@@ -49,7 +49,7 @@ public class TimeMessageHandler extends AbstractMessageHandler<ListEntitiesTimeR
         String icon = getChannelIcon(rsp.getIcon(), "time");
 
         String itemType = "Number:Time";
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Control"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%1$tH:%1$tM:%1$tS");
 

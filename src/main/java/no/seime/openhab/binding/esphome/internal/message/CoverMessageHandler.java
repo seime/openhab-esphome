@@ -27,6 +27,8 @@ import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.EntityTypes;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.CoverDeviceClass;
+import no.seime.openhab.binding.esphome.internal.message.deviceclass.DeviceClass;
 
 public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCoverResponse, CoverStateResponse> {
 
@@ -168,20 +170,17 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
     public void buildChannels(ListEntitiesCoverResponse rsp) {
 
-        CoverDeviceClass deviceClass = CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass());
-        if (deviceClass == null) {
-            logger.info(
-                    "[{}] Device class `{}` unknown, assuming 'None' for entity '{}'. To get rid of this log message, add a device_class attribute with a value from this list: https://www.home-assistant.io/integrations/cover/#device-class",
-                    handler.getLogPrefix(), rsp.getDeviceClass(), rsp.getName());
-            deviceClass = CoverDeviceClass.NONE;
-        }
+        DeviceClass deviceClass = resolveDeviceClassAndSetInConfiguration(null,
+                CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass()), CoverDeviceClass.NONE, rsp.getDeviceClass(),
+                rsp.getName(), "https://www.home-assistant.io/integrations/cover/#device-class");
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
         if (rsp.getSupportsPosition()) {
+            Set<String> semanticTags = createSemanticTags("OpenLevel", deviceClass);
+
             ChannelType channelTypePosition = addChannelType(rsp.getUniqueId() + CHANNEL_POSITION, "Position",
-                    deviceClass.getItemType(), Set.of("OpenLevel"), icon, rsp.getEntityCategory(),
-                    rsp.getDisabledByDefault());
+                    deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = patternStateDescription("%d %%");
 
             Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
@@ -191,9 +190,10 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
             super.registerChannel(channelPosition, channelTypePosition, stateDescription);
         }
         if (rsp.getSupportsTilt()) {
+            Set<String> semanticTags = createSemanticTags("Tilt", deviceClass);
+
             ChannelType channelTypeTilt = addChannelType(rsp.getUniqueId() + CHANNEL_TILT, "Tilt",
-                    deviceClass.getItemType(), Set.of("Tilt"), icon, rsp.getEntityCategory(),
-                    rsp.getDisabledByDefault());
+                    deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = patternStateDescription("%d %%");
 
             Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
@@ -204,8 +204,9 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         }
 
         // Legacy state
+
         ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "Legacy State",
-                deviceClass.getItemType(), Set.of("OpenClose"), icon, rsp.getEntityCategory(),
+                deviceClass.getItemType(), createSemanticTags("OpenClose", deviceClass), icon, rsp.getEntityCategory(),
                 rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%s");
 
@@ -217,8 +218,8 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         // Operation status
         ChannelType channelTypeCurrentOperation = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_OPERATION,
-                "Current operation", STRING, Set.of("Status"), "motion", rsp.getEntityCategory(),
-                rsp.getDisabledByDefault());
+                "Current operation", STRING, createSemanticTags("Status", deviceClass), "motion",
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
         stateDescription = optionListStateDescription(Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), true);
 
         Channel channelCurrentOperation = ChannelBuilder
