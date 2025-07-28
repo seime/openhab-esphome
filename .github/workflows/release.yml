@@ -35,14 +35,15 @@ jobs:
       - name: Build
         run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=17 clean verify
   release_oh4:
-    - name: Create release
-      needs: build_oh4
-      if: github.ref == 'refs/heads/master'
-      uses: "marvinpinto/action-automatic-releases@latest"
-      with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        automatic_release_tag: "latest_oh4"
-        prerelease: true
-        title: "Latest Build"
-        files: |
-          target/*.jar
+    steps:
+      - name: Create release
+        needs: build_oh4
+        if: github.ref == 'refs/heads/master'
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest_oh4"
+          prerelease: true
+          title: "Latest Build"
+          files: |
+            target/*.jar
