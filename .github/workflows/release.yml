@@ -1,5 +1,14 @@
 name: Build and create release
 
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
 jobs:
 
   build_oh4:
