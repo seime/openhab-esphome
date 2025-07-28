@@ -69,35 +69,33 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
     @Override
     public void buildChannels(ListEntitiesNumberResponse rsp) {
         Configuration configuration = configuration(EntityTypes.NUMBER, rsp.getKey(), null);
-        String unitOfMeasurement = rsp.getUnitOfMeasurement();
-        if (!"None".equals(unitOfMeasurement) && !"".equals(unitOfMeasurement)) {
-            configuration.put("unit", unitOfMeasurement);
-        }
-        String deviceClass = rsp.getDeviceClass();
-        if (deviceClass != null && !"".equals(deviceClass)) {
-            configuration.put("deviceClass", deviceClass);
-        } else {
-            configuration.put("deviceClass", "generic_number");
-        }
 
-        SensorNumberDeviceClass numberDeviceClass = SensorNumberDeviceClass.fromDeviceClass(deviceClass);
+        SensorNumberDeviceClass deviceClass = SensorNumberDeviceClass.fromDeviceClass(rsp.getDeviceClass());
+        if (deviceClass == null) {
+            logger.info(
+                    "[{}] Device class `{}` unknown, using 'None' for entity '{}'. To get rid of this log message, add a 'device_class' attribute with a value from this list: https://www.home-assistant.io/integrations/number/#device-class",
+                    handler.getLogPrefix(), rsp.getDeviceClass(), rsp.getName());
+            deviceClass = SensorNumberDeviceClass.GENERIC_NUMBER;
+        }
 
         Set<String> tags = new HashSet<>();
         tags.add("Setpoint");
-        if (numberDeviceClass != null && numberDeviceClass.getSemanticType() != null) {
-            tags.add(numberDeviceClass.getSemanticType());
+        if (deviceClass.getSemanticType() != null) {
+            tags.add(deviceClass.getSemanticType());
         }
 
-        String itemType = resolveNumericItemType(unitOfMeasurement, rsp.getName(), numberDeviceClass);
+        String unit = rsp.getUnitOfMeasurement();
+        String itemType = resolveNumericItemType(unit, rsp.getName(), deviceClass);
         String step = "" + rsp.getStep();
-        int accurracyDecimals = step.indexOf('.') > 0 ? step.length() - step.indexOf('.') - 1 : 0;
+        int accuracyDecimals = step.indexOf('.') > 0 ? step.length() - step.indexOf('.') - 1 : 0;
 
-        String icon = getChannelIcon(rsp.getIcon(), numberDeviceClass != null ? numberDeviceClass.getCategory() : null);
+        String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
         ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, tags, icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
+
         StateDescription stateDescription = numericStateDescription(
-                "%." + accurracyDecimals + "f " + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement),
+                "%." + accuracyDecimals + "f " + (unit.equals("%") ? "%unit%" : unit),
                 rsp.getStep() != 0f ? BigDecimal.valueOf(rsp.getStep()) : null,
                 rsp.getMinValue() != 0f ? BigDecimal.valueOf(rsp.getMinValue()) : null,
                 rsp.getMaxValue() != 0f ? BigDecimal.valueOf(rsp.getMaxValue()) : null);

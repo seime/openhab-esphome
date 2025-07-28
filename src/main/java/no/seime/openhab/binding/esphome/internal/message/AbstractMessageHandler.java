@@ -156,11 +156,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     public abstract void buildChannels(S rsp);
 
-    protected String resolveNumericItemType(String unitOfMeasurement, String name,
-            SensorNumberDeviceClass deviceClass) {
+    protected String resolveNumericItemType(String unit, String name, SensorNumberDeviceClass deviceClass) {
 
-        String itemTypeFromUnit = getItemTypeBaseOnUnit(unitOfMeasurement);
-
+        String itemTypeFromUnit = getItemTypeBaseOnUnit(unit);
         String itemTypeToUse;
 
         if (itemTypeFromUnit != null && deviceClass != null) {
@@ -169,19 +167,19 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
                 itemTypeToUse = itemTypeFromUnit;
                 logger.warn(
                         "[{}] Unexpected combination of device_class '{}' and unit '{}' for entity '{}'. Returning item type '{}' based on unit",
-                        handler.getLogPrefix(), deviceClass.getDeviceClass(), unitOfMeasurement, name, itemTypeToUse);
+                        handler.getLogPrefix(), deviceClass.getDeviceClass(), unit, name, itemTypeToUse);
 
             } else {
                 itemTypeToUse = deviceClass.getItemType();
                 logger.debug("[{}] Using item type '{}' based on device_class '{}' and unit '{}'",
-                        handler.getLogPrefix(), itemTypeToUse, deviceClass.getDeviceClass(), unitOfMeasurement);
+                        handler.getLogPrefix(), itemTypeToUse, deviceClass.getDeviceClass(), unit);
             }
 
         } else if (itemTypeFromUnit != null) {
             itemTypeToUse = itemTypeFromUnit;
             logger.debug(
                     "[{}] Using item type '{}' based on unit '{}' for entity '{}' since device_class is either missing from ESPHome device configuration or openhab mapping is incomplete",
-                    handler.getLogPrefix(), itemTypeToUse, unitOfMeasurement, name);
+                    handler.getLogPrefix(), itemTypeToUse, unit, name);
         } else if (deviceClass != null) {
             itemTypeToUse = deviceClass.getItemType();
             logger.debug("[{}] Using item type '{}' based on device_class '{}' ", handler.getLogPrefix(), itemTypeToUse,
@@ -201,9 +199,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
         Unit<?> unit = UnitUtils.parseUnit(unitOfMeasurement);
         if (unit != null) {
-            String dimensionName = UnitUtils.getDimensionName(unit);
-            if (dimensionName != null) {
-                return String.format("%s:%s", NUMBER, dimensionName);
+            String dimension = UnitUtils.getDimensionName(unit);
+            if (dimension != null) {
+                return String.format("%s:%s", NUMBER, dimension);
             }
         }
         return null;

@@ -43,37 +43,30 @@ public class BinarySensorMessageHandler
     public void buildChannels(ListEntitiesBinarySensorResponse rsp) {
         Configuration configuration = configuration(EntityTypes.BINARY_SENSOR, rsp.getKey(), null);
 
-        String deviceClass = rsp.getDeviceClass();
-        if (!deviceClass.isEmpty()) {
-            configuration.put("deviceClass", deviceClass);
-        } else {
-            configuration.put("deviceClass", "generic");
-        }
-
-        BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
-        if (binarySensorDeviceClass == null) {
+        BinarySensorDeviceClass deviceClass = BinarySensorDeviceClass.fromDeviceClass(rsp.getDeviceClass());
+        if (deviceClass == null) {
             logger.info(
-                    "[{}] Device class `{}` unknown, using 'None' for entity '{}'. To get rid of this log message, add a device_class attribute with a value from this list: https://www.home-assistant.io/integrations/binary_sensor/#device-class",
-                    handler.getLogPrefix(), deviceClass, rsp.getName());
-            binarySensorDeviceClass = BinarySensorDeviceClass.GENERIC;
+                    "[{}] Device class `{}` unknown, using 'None' for entity '{}'. To get rid of this log message, add a 'device_class' attribute with a value from this list: https://www.home-assistant.io/integrations/binary_sensor/#device-class",
+                    handler.getLogPrefix(), rsp.getDeviceClass(), rsp.getName());
+            deviceClass = BinarySensorDeviceClass.GENERIC;
         }
+        configuration.put("deviceClass", deviceClass.getDeviceClass());
+
+        String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
         Set<String> tags = new HashSet<>();
-        if (binarySensorDeviceClass.getSemanticType() != null) {
-            tags.add(binarySensorDeviceClass.getSemanticType());
+        if (deviceClass.getSemanticType() != null) {
+            tags.add(deviceClass.getSemanticType());
         } else {
             tags.add("Status"); // default
         }
 
-        String icon = getChannelIcon(rsp.getIcon(),
-                binarySensorDeviceClass != null ? binarySensorDeviceClass.getCategory() : null);
-
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(),
-                binarySensorDeviceClass.getItemType(), tags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), deviceClass.getItemType(), tags,
+                icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                .withAcceptedItemType(binarySensorDeviceClass.getItemType()).withConfiguration(configuration).build();
+                .withAcceptedItemType(deviceClass.getItemType()).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType, readOnlyStateDescription());
     }
