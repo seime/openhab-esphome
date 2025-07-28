@@ -170,9 +170,9 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         CoverDeviceClass deviceClass = CoverDeviceClass.fromDeviceClass(rsp.getDeviceClass());
         if (deviceClass == null) {
-            logger.warn("[{}] Cover Device class `{}` unknown, using NONE for {}", handler.getLogPrefix(), deviceClass,
-                    rsp.getUniqueId());
-
+            logger.info(
+                    "[{}] Cover Device class `{}` unknown, using 'None' for entity '{}'. To get rid of this log message, add a device_class attribute with a value from this list: https://www.home-assistant.io/integrations/cover/#device-class",
+                    handler.getLogPrefix(), deviceClass, rsp.getName());
             deviceClass = CoverDeviceClass.NONE;
 
         }

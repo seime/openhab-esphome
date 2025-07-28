@@ -52,8 +52,9 @@ public class BinarySensorMessageHandler
 
         BinarySensorDeviceClass binarySensorDeviceClass = BinarySensorDeviceClass.fromDeviceClass(deviceClass);
         if (binarySensorDeviceClass == null) {
-            logger.warn("[{}] Binary Sensor Device class `{}` unknown, using GENERIC for {}", handler.getLogPrefix(),
-                    deviceClass, rsp.getUniqueId());
+            logger.info(
+                    "[{}] Device class `{}` unknown, using 'None' for entity '{}'. To get rid of this log message, add a device_class attribute with a value from this list: https://www.home-assistant.io/integrations/binary_sensor/#device-class",
+                    handler.getLogPrefix(), deviceClass, rsp.getName());
             binarySensorDeviceClass = BinarySensorDeviceClass.GENERIC;
         }
 
