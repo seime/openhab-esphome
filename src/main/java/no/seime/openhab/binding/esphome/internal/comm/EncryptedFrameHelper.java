@@ -352,7 +352,7 @@ public class EncryptedFrameHelper {
         try {
             Method parseMethod = messageTypeToClassConverter.getMethod(messageType);
             if (parseMethod != null) {
-                GeneratedMessage invoke = (GeneratedMessage) parseMethod.invoke(null, bytes);
+                GeneratedMessage invoke = (GeneratedMessage) parseMethod.invoke(this, bytes);
                 if (invoke != null) {
                     listener.onPacket(invoke);
                 } else {

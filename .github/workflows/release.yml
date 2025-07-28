@@ -69,64 +69,64 @@ jobs:
           files: |
             target/*.jar
 
-  build_oh5:
-    strategy:
-      fail-fast: false
-      matrix:
-        java: [ '21' ]
-        maven: [ '3.9.4' ]
-        os: [ 'ubuntu-latest' ]
-    name: Build OH5 (Java ${{ matrix.java }}, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
-        with:
-          java-version: ${{matrix.java}}
-          distribution: 'temurin'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install ESPHome
-        run: |
-          pip install esphome
-      - name: Cache local Maven repository
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2/repository
-          key: ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ matrix.java }}-maven-
-            ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
-      - name: Upgrade version
-        run: mvn versions:set -DnewVersion=5.0.0-SNAPSHOT
-      - name: Upgrade parent version
-        run: mvn versions:update-parent -DskipResolution=true -DparentVersion=5.0.0
-      - name: Build
-        run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=21 clean verify
-      - name: Upload OH5 JARs
-        uses: actions/upload-artifact@v4
-        with:
-          name: oh5-artifact
-          path: target/*.jar
-
-  release_oh5:
-    needs: build_oh5
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - name: Download OH5 JARs
-        uses: actions/download-artifact@v4
-        with:
-          name: oh5-artifact
-          path: target
-      - name: Create release
-        uses: marvinpinto/action-automatic-releases@latest
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest_oh5"
-          prerelease: true
-          title: "Latest Build"
-          files: |
-            target/*.jar
+#  build_oh5:
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        java: [ '21' ]
+#        maven: [ '3.9.4' ]
+#        os: [ 'ubuntu-latest' ]
+#    name: Build OH5 (Java ${{ matrix.java }}, ${{ matrix.os }})
+#    runs-on: ${{ matrix.os }}
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: Set up JDK 21
+#        uses: actions/setup-java@v3
+#        with:
+#          java-version: ${{matrix.java}}
+#          distribution: 'temurin'
+#      - uses: actions/setup-python@v5
+#        with:
+#          python-version: '3.13'
+#      - name: Install ESPHome
+#        run: |
+#          pip install esphome
+#      - name: Cache local Maven repository
+#        uses: actions/cache@v3
+#        with:
+#          path: ~/.m2/repository
+#          key: ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
+#          restore-keys: |
+#            ${{ matrix.java }}-maven-
+#            ${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
+#      - name: Upgrade version
+#        run: mvn versions:set -DnewVersion=5.0.0-SNAPSHOT
+#      - name: Upgrade parent version
+#        run: mvn versions:update-parent -DskipResolution=true -DparentVersion=5.0.0
+#      - name: Build
+#        run: mvn -P 'standalone' --batch-mode -DskipChecks -Doh.java.version=21 clean verify
+#      - name: Upload OH5 JARs
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: oh5-artifact
+#          path: target/*.jar
+#
+#  release_oh5:
+#    needs: build_oh5
+#    runs-on: ubuntu-latest
+#    if: github.ref == 'refs/heads/master'
+#    steps:
+#      - name: Download OH5 JARs
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: oh5-artifact
+#          path: target
+#      - name: Create release
+#        uses: marvinpinto/action-automatic-releases@latest
+#        with:
+#          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+#          automatic_release_tag: "latest_oh5"
+#          prerelease: true
+#          title: "Latest Build"
+#          files: |
+#            target/*.jar

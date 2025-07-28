@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
@@ -10,37 +10,31 @@
     <version>4.1.0</version>
   </parent>
 
-  <version>4.1.0-SNAPSHOT</version>
-
   <artifactId>no.seime.openhab.binding.esphome</artifactId>
+
+  <version>4.1.0-SNAPSHOT</version>
 
   <name>Seime Add-ons :: Bundles :: ESPHome Native API</name>
 
-  <properties>
-    <oh.java.version>17</oh.java.version>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>${oh.java.version}</maven.compiler.target>
-    <maven.compiler.compilerVersion>${oh.java.version}</maven.compiler.compilerVersion>
-    <spotless.version>2.36.0</spotless.version>
-    <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
-    <proto.version>4.29.1</proto.version>
-    <protobuf-maven-plugin.version>0.7.1</protobuf-maven-plugin.version>
-
-
-  </properties>
-
   <distributionManagement>
-    <snapshotRepository>
-      <id>github</id>
-      <name>GitHub Packages</name>
-      <url>https://maven.pkg.github.com/seime/openhab-esphome</url>
-    </snapshotRepository>
     <repository>
       <id>github</id>
       <name>GitHub Packages</name>
       <url>https://maven.pkg.github.com/seime/openhab-esphome</url>
     </repository>
+    <snapshotRepository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/seime/openhab-esphome</url>
+    </snapshotRepository>
   </distributionManagement>
+
+  <properties>
+    <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
+    <proto.version>4.29.1</proto.version>
+    <protobuf-maven-plugin.version>0.7.1</protobuf-maven-plugin.version>
+
+  </properties>
 
   <dependencies>
     <dependency>
@@ -84,7 +78,6 @@
       <scope>test</scope>
     </dependency>
 
-
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
@@ -115,18 +108,18 @@
 
   <repositories>
     <repository>
-      <id>openhab-release</id>
-      <url>https://openhab.jfrog.io/artifactory/libs-release</url>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
+      <id>openhab-release</id>
+      <url>https://openhab.jfrog.io/artifactory/libs-release</url>
     </repository>
     <repository>
-      <id>openhab-snapshot</id>
-      <url>https://openhab.jfrog.io/artifactory/libs-snapshot</url>
       <snapshots>
         <enabled>true</enabled>
       </snapshots>
+      <id>openhab-snapshot</id>
+      <url>https://openhab.jfrog.io/artifactory/libs-snapshot</url>
     </repository>
   </repositories>
 
@@ -221,7 +214,5 @@
 
     </profile>
   </profiles>
-
-
 
 </project>
