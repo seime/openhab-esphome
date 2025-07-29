@@ -220,6 +220,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     if (defaultEncryptionKey != null) {
                         encryptionKey = defaultEncryptionKey;
                         logger.info("[{}] Using binding default encryption key", logPrefix);
+                    } else {
+                        logger.warn("[{}] No encryption key configured on neither binding nor thing. Cannot continue",
+                                logPrefix);
+                        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
+                                "No encryption key configured. Please set 'encryptionKey' in thing configuration or a default one in binding configuration");
+                        return;
                     }
                 }
 
