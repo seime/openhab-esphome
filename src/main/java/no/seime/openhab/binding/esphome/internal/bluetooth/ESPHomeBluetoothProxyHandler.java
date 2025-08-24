@@ -22,6 +22,7 @@ import com.google.protobuf.GeneratedMessage;
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
+import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThreadPoolExecutor;
 
 @NonNullByDefault
 public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler<ESPHomeBluetoothDevice> {
@@ -41,15 +42,20 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private final Map<ESPHomeBluetoothDevice, ESPHomeHandler> connectionMap = new ConcurrentHashMap<>();
 
+    private final MonitoredScheduledThreadPoolExecutor executor;
+
     /**
      * Creates a new instance of this class for the {@link Thing}.
      *
      * @param bridge the thing that should be handled, not null
      * @param thingRegistry
+     * @param executor
      */
-    public ESPHomeBluetoothProxyHandler(Bridge bridge, ThingRegistry thingRegistry) {
+    public ESPHomeBluetoothProxyHandler(Bridge bridge, ThingRegistry thingRegistry,
+            MonitoredScheduledThreadPoolExecutor executor) {
         super(bridge);
         this.thingRegistry = thingRegistry;
+        this.executor = executor;
         CacheLoader<Long, Optional<BluetoothLEAdvertisementResponse>> loader;
         loader = new CacheLoader<>() {
 
@@ -67,7 +73,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         super.initialize();
         updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Looking for BLE enabled ESPHome devices");
 
-        registrationFuture = scheduler.scheduleWithFixedDelay(this::updateESPHomeDeviceList, 0, 5, TimeUnit.SECONDS);
+        registrationFuture = executor.scheduleWithFixedDelay(this::updateESPHomeDeviceList, 0, 5, TimeUnit.SECONDS);
     }
 
     @Override
@@ -268,16 +274,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         connectionMap.remove(espHomeBluetoothDevice);
     }
 
-    private static class DeviceAndRSSI implements Comparable<DeviceAndRSSI> {
-        private final ThingUID device;
-        private final int rssi;
-        private final Instant lastSeen;
-
-        public DeviceAndRSSI(ThingUID device, int rssi, Instant lastSeen) {
-            this.device = device;
-            this.rssi = rssi;
-            this.lastSeen = lastSeen;
-        }
+    private record DeviceAndRSSI(ThingUID device, int rssi, Instant lastSeen) implements Comparable<DeviceAndRSSI> {
 
         @Override
         public int compareTo(DeviceAndRSSI o) {
