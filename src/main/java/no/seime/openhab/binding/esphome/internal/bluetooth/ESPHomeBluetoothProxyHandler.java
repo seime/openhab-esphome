@@ -177,6 +177,9 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         } else if (message instanceof BluetoothScannerStateResponse rsp) {
             logger.debug("Received BluetoothScannerStateResponse from {} with status {}, currently ignored",
                     handler.getThing().getUID(), rsp.getState());
+        } else if (message instanceof BluetoothLERawAdvertisementsResponse) {
+            logger.debug("Received BluetoothLERawAdvertisementsResponse from {}, currently ignored",
+                    handler.getThing().getUID());
         } else {
             logger.warn("Received unhandled Bluetooth packet type: {} from {}", message.getClass().getSimpleName(),
                     handler.getThing().getUID());
