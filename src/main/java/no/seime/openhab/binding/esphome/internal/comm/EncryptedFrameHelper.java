@@ -136,6 +136,7 @@ public class EncryptedFrameHelper {
                 processBuffer();
             } else {
                 // Compact the buffer to make room for more data while preserving existing data
+                internalBuffer.position(internalBuffer.position() - 3 );
                 internalBuffer.compact();
             }
         } catch (ShortBufferException e) {
