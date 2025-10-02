@@ -112,7 +112,7 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
         Set<String> semanticTags = Set.of("Control", "Light");
         if (capabilities.contains(LightColorCapability.RGB)) {
             // Go for a single Color channel
-            ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), COLOR, semanticTags, icon,
+            ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), COLOR, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
@@ -122,7 +122,7 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
             super.registerChannel(channel, channelType);
         } else if (capabilities.contains(LightColorCapability.BRIGHTNESS)) {
             // Go for a single Dimmer channel
-            ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), DIMMER, semanticTags, icon,
+            ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), DIMMER, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
@@ -132,7 +132,7 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
             super.registerChannel(channel, channelType);
         } else if (capabilities.contains(LightColorCapability.ON_OFF)) {
             // Go for a single Switch channel
-            ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), SWITCH, semanticTags, icon,
+            ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), SWITCH, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
@@ -144,7 +144,7 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
 
         if (rsp.getEffectsCount() > 0) {
             // Create effects channel
-            ChannelType channelType = addChannelType(rsp.getUniqueId() + "-effects", rsp.getName(), STRING,
+            ChannelType channelType = addChannelType(rsp.getObjectId() + "-effects", rsp.getName(), STRING,
                     semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(rsp.getEffectsList());
 
