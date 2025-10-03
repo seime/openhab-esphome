@@ -83,7 +83,7 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, semanticTags, icon,
+        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, semanticTags, icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         StateDescription stateDescription = numericStateDescription(

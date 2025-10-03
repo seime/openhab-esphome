@@ -179,7 +179,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         if (rsp.getSupportsPosition()) {
             Set<String> semanticTags = createSemanticTags("OpenLevel", deviceClass);
 
-            ChannelType channelTypePosition = addChannelType(rsp.getUniqueId() + CHANNEL_POSITION, "Position",
+            ChannelType channelTypePosition = addChannelType(rsp.getObjectId() + CHANNEL_POSITION, "Position",
                     deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = patternStateDescription("%d %%");
 
@@ -192,7 +192,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         if (rsp.getSupportsTilt()) {
             Set<String> semanticTags = createSemanticTags("Tilt", deviceClass);
 
-            ChannelType channelTypeTilt = addChannelType(rsp.getUniqueId() + CHANNEL_TILT, "Tilt",
+            ChannelType channelTypeTilt = addChannelType(rsp.getObjectId() + CHANNEL_TILT, "Tilt",
                     deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = patternStateDescription("%d %%");
 
@@ -205,7 +205,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         // Legacy state
 
-        ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + LEGACY_CHANNEL_STATE, "Legacy State",
+        ChannelType channelTypeState = addChannelType(rsp.getObjectId() + LEGACY_CHANNEL_STATE, "Legacy State",
                 deviceClass.getItemType(), createSemanticTags("OpenClose", deviceClass), icon, rsp.getEntityCategory(),
                 rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%s");
@@ -217,7 +217,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         super.registerChannel(channelState, channelTypeState, stateDescription);
 
         // Operation status
-        ChannelType channelTypeCurrentOperation = addChannelType(rsp.getUniqueId() + CHANNEL_CURRENT_OPERATION,
+        ChannelType channelTypeCurrentOperation = addChannelType(rsp.getObjectId() + CHANNEL_CURRENT_OPERATION,
                 "Current operation", STRING, createSemanticTags("Status", deviceClass), "motion",
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         stateDescription = optionListStateDescription(Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), true);

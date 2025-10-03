@@ -36,7 +36,7 @@ public class SwitchMessageHandler extends AbstractMessageHandler<ListEntitiesSwi
 
         String icon = getChannelIcon(rsp.getIcon(), "switch");
 
-        ChannelType channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), SWITCH, Set.of("Switch"), icon,
+        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), SWITCH, Set.of("Switch"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))

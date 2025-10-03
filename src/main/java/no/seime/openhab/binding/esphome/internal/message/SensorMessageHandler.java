@@ -53,11 +53,11 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         StateDescription stateDescription;
 
         if (deviceClass.getItemType().equals(DATETIME)) {
-            channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
+            channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, Set.of("Status"), icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS", true);
         } else if (deviceClass.getItemType().equals(STRING)) {
-            channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, Set.of("Status"), icon,
+            channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, Set.of("Status"), icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%s", true);
         } else {
@@ -75,7 +75,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
                 }
             }
 
-            channelType = addChannelType(rsp.getUniqueId(), rsp.getName(), itemType, semanticTags, icon,
+            channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%." + rsp.getAccuracyDecimals() + "f "
                     + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), true);

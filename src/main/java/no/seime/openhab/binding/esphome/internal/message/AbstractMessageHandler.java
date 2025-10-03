@@ -46,11 +46,11 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         this.handler = handler;
     }
 
-    protected ChannelType addChannelType(final String channelTypePrefix, final String label, final String itemType,
+    protected ChannelType addChannelType(final String channelTypeSuffix, final String label, final String itemType,
             @Nullable final Set<String> tags, String category, EntityCategory entityCategory,
             boolean disabledByDefault) {
         final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
-                channelTypePrefix + handler.getThing().getUID().getId());
+                handler.getThing().getUID().getId() + "_" + channelTypeSuffix);
 
         final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID, label, itemType);
         if (tags != null && !tags.isEmpty()) {
@@ -357,7 +357,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
         if (configuration != null)
             configuration.put("deviceClass", deviceClass.getDeviceClass());
-        return defaultDeviceClass;
+        return deviceClass;
     }
 
     protected Set<String> createSemanticTags(String point, DeviceClass deviceClass) {

@@ -189,7 +189,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
         String icon = getChannelIcon(rsp.getIcon(), "fan");
 
-        ChannelType channelTypeState = addChannelType(rsp.getUniqueId() + CHANNEL_STATE, "State", SWITCH,
+        ChannelType channelTypeState = addChannelType(rsp.getObjectId() + CHANNEL_STATE, "State", SWITCH,
                 Set.of("Switch"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
         Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_STATE))
@@ -200,7 +200,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         super.registerChannel(channelState, channelTypeState);
 
         if (rsp.getSupportsOscillation()) {
-            ChannelType channelTypeOscillation = addChannelType(rsp.getUniqueId() + CHANNEL_OSCILLATION, "Oscillation",
+            ChannelType channelTypeOscillation = addChannelType(rsp.getObjectId() + CHANNEL_OSCILLATION, "Oscillation",
                     SWITCH, Set.of("Control"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
             Channel channelOscillation = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_OSCILLATION))
@@ -212,7 +212,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         }
         if (rsp.getSupportsDirection()) {
 
-            ChannelType channelTypeDirection = addChannelType(rsp.getUniqueId() + CHANNEL_DIRECTION, "Direction",
+            ChannelType channelTypeDirection = addChannelType(rsp.getObjectId() + CHANNEL_DIRECTION, "Direction",
                     STRING, Set.of("Control"), "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(
                     Arrays.stream(FanDirection.values()).filter(e -> e != FanDirection.UNRECOGNIZED)
@@ -230,7 +230,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
 
             int supportedSpeedLevels = rsp.getSupportedSpeedCount();
 
-            ChannelType channelTypeSpeed = addChannelType(rsp.getUniqueId() + CHANNEL_SPEED_LEVEL, "Speed", DIMMER,
+            ChannelType channelTypeSpeed = addChannelType(rsp.getObjectId() + CHANNEL_SPEED_LEVEL, "Speed", DIMMER,
                     Set.of("Setpoint", "Speed"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = numericStateDescription(null,
                     BigDecimal.valueOf(100 / supportedSpeedLevels), BigDecimal.ZERO, BigDecimal.valueOf(100));
@@ -244,7 +244,7 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         }
 
         if (rsp.getSupportedPresetModesCount() > 0) {
-            ChannelType channelTypePreset = addChannelType(rsp.getUniqueId() + CHANNEL_PRESET, "Preset", STRING,
+            ChannelType channelTypePreset = addChannelType(rsp.getObjectId() + CHANNEL_PRESET, "Preset", STRING,
                     Set.of("Setpoint"), "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(rsp.getSupportedPresetModesList());
             Channel channelPreset = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_PRESET))
