@@ -14,6 +14,9 @@
 				<label>Device address</label>
 				<context>network-address</context>
 			</parameter-group>
+			<parameter-group name="haActions">
+				<label>Actions</label>
+			</parameter-group>
 			<parameter-group name="timeout">
 				<label>Connection timeouts</label>
 			</parameter-group>
@@ -45,6 +48,14 @@
 				<label>Base64 encoded encryption key for encrypted connection</label>
 				<description>Specified in the api: -> encryption: -> key: section of the esphome device config. See
 					https://esphome.io/components/api#configuration-variables</description>
+			</parameter>
+
+			<parameter name="allowActions" type="boolean" required="false" groupName="haActions">
+				<label>Allow the device to send actions and events</label>
+				<description>Actions includes requesting actions be executed, sending events, and scanning tags. See
+					https://esphome.io/components/api/#api-actions</description>
+				<default>false</default>
+				<advanced>false</advanced>
 			</parameter>
 
 			<parameter name="reconnectInterval" type="integer" min="0" required="false" groupName="timeout">

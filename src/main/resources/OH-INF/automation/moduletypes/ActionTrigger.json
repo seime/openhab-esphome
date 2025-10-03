@@ -1,0 +1,26 @@
+{
+	"triggers": [
+		{
+			"uid": "esphome.ActionTrigger",
+			"label": "an action is requested from an ESPHome device",
+			"description": "Triggers when the homeassistent.action action is called on a device",
+			"visibility": "PUBLIC",
+			"configDescriptions": [
+				{
+					"name": "action",
+					"type": "TEXT",
+					"label": "Action",
+					"description": "the action to perform",
+					"required": true
+				},
+				{
+					"name": "deviceId",
+					"type": "TEXT",
+					"label": "Device ID",
+					"description": "the device that requested the action",
+					"required": false
+				}
+			]
+		}
+	]
+}

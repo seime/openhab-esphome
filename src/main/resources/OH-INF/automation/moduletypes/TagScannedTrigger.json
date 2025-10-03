@@ -1,0 +1,26 @@
+{
+	"triggers": [
+		{
+			"uid": "esphome.TagScannedTrigger",
+			"label": "a tag is scanned from an ESPHome device",
+			"description": "Triggers when the homeassistent.tag_scanned action is called on a device",
+			"visibility": "PUBLIC",
+			"configDescriptions": [
+				{
+					"name": "tagId",
+					"type": "TEXT",
+					"label": "Tag",
+					"description": "the tag that was scanned",
+					"required": false
+				},
+				{
+					"name": "deviceId",
+					"type": "TEXT",
+					"label": "Device ID",
+					"description": "the device that scanned the tag",
+					"required": false
+				}
+			]
+		}
+	]
+}

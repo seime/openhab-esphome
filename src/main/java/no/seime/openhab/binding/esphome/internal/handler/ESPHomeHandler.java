@@ -22,6 +22,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.events.AbstractEvent;
+import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.type.ChannelType;
@@ -33,6 +35,7 @@ import com.google.protobuf.GeneratedMessage;
 import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
@@ -53,6 +56,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 9;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
+    private static final String ACTION_TAG_SCANNED = "esphome.tag_scanned";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
@@ -66,6 +70,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredScheduledThreadPoolExecutor executorService;
     private final KeySequentialExecutor packetProcessor;
+    private final EventPublisher eventPublisher;
     @Nullable
     private final String defaultEncryptionKey;
     private @Nullable ESPHomeConfiguration config;
@@ -90,7 +95,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
             ESPHomeEventSubscriber eventSubscriber, MonitoredScheduledThreadPoolExecutor executorService,
-            KeySequentialExecutor packetProcessor, @Nullable String defaultEncryptionKey) {
+            KeySequentialExecutor packetProcessor, EventPublisher eventPublisher,
+            @Nullable String defaultEncryptionKey) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -99,6 +105,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.eventSubscriber = eventSubscriber;
         this.executorService = executorService;
         this.packetProcessor = packetProcessor;
+        this.eventPublisher = eventPublisher;
         this.defaultEncryptionKey = defaultEncryptionKey;
 
         // Register message handlers for each type of message pairs
@@ -435,6 +442,25 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
+        } else if (message instanceof HomeassistantServiceResponse serviceResponse) {
+            Map<String, String> data = convertPbListToMap(serviceResponse.getDataList());
+            Map<String, String> dataTemplate = convertPbListToMap(serviceResponse.getDataTemplateList());
+            Map<String, String> variables = convertPbListToMap(serviceResponse.getVariablesList());
+            AbstractEvent event;
+            if (serviceResponse.getIsEvent()) {
+                String tagId;
+                if (serviceResponse.getService().equals(ACTION_TAG_SCANNED) && dataTemplate.isEmpty()
+                        && variables.isEmpty() && data.size() == 1 && (tagId = data.get("tag_id")) != null) {
+                    event = ESPHomeEventFactory.createTagScannedEvent(config.deviceId, tagId);
+                } else {
+                    event = ESPHomeEventFactory.createEventEvent(config.deviceId, serviceResponse.getService(), data,
+                            dataTemplate, variables);
+                }
+            } else {
+                event = ESPHomeEventFactory.createActionEvent(config.deviceId, serviceResponse.getService(), data,
+                        dataTemplate, variables);
+            }
+            eventPublisher.post(event);
         } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
             initializeStateSubscription(subscribeHomeAssistantStateResponse);
         } else if (message instanceof GetTimeRequest) {
@@ -536,6 +562,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }
                 connectionState = ConnectionState.CONNECTED;
 
+                if (config.allowActions) {
+                    logger.debug("[{}] Requesting device to send actions and events", logPrefix);
+                    frameHelper.send(SubscribeHomeassistantServicesRequest.getDefaultInstance());
+                }
                 if (config.deviceLogLevel != LogLevel.NONE) {
                     logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
 
@@ -689,6 +719,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public String getLogPrefix() {
         return logPrefix;
+    }
+
+    private Map<String, String> convertPbListToMap(List<HomeassistantServiceMap> list) {
+        Map<String, String> map = new HashMap<>();
+        for (HomeassistantServiceMap kv : list) {
+            map.put(kv.getKey(), kv.getValue());
+        }
+        return Collections.unmodifiableMap(map);
     }
 
     private enum ConnectionState {

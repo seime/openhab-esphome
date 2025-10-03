@@ -20,6 +20,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
+import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
@@ -68,6 +69,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final ESPHomeEventSubscriber eventSubscriber;
 
     private final ThingRegistry thingRegistry;
+    private final EventPublisher eventPublisher;
     private final MonitoredScheduledThreadPoolExecutor scheduler;
     private final KeySequentialExecutor packetExecutor;
     private final ConnectionSelector connectionSelector;
@@ -75,8 +77,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPStateDescriptionProvider stateDescriptionProvider,
-            @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry)
-            throws IOException {
+            @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry,
+            @Reference EventPublisher eventPublisher) throws IOException {
         scheduler = new MonitoredScheduledThreadPoolExecutor(4, r -> {
             long currentCount = threadCounter.incrementAndGet();
             logger.debug("Creating new worker thread {} for scheduler", currentCount);
@@ -92,6 +94,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         this.stateDescriptionProvider = stateDescriptionProvider;
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
+        this.eventPublisher = eventPublisher;
 
         connectionSelector = new ConnectionSelector();
     }
@@ -102,7 +105,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, stateDescriptionProvider,
-                    eventSubscriber, scheduler, packetExecutor, defaultEncryptionKey);
+                    eventSubscriber, scheduler, packetExecutor, eventPublisher, defaultEncryptionKey);
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
             ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry,
                     scheduler);

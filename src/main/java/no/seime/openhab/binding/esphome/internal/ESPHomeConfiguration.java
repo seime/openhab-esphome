@@ -38,6 +38,8 @@ public class ESPHomeConfiguration {
 
     public String deviceId;
 
+    public boolean allowActions = false;
+
     @Nullable
     public String logPrefix;
 
