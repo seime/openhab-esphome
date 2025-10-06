@@ -25,9 +25,9 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 public class EventEvent extends AbstractESPHomeEvent {
     public static final String TYPE = "esphome.EventEvent";
 
-    public EventEvent(String topic, String payload, String deviceId, String action, Map<String, String> data,
+    public EventEvent(String topic, String payload, String deviceId, String event, Map<String, String> data,
             Map<String, String> data_template, Map<String, String> variables) {
-        super(topic, payload, deviceId, action, data, data_template, variables);
+        super(topic, payload, deviceId, event, data, data_template, variables);
     }
 
     @Override

@@ -91,9 +91,11 @@ public class ESPHomeEventFactory extends AbstractEventFactory {
     /**
      * Creates an {@link ActionEvent}
      *
-     * @param moduleId the module type id of this event
-     * @param label The label (or id) of this object
-     * @param configuration the configuration of the trigger
+     * @param deviceId the device requesting the action
+     * @param action the action to perform
+     * @param data the data for the action
+     * @param data_template the data template for the action
+     * @param variables variables for the use in the templates
      * @return the created event
      */
     public static ActionEvent createActionEvent(String deviceId, String action, Map<String, String> data,
@@ -105,21 +107,30 @@ public class ESPHomeEventFactory extends AbstractEventFactory {
     }
 
     /**
-     * Creates an {@link ActionEvent}
+     * Creates an {@link EventEvent}
      *
-     * @param moduleId the module type id of this event
-     * @param label The label (or id) of this object
-     * @param configuration the configuration of the trigger
+     * @param deviceId the device emitting the event
+     * @param event the event identifier
+     * @param data the data for the action
+     * @param data_template the data template for the action
+     * @param variables variables for the use in the templates
      * @return the created event
      */
-    public static EventEvent createEventEvent(String deviceId, String action, Map<String, String> data,
+    public static EventEvent createEventEvent(String deviceId, String event, Map<String, String> data,
             Map<String, String> data_template, Map<String, String> variables) {
-        String topic = EVENT_EVENT_TOPIC.replace(ACTION_IDENTIFIER, action);
+        String topic = EVENT_EVENT_TOPIC.replace(ACTION_IDENTIFIER, event);
         ActionEventPayloadBean bean = new ActionEventPayloadBean(data, data_template, variables);
         String payload = serializePayload(bean);
-        return new EventEvent(topic, payload, SOURCE_PREFIX + deviceId, action, data, data_template, variables);
+        return new EventEvent(topic, payload, SOURCE_PREFIX + deviceId, event, data, data_template, variables);
     }
 
+    /**
+     * Creates a {@link TagScannedEvent}
+     *
+     * @param deviceId the device emitting the event
+     * @param tagId the tag identifier
+     * @return the created event
+     */
     public static TagScannedEvent createTagScannedEvent(String deviceId, String tagId) {
         return new TagScannedEvent(TAG_SCANNED_EVENT_TOPIC, tagId, SOURCE_PREFIX + deviceId);
     }
