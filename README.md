@@ -330,7 +330,7 @@ To process actions and events sent via the [Native API Component's actions](http
 Be sure to enable `allowActions` in the Thing configuration so that openHAB will request the device to send events.
 The event object has `getData`, `getDataTemplate`, and `getVariables` methods to access the appropriate information for action and event events.
 For tag scanned events, the event's payload is the tag ID.
-The event's source is the ESPHome device ID that sent the event.
+The event's source will be of the form `no.seime.openhab.binding.openhab$<device_id>`, where device_id is the ESPHome device ID that sent the event.
 
 Unfortunately, these triggers are not available from Rules DSL, but some other openHAB automation languages may support setting triggers based on any event sent through the [event bus](https://www.openhab.org/docs/developer/utils/events.html).
 To listen for these events, they look like this:

@@ -14,7 +14,7 @@ public class ESPHomeEventFactoryTest {
         TagScannedEvent event = ESPHomeEventFactory.createTagScannedEvent("device123", "tag456");
         assertEquals("openhab/esphome/tag_scanned", event.getTopic());
         assertEquals("tag456", event.getTagId());
-        assertEquals("device123", event.getSource());
+        assertEquals("no.seime.openhab.binding.esphome$device123", event.getSource());
     }
 
     @Test
@@ -33,7 +33,7 @@ public class ESPHomeEventFactoryTest {
                 variables);
 
         assertEquals("openhab/esphome/action/testAction", event.getTopic());
-        assertEquals("testDevice", event.getSource());
+        assertEquals("no.seime.openhab.binding.esphome$testDevice", event.getSource());
         assertEquals("testAction", event.getAction());
         assertEquals(data, event.getData());
         assertEquals(dataTemplate, event.getDataTemplate());
@@ -55,7 +55,7 @@ public class ESPHomeEventFactoryTest {
                 dataTemplate, variables);
 
         assertEquals("openhab/esphome/event/testEventAction", event.getTopic());
-        assertEquals("testEventDevice", event.getSource());
+        assertEquals("no.seime.openhab.binding.esphome$testEventDevice", event.getSource());
         assertEquals("testEventAction", event.getEvent());
         assertEquals(data, event.getData());
         assertEquals(dataTemplate, event.getDataTemplate());

@@ -36,6 +36,7 @@ public class ESPHomeEventFactory extends AbstractEventFactory {
     private static final String ACTION_EVENT_TOPIC = "openhab/esphome/action/" + ACTION_IDENTIFIER;
     private static final String EVENT_EVENT_TOPIC = "openhab/esphome/event/" + ACTION_IDENTIFIER;
     private static final String TAG_SCANNED_EVENT_TOPIC = "openhab/esphome/tag_scanned";
+    private static final String SOURCE_PREFIX = "no.seime.openhab.binding.esphome$";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeEventFactory.class);
 
@@ -100,7 +101,7 @@ public class ESPHomeEventFactory extends AbstractEventFactory {
         String topic = ACTION_EVENT_TOPIC.replace(ACTION_IDENTIFIER, action);
         ActionEventPayloadBean bean = new ActionEventPayloadBean(data, data_template, variables);
         String payload = serializePayload(bean);
-        return new ActionEvent(topic, payload, deviceId, action, data, data_template, variables);
+        return new ActionEvent(topic, payload, SOURCE_PREFIX + deviceId, action, data, data_template, variables);
     }
 
     /**
@@ -116,11 +117,11 @@ public class ESPHomeEventFactory extends AbstractEventFactory {
         String topic = EVENT_EVENT_TOPIC.replace(ACTION_IDENTIFIER, action);
         ActionEventPayloadBean bean = new ActionEventPayloadBean(data, data_template, variables);
         String payload = serializePayload(bean);
-        return new EventEvent(topic, payload, deviceId, action, data, data_template, variables);
+        return new EventEvent(topic, payload, SOURCE_PREFIX + deviceId, action, data, data_template, variables);
     }
 
     public static TagScannedEvent createTagScannedEvent(String deviceId, String tagId) {
-        return new TagScannedEvent(TAG_SCANNED_EVENT_TOPIC, tagId, deviceId);
+        return new TagScannedEvent(TAG_SCANNED_EVENT_TOPIC, tagId, SOURCE_PREFIX + deviceId);
     }
 
     /**
