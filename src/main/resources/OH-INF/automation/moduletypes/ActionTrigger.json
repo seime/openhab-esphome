@@ -3,7 +3,7 @@
 		{
 			"uid": "esphome.ActionTrigger",
 			"label": "an action is requested from an ESPHome device",
-			"description": "Triggers when the homeassistent.action action is called on a device",
+			"description": "Triggers when the homeassistant.action action is called on a device",
 			"visibility": "PUBLIC",
 			"configDescriptions": [
 				{

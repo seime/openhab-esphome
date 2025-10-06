@@ -3,7 +3,7 @@
 		{
 			"uid": "esphome.TagScannedTrigger",
 			"label": "a tag is scanned from an ESPHome device",
-			"description": "Triggers when the homeassistent.tag_scanned action is called on a device",
+			"description": "Triggers when the homeassistant.tag_scanned action is called on a device",
 			"visibility": "PUBLIC",
 			"configDescriptions": [
 				{
