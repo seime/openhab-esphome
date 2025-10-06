@@ -56,7 +56,7 @@ public abstract class AbstractESPHomeDeviceTest {
     protected @Mock ThingRegistry thingRegistry;
     protected @Mock EventPublisher eventPublisher;
     protected ESPHomeEventSubscriber eventSubscriber;
-    private ESPHomeConfiguration deviceConfiguration;
+    protected ESPHomeConfiguration deviceConfiguration;
     private ConnectionSelector selector;
     private @Mock Configuration configuration;
     private @Mock ESPChannelTypeProvider channelTypeProvider;
