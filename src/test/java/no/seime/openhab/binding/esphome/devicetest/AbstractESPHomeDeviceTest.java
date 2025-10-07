@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.events.EventPublisher;
 import org.openhab.core.items.GenericItem;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemNotFoundException;
@@ -53,8 +54,9 @@ public abstract class AbstractESPHomeDeviceTest {
     protected ThingImpl thing;
     protected @Mock ItemRegistry itemRegistry;
     protected @Mock ThingRegistry thingRegistry;
+    protected @Mock EventPublisher eventPublisher;
     protected ESPHomeEventSubscriber eventSubscriber;
-    private ESPHomeConfiguration deviceConfiguration;
+    protected ESPHomeConfiguration deviceConfiguration;
     private ConnectionSelector selector;
     private @Mock Configuration configuration;
     private @Mock ESPChannelTypeProvider channelTypeProvider;
@@ -86,7 +88,7 @@ public abstract class AbstractESPHomeDeviceTest {
         eventSubscriber = new ESPHomeEventSubscriber(thingRegistry, itemRegistry);
 
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
-                eventSubscriber, executor, new KeySequentialExecutor(executor), null);
+                eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
     }

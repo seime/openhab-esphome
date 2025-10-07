@@ -1,0 +1,30 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+button:
+  - platform: template
+    name: "Trigger Action"
+    on_press:
+      - homeassistant.action:
+          action: some.action
+          data:
+            entity_id: Something
+  - platform: template
+    name: "Trigger Event"
+    on_press:
+      - homeassistant.event:
+          event: esphome.something
+  - platform: template
+    name: "Trigger Tag"
+    on_press:
+      - homeassistant.tag_scanned: mytag

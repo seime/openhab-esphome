@@ -64,6 +64,7 @@ to `$OH_CONFDIR/services/runtime.cfg` .
 | `hostname`             | `text`    | Hostname or IP address of the device. Typically something like `myboard.local` or `192.168.0.123`. *It is recommended to configure your ESP with a static IP address and use that here, it will allow for quicker reconnects* |          | yes                              | no       |
 | `port`                 | `integer` | IP Port of the device                                                                                                                                                                                                         | 6053     | no                               | no       |
 | `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables. *Can also be set on the binding level if your ESPs all use the same key.*             |          | yes or via binding configuration | no       |
+| `allowActions`         | `boolean` | Allow the device to send actions and events.                                                                                                                                                                                  | false    | no                               | no       |
 | `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                                                                                             | 10       | no                               | yes      |
 | `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                                                                                            | 4        | no                               | yes      |
 | `reconnectInterval`    | `integer` | Seconds between reconnect attempts when connection is lost or the device restarts.                                                                                                                                            | 10       | no                               | yes      |
@@ -319,6 +320,29 @@ time:
   - platform: homeassistant
     id: openhab_time
 ```
+
+## Actions and Events
+
+To process actions and events sent via the [Native API Component's actions](https://esphome.io/components/api/#api-actions), the binding adds three new trigger types accessible via UI rules:
+
+![New Triggers](triggers.png)
+
+Be sure to enable `allowActions` in the Thing configuration so that openHAB will request the device to send events.
+The event object has `getData`, `getDataTemplate`, and `getVariables` methods to access the appropriate information for action and event events.
+For tag scanned events, the event's payload is the tag ID.
+The event's source will be of the form `no.seime.openhab.binding.openhab$<device_id>`, where device_id is the ESPHome device ID that sent the event.
+
+Unfortunately, these triggers are not available from Rules DSL, but some other openHAB automation languages may support setting triggers based on any event sent through the [event bus](https://www.openhab.org/docs/developer/utils/events.html).
+To listen for these events, they look like this:
+
+| ESPHome Action              | Topic                             | Event Type                | Payload                                                                |
+|-----------------------------|-----------------------------------|---------------------------|------------------------------------------------------------------------|
+| `homeassistant.action`      | `openhab/esphome/action/<action>` | `esphome.ActionEvent`     | JSON object with "data", "data_template", and "variables" sub-objects. |
+| `homeassistant.event`       | `openhab/esphome/event/<event>`   | `esphome.EventEvent`      | JSON object with "data", "data_template", and "variables" sub-objects. |
+| `homeassistant.tag_scanned` | `openhab/esphome/tag_scanned`     | `esphome.TagScannedEvent` | The tag id.                                                            |
+
+For JRuby, use the [`event` trigger](https://openhab.github.io/openhab-jruby/main/OpenHAB/DSL/Rules/BuilderDSL.html#event-instance_method).
+For Python Scripting, use [`GenericEventTrigger`](https://www.openhab.org/addons/automation/pythonscripting/#module-openhab-triggers).
 
 ## Limitations
 
