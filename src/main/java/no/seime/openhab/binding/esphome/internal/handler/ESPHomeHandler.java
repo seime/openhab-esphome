@@ -321,6 +321,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
             connectionState = ConnectionState.HELLO_SENT;
             frameHelper.send(helloRequest);
+            // Send this at the same time; no need to wait
+            frameHelper.send(ConnectRequest.getDefaultInstance());
         }
     }
 
@@ -338,7 +340,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                                 message.getClass().getSimpleName());
                     }
                     case HELLO_SENT -> handleHelloResponse(message);
-                    case LOGIN_SENT -> handleLoginResponse(message);
                     case CONNECTED -> handleConnected(message);
                 }
             } catch (ProtocolAPIError e) {
@@ -404,6 +405,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
         if (disposed) {
             return;
+        }
+
+        if (message instanceof ConnectResponse connectResponse) {
+            if (connectResponse.getInvalidPassword()) {
+                logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
+
+                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password", false);
+                return;
+            }
         }
 
         if (message instanceof DeviceInfoResponse rsp) {
@@ -551,15 +561,19 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private void handleLoginResponse(GeneratedMessage message) throws ProtocolAPIError {
-        if (message instanceof ConnectResponse connectResponse) {
-            synchronized (connectionStateLock) {
-                logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
+    @Override
+    public void updateState(ChannelUID channelUID, State state) {
+        super.updateState(channelUID, state);
+    }
 
-                if (connectResponse.getInvalidPassword()) {
-                    handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password", false);
-                    return;
-                }
+    private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
+        if (message instanceof HelloResponse helloResponse) {
+            synchronized (connectionStateLock) {
+                logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
+                logger.info(
+                        "[{}] API handshake successful. Device '{}' running '{}' on protocol version '{}.{}'. Logging in.",
+                        logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
+                        helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
                 connectionState = ConnectionState.CONNECTED;
 
                 if (config.allowActions) {
@@ -610,25 +624,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.send(DeviceInfoRequest.getDefaultInstance());
                 frameHelper.send(ListEntitiesRequest.getDefaultInstance());
                 frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
-            }
-        }
-    }
-
-    @Override
-    public void updateState(ChannelUID channelUID, State state) {
-        super.updateState(channelUID, state);
-    }
-
-    private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
-        if (message instanceof HelloResponse helloResponse) {
-            synchronized (connectionStateLock) {
-                logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
-                logger.info(
-                        "[{}] API handshake successful. Device '{}' running '{}' on protocol version '{}.{}'. Logging in.",
-                        logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
-                        helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
-                connectionState = ConnectionState.LOGIN_SENT;
-                frameHelper.send(ConnectRequest.getDefaultInstance());
             }
         }
     }
@@ -736,9 +731,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         CONNECTING,
         // TCP connected to ESPHome, first handshake sent
         HELLO_SENT,
-
-        // First handshake received, login sent (with password)
-        LOGIN_SENT,
 
         // Connection established
         CONNECTED
