@@ -1,5 +1,7 @@
 package no.seime.openhab.binding.esphome.internal.bluetooth;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -8,6 +10,10 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.*;
 import org.openhab.binding.bluetooth.notification.BluetoothConnectionStatusNotification;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
+
+import com.neovisionaries.bluetooth.ble.advertising.ADManufacturerSpecific;
+import com.neovisionaries.bluetooth.ble.advertising.ADStructure;
+import com.neovisionaries.bluetooth.ble.advertising.ServiceData;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
@@ -51,6 +57,27 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         notification.setRssi(packet.getRssi());
         notification.setDeviceName(packet.getName().toStringUtf8());
 
+        notifyListeners(BluetoothEventType.SCAN_RECORD, notification);
+    }
+
+    public void handleAdvertisementPacket(BluetoothLERawAdvertisement advertisement,
+            List<ADStructure> advertisementStructures) {
+
+        BluetoothScanNotification notification = new BluetoothScanNotification();
+        advertisementStructures.stream().forEach(structure -> {
+            if (structure instanceof ADManufacturerSpecific manufacturerSpecific) {
+                notification.setManufacturerData(manufacturerSpecific.getData());
+            } else if (structure instanceof ServiceData serviceData) {
+                // UUID 2 bytes included in serviceData.getData(), trim away
+                byte[] dataIncludingUUID = serviceData.getData();
+                byte[] dataExcludingUUID = Arrays.copyOfRange(dataIncludingUUID, 2, dataIncludingUUID.length);
+                notification.getServiceData().put(serviceData.getServiceUUID().toString(), dataExcludingUUID);
+            }
+        });
+
+        notification.setData(advertisement.getData().toByteArray());
+        notification.setRssi(advertisement.getRssi());
+        notification.setBeaconType(BluetoothScanNotification.BluetoothBeaconType.BEACON_ADVERTISEMENT);
         notifyListeners(BluetoothEventType.SCAN_RECORD, notification);
     }
 

@@ -18,6 +18,10 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.protobuf.GeneratedMessage;
+import com.neovisionaries.bluetooth.ble.advertising.ADManufacturerSpecific;
+import com.neovisionaries.bluetooth.ble.advertising.ADPayloadParser;
+import com.neovisionaries.bluetooth.ble.advertising.ADStructure;
+import com.neovisionaries.bluetooth.ble.advertising.LocalName;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
@@ -36,7 +40,11 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private final List<ESPHomeHandler> espHomeHandlers = new ArrayList<>();
 
-    private final LoadingCache<Long, Optional<BluetoothLEAdvertisementResponse>> cache;
+    // Deprecated, used by older firmware
+    private final LoadingCache<Long, Optional<BluetoothLEAdvertisementResponse>> singleAdvertisementPerPacketCache;
+
+    // Deprecated, used by older firmware
+    private final LoadingCache<Long, Optional<BluetoothLERawAdvertisement>> multipleAdvertisementPerPacketCache;
 
     private final Map<Long, SortedSet<DeviceAndRSSI>> knownDevices = new ConcurrentHashMap<>();
 
@@ -56,16 +64,29 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         super(bridge);
         this.thingRegistry = thingRegistry;
         this.executor = executor;
-        CacheLoader<Long, Optional<BluetoothLEAdvertisementResponse>> loader;
-        loader = new CacheLoader<>() {
 
+        // Deprecated
+        CacheLoader<Long, Optional<BluetoothLEAdvertisementResponse>> deprecatedLoader = new CacheLoader<>() {
             @Override
             public Optional<BluetoothLEAdvertisementResponse> load(Long key) {
                 return Optional.empty();
             }
         };
 
-        cache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.SECONDS).maximumSize(1000).build(loader);
+        // Deprecated
+        singleAdvertisementPerPacketCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.SECONDS)
+                .maximumSize(1000).build(deprecatedLoader);
+
+        CacheLoader<Long, Optional<BluetoothLERawAdvertisement>> loader = new CacheLoader<>() {
+            @Override
+            public Optional<BluetoothLERawAdvertisement> load(Long key) {
+                return Optional.empty();
+            }
+        };
+
+        // Deprecated
+        multipleAdvertisementPerPacketCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.SECONDS)
+                .maximumSize(1000).build(loader);
     }
 
     @Override
@@ -151,8 +172,13 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         // Update RSSi list
 
         if (message instanceof BluetoothLEAdvertisementResponse advertisementResponse) {
-            updateDeviceLocation(advertisementResponse, handler);
+            updateDeviceLocation(advertisementResponse.getAddress(), advertisementResponse.getRssi(), handler);
             handleAdvertisement(advertisementResponse, handler);
+        } else if (message instanceof BluetoothLERawAdvertisementsResponse rawAdvertisementsResponse) {
+            rawAdvertisementsResponse.getAdvertisementsList().forEach(advertisement -> {
+                updateDeviceLocation(advertisement.getAddress(), advertisement.getRssi(), handler);
+            });
+            handleRawAdvertisement(rawAdvertisementsResponse, handler);
         } else if (message instanceof BluetoothDeviceConnectionResponse rsp) {
             Optional<Map.Entry<ESPHomeBluetoothDevice, ESPHomeHandler>> deviceEntry = connectionMap.entrySet().stream()
                     .filter(device -> device.getKey().getAddress()
@@ -177,24 +203,23 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         } else if (message instanceof BluetoothScannerStateResponse rsp) {
             logger.debug("Received BluetoothScannerStateResponse from {} with status {}, currently ignored",
                     handler.getThing().getUID(), rsp.getState());
-        } else if (message instanceof BluetoothLERawAdvertisementsResponse) {
-            logger.debug("Received BluetoothLERawAdvertisementsResponse from {}, currently ignored",
-                    handler.getThing().getUID());
         } else {
             logger.warn("Received unhandled Bluetooth packet type: {} from {}", message.getClass().getSimpleName(),
                     handler.getThing().getUID());
         }
     }
 
+    // Now legacy after ESPHome 2025.9 (approx)
     private void handleAdvertisement(BluetoothLEAdvertisementResponse rsp, ESPHomeHandler handler) {
         try {
-            Optional<BluetoothLEAdvertisementResponse> cachedAdvertisement = cache.get(rsp.getAddress());
+            Optional<BluetoothLEAdvertisementResponse> cachedAdvertisement = singleAdvertisementPerPacketCache
+                    .get(rsp.getAddress());
             if (cachedAdvertisement.isPresent() && equalsExceptRssi(rsp, cachedAdvertisement.get())) {
                 logger.debug("Received duplicate BLE advertisement from device {} via {}", rsp.getAddress(),
                         handler.getThing().getUID());
                 return;
             } else {
-                cache.put(rsp.getAddress(), Optional.of(rsp));
+                singleAdvertisementPerPacketCache.put(rsp.getAddress(), Optional.of(rsp));
             }
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
@@ -224,6 +249,53 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         }
     }
 
+    private void handleRawAdvertisement(BluetoothLERawAdvertisementsResponse rsp, ESPHomeHandler handler) {
+        rsp.getAdvertisementsList().forEach(advertisement -> {
+            try {
+                Optional<BluetoothLERawAdvertisement> cachedAdvertisement = multipleAdvertisementPerPacketCache
+                        .get(advertisement.getAddress());
+                if (cachedAdvertisement.isPresent() && equalsExceptRssi(advertisement, cachedAdvertisement.get())) {
+                    logger.debug("Received duplicate BLE advertisement from device {} via {}",
+                            advertisement.getAddress(), handler.getThing().getUID());
+                    return;
+                } else {
+                    multipleAdvertisementPerPacketCache.put(advertisement.getAddress(), Optional.of(advertisement));
+                }
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+
+            try {
+                BluetoothAddress address = BluetoothAddressUtil.createAddress(advertisement.getAddress());
+                ESPHomeBluetoothDevice device = getDevice(address);
+
+                logger.debug("Received BLE advertisement from device {}/{} via {}", address, advertisement.getAddress(),
+                        handler.getThing().getUID());
+                device.setAddressType(advertisement.getAddressType());
+                device.setRssi(advertisement.getRssi());
+
+                List<ADStructure> advertisementStructures = ADPayloadParser.getInstance()
+                        .parse(advertisement.getData().toByteArray());
+
+                for (ADStructure structure : advertisementStructures) {
+                    if (structure instanceof LocalName part) {
+                        device.setName(part.getLocalName());
+                    } else if (structure instanceof ADManufacturerSpecific part) {
+                        device.setManufacturerId(part.getCompanyId());
+                    }
+                }
+
+                deviceDiscovered(device);
+
+                device.handleAdvertisementPacket(advertisement, advertisementStructures);
+
+            } catch (Exception e) {
+                logger.warn("Error handling BLE advertisement", e);
+            }
+
+        });
+    }
+
     @Nullable
     public ESPHomeHandler getNearestESPHomeDevice(long address) {
         SortedSet<DeviceAndRSSI> deviceAndRSSIS = knownDevices.get(address);
@@ -241,12 +313,12 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         }
     }
 
-    private void updateDeviceLocation(BluetoothLEAdvertisementResponse rsp, ESPHomeHandler handler) {
-        SortedSet<DeviceAndRSSI> deviceAndRSSIS = knownDevices.computeIfAbsent(rsp.getAddress(),
+    private void updateDeviceLocation(long address, int rssi, ESPHomeHandler handler) {
+        SortedSet<DeviceAndRSSI> deviceAndRSSIS = knownDevices.computeIfAbsent(address,
                 k -> new ConcurrentSkipListSet<>());
         deviceAndRSSIS.removeIf(e -> e.device.equals(handler.getThing().getUID())); // Remove previous entry for this
         // esphome device
-        deviceAndRSSIS.add(new DeviceAndRSSI(handler.getThing().getUID(), rsp.getRssi(), Instant.now()));
+        deviceAndRSSIS.add(new DeviceAndRSSI(handler.getThing().getUID(), rssi, Instant.now()));
     }
 
     private boolean equalsExceptRssi(BluetoothLEAdvertisementResponse rsp1, BluetoothLEAdvertisementResponse rsp2) {
@@ -254,6 +326,11 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                 && rsp1.getManufacturerDataList().equals(rsp2.getManufacturerDataList())
                 && rsp1.getServiceDataList().equals(rsp2.getServiceDataList())
                 && rsp1.getServiceUuidsList().equals(rsp2.getServiceUuidsList())
+                && rsp1.getAddressType() == rsp2.getAddressType();
+    }
+
+    private boolean equalsExceptRssi(BluetoothLERawAdvertisement rsp1, BluetoothLERawAdvertisement rsp2) {
+        return rsp1.getAddress() == rsp2.getAddress() && rsp1.getData().equals(rsp2.getData())
                 && rsp1.getAddressType() == rsp2.getAddressType();
     }
 
