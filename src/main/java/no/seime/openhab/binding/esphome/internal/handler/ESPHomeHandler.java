@@ -412,8 +412,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
 
                 handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password", false);
-                return;
             }
+            return;
         }
 
         if (message instanceof DeviceInfoResponse rsp) {
