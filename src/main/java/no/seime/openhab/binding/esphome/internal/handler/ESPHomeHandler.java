@@ -496,8 +496,20 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
 
             } catch (ProtocolException e) {
-                logger.warn("[{}] Error initial connection", logPrefix, e);
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+                Throwable cause = e.getCause();
+                String message = e.getMessage();
+                if (cause != null) {
+                    if (message == null) {
+                        message = cause.getMessage();
+                    } else {
+                        String causeMessage = cause.getMessage();
+                        if (causeMessage != null) {
+                            message += " (" + cause.getMessage() + ")";
+                        }
+                    }
+                }
+                logger.warn("[{}] Error initial connection: {}", logPrefix, message);
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
                 connectionState = ConnectionState.UNINITIALIZED;
                 resolvedIpAddressForCurrentConnection = null;
 
