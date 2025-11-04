@@ -189,19 +189,18 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_POSITION)).build();
             super.registerChannel(channelPosition, channelTypePosition, stateDescription);
         }
-        if (rsp.getSupportsTilt()) {
-            Set<String> semanticTags = createSemanticTags("Tilt", deviceClass);
 
-            ChannelType channelTypeTilt = addChannelType(rsp.getObjectId() + CHANNEL_TILT, "Tilt",
-                    deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            StateDescription stateDescription = patternStateDescription("%d %%");
+        Set<String> semanticTags = createSemanticTags("Tilt", deviceClass);
 
-            Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
-                    .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
-                    .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                    .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
-            super.registerChannel(channelTilt, channelTypeTilt, stateDescription);
-        }
+        ChannelType channelTypeTilt = addChannelType(rsp.getObjectId() + CHANNEL_TILT, "Tilt",
+                deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        StateDescription stateDescriptionTilt = patternStateDescription("%d %%");
+
+        Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
+                .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
+                .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
+                .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
+        super.registerChannel(channelTilt, channelTypeTilt, stateDescriptionTilt);
 
         // Legacy state
 
