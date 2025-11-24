@@ -255,7 +255,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                 Optional<BluetoothLERawAdvertisement> cachedAdvertisement = multipleAdvertisementPerPacketCache
                         .get(advertisement.getAddress());
                 if (cachedAdvertisement.isPresent() && equalsExceptRssi(advertisement, cachedAdvertisement.get())) {
-                    logger.debug("Received duplicate BLE advertisement from device {} via {}",
+                    logger.trace("Received duplicate BLE advertisement from device {} via {}",
                             advertisement.getAddress(), handler.getThing().getUID());
                     return;
                 } else {

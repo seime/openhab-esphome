@@ -653,6 +653,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             this.espHomeBluetoothProxyHandler = espHomeBluetoothProxyHandler;
             if (config.enableBluetoothProxy && !bluetoothProxyStarted && connectionState == ConnectionState.CONNECTED) {
                 try {
+                    logger.info("[{}] Starting BLE proxy", logPrefix);
                     frameHelper.send(SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
                     bluetoothProxyStarted = true;
                 } catch (Exception e) {
@@ -666,6 +667,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         synchronized (connectionStateLock) {
             if (connectionState == ConnectionState.CONNECTED) {
                 try {
+                    logger.info("[{}] Stopping BLE proxy", logPrefix);
                     frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
                 } catch (Exception e) {
                     logger.warn("[{}] Error stopping BLE proxy", logPrefix, e);
