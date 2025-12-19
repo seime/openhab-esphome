@@ -16,6 +16,7 @@ import javax.validation.constraints.NotNull;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.library.CoreItemFactory;
 import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
@@ -156,7 +157,16 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     public abstract void buildChannels(S rsp);
 
-    protected String resolveNumericItemType(String unit, String name, @NonNull DeviceClass deviceClass) {
+    protected String resolveNumericItemType(String unit, String name, @NonNull DeviceClass deviceClass,
+            Configuration configuration) {
+        if (UnitUtils.parseUnit(unit) == null) {
+            logger.info(
+                    "[{}] Unit of measurement '{}' is not supported by openHAB, ignoring and using plain 'Number' for entity '{}'",
+                    handler.getLogPrefix(), unit, name);
+            return CoreItemFactory.NUMBER;
+        }
+
+        configuration.put("unit", unit);
 
         String itemTypeFromUnit = getItemTypeBaseOnUnit(unit);
         String itemTypeToUse;
