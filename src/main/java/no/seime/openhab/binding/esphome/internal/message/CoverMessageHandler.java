@@ -33,7 +33,6 @@ import no.seime.openhab.binding.esphome.internal.message.deviceclass.DeviceClass
 public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCoverResponse, CoverStateResponse> {
 
     public static final String CHANNEL_POSITION = "position";
-    public static final String LEGACY_CHANNEL_STATE = "legacy_state";
     public static final String CHANNEL_TILT = "tilt";
     public static final String CHANNEL_CURRENT_OPERATION = "current_operation";
 
@@ -95,8 +94,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         } else if (command instanceof DecimalType dc) {
                             builder.setPosition((1 - dc.floatValue()) / 100);
                         } else if (command == UpDownType.UP) {
+                            builder.setHasLegacyCommand(true);
+                            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_OPEN);
                             builder.setPosition(1);
                         } else if (command == UpDownType.DOWN) {
+                            builder.setHasLegacyCommand(true);
+                            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_CLOSE);
                             builder.setPosition(0);
                         }
                         builder.setHasPosition(true);
@@ -112,26 +115,6 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                             builder.setTilt(0);
                         }
                         builder.setHasTilt(true);
-                    }
-                    case LEGACY_CHANNEL_STATE -> {
-
-                        if (command instanceof QuantityType<?> qt) {
-                            builder.setPosition(qt.floatValue() > 0 ? 1 : 0);
-                            logger.warn(
-                                    "[{}] Use position or tilt channel to set position or tilt, not the legacy state channel",
-                                    handler.getLogPrefix());
-                        } else if (command instanceof DecimalType dc) {
-                            builder.setPosition(dc.floatValue() > 0 ? 1 : 0);
-                            logger.warn(
-                                    "[{}] Use position or tilt channel to set position or tilt, not the legacy state channel",
-                                    handler.getLogPrefix());
-                        } else if (command == UpDownType.UP) {
-                            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_OPEN);
-                            builder.setHasLegacyCommand(true);
-                        } else if (command == UpDownType.DOWN) {
-                            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_CLOSE);
-                            builder.setHasLegacyCommand(true);
-                        }
                     }
 
                     case CHANNEL_CURRENT_OPERATION -> logger.warn("current_operation channel is read-only");
@@ -176,25 +159,24 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
-        if (rsp.getSupportsPosition()) {
-            Set<String> semanticTags = createSemanticTags("OpenLevel", deviceClass);
+        Set<String> semanticTags = createSemanticTags("OpenLevel", deviceClass);
 
-            ChannelType channelTypePosition = addChannelType(rsp.getObjectId() + CHANNEL_POSITION, "Position",
-                    deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            StateDescription stateDescription = patternStateDescription("%d %%");
+        ChannelType channelTypePosition = addChannelType(rsp.getObjectId() + CHANNEL_POSITION, "Position",
+                deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        StateDescription stateDescription = patternStateDescription("%d %%");
 
-            Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
-                    .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
-                    .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                    .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_POSITION)).build();
-            super.registerChannel(channelPosition, channelTypePosition, stateDescription);
-        }
+        Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
+                .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
+                .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
+                .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_POSITION)).build();
+        super.registerChannel(channelPosition, channelTypePosition, stateDescription);
+
         if (rsp.getSupportsTilt()) {
-            Set<String> semanticTags = createSemanticTags("Tilt", deviceClass);
+            semanticTags = createSemanticTags("Tilt", deviceClass);
 
             ChannelType channelTypeTilt = addChannelType(rsp.getObjectId() + CHANNEL_TILT, "Tilt",
                     deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
-            StateDescription stateDescription = patternStateDescription("%d %%");
+            stateDescription = patternStateDescription("%d %%");
 
             Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
                     .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
@@ -202,19 +184,6 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
             super.registerChannel(channelTilt, channelTypeTilt, stateDescription);
         }
-
-        // Legacy state
-
-        ChannelType channelTypeState = addChannelType(rsp.getObjectId() + LEGACY_CHANNEL_STATE, "Legacy State",
-                deviceClass.getItemType(), createSemanticTags("OpenClose", deviceClass), icon, rsp.getEntityCategory(),
-                rsp.getDisabledByDefault());
-        StateDescription stateDescription = patternStateDescription("%s");
-
-        Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), LEGACY_CHANNEL_STATE))
-                .withLabel(createLabel(rsp.getName(), "Legacy State")).withKind(ChannelKind.STATE)
-                .withType(channelTypeState.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), LEGACY_CHANNEL_STATE)).build();
-        super.registerChannel(channelState, channelTypeState, stateDescription);
 
         // Operation status
         ChannelType channelTypeCurrentOperation = addChannelType(rsp.getObjectId() + CHANNEL_CURRENT_OPERATION,
@@ -231,9 +200,6 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     }
 
     public void handleState(CoverStateResponse rsp) {
-        findChannelByKeyAndField(rsp.getKey(), LEGACY_CHANNEL_STATE)
-                .ifPresent(channel -> handler.updateState(channel.getUID(),
-                        new DecimalType(rsp.getLegacyState() == LegacyCoverState.LEGACY_COVER_STATE_OPEN ? 0 : 1)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_POSITION).ifPresent(channel -> handler
                 .updateState(channel.getUID(), toNumericState(channel, 1 - rsp.getPosition(), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_TILT).ifPresent(
