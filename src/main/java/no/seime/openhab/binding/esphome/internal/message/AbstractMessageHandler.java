@@ -159,6 +159,10 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     protected String resolveNumericItemType(String unit, String name, @NonNull DeviceClass deviceClass,
             Configuration configuration) {
+        // Guard against special "no unit" values before attempting to parse or validate
+        if (unit == null || "None".equals(unit) || unit.isEmpty()) {
+            return CoreItemFactory.NUMBER;
+        }
         if (UnitUtils.parseUnit(unit) == null) {
             logger.info(
                     "[{}] Unit of measurement '{}' is not supported by openHAB, ignoring and using plain 'Number' for entity '{}'",
