@@ -12,7 +12,6 @@ import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.StateDescription;
-import org.openhab.core.types.util.UnitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,18 +61,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
             stateDescription = patternStateDescription("%s", true);
         } else {
             String unitOfMeasurement = rsp.getUnitOfMeasurement();
-            itemType = resolveNumericItemType(unitOfMeasurement, rsp.getName(), deviceClass);
-
-            if (!"None".equals(unitOfMeasurement) && !"".equals(unitOfMeasurement)) {
-                if (isOHSupportedUnit(unitOfMeasurement)) {
-                    configuration.put("unit", unitOfMeasurement);
-                } else {
-                    logger.info(
-                            "[{}] Unit of measurement '{}' is not supported by openHAB, ignoring and using plain 'Number' for entity '{}'",
-                            handler.getLogPrefix(), unitOfMeasurement, rsp.getName());
-                    itemType = NUMBER;
-                }
-            }
+            itemType = resolveNumericItemType(unitOfMeasurement, rsp.getName(), deviceClass, configuration);
 
             channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
@@ -84,10 +72,6 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
                 .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
         super.registerChannel(channel, channelType, stateDescription);
-    }
-
-    private boolean isOHSupportedUnit(String unitOfMeasurement) {
-        return UnitUtils.parseUnit(unitOfMeasurement) != null;
     }
 
     @Override
