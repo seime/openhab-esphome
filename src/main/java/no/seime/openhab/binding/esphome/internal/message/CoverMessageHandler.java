@@ -93,7 +93,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         if (command instanceof QuantityType<?> number) {
                             builder.setPosition(invert(number.floatValue() / 100));
                         } else if (command instanceof PercentType number) {
-                            builder.setPosition((invert(number.floatValue() / 100)));
+                            builder.setPosition(invert(number.floatValue() / 100));
                         } else if (command instanceof DecimalType number) {
                             builder.setPosition(invert(number.floatValue() / 100));
                         } else if (command == UpDownType.UP) {
@@ -111,7 +111,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         if (command instanceof QuantityType<?> number) {
                             builder.setTilt(invert(number.floatValue() / 100));
                         } else if (command instanceof PercentType number) {
-                            builder.setTilt((invert(number.floatValue() / 100)));
+                            builder.setTilt(invert(number.floatValue() / 100));
                         } else if (command instanceof DecimalType number) {
                             builder.setTilt(invert(number.floatValue() / 100));
                         } else if (command == UpDownType.UP) {

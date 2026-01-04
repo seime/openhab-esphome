@@ -19,7 +19,6 @@ import tech.units.indriya.unit.Units;
 public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
     public static final String POSITION_CHANNEL = "time-based_cover#position";
-    public static final String TILT_CHANNEL = "time-based_cover#tilt";
 
     protected File getEspDeviceConfigurationYamlFileName() {
         return new File("src/test/resources/device_configurations/cover.yaml");
