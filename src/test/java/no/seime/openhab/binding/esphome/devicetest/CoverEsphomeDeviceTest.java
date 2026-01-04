@@ -46,7 +46,7 @@ public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
         verify(thingHandlerCallback, timeout(3000)).stateUpdated(eq(new ChannelUID(thing.getUID(), POSITION_CHANNEL)),
                 percentCloseTo(20, 2f));
 
-        // Send 60% down using PercentType
+        // Send 80% down using PercentType
         reset(thingHandlerCallback);
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), POSITION_CHANNEL), new PercentType(80));
 
