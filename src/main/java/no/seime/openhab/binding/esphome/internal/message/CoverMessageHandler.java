@@ -2,6 +2,7 @@ package no.seime.openhab.binding.esphome.internal.message;
 
 import static org.openhab.core.library.CoreItemFactory.STRING;
 
+import java.math.BigDecimal;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -224,7 +225,7 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         if (missingState || Float.isNaN(state)) {
             return UnDefType.UNDEF;
         } else {
-            return new PercentType((int) (state * 100));
+            return new PercentType(BigDecimal.valueOf(state * 100));
         }
     }
 
