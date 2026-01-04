@@ -91,20 +91,28 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     case CHANNEL_POSITION -> {
                         if (command instanceof QuantityType<?> number) {
                             builder.setPosition(invert(number.floatValue() / 100));
+                            builder.setHasPosition(true);
                         } else if (command instanceof PercentType number) {
                             builder.setPosition((invert(number.floatValue() / 100)));
+                            builder.setHasPosition(true);
                         } else if (command instanceof DecimalType number) {
                             builder.setPosition(invert(number.floatValue() / 100));
+                            builder.setHasPosition(true);
                         } else if (command == UpDownType.UP) {
                             builder.setHasLegacyCommand(true);
                             builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_OPEN);
                             builder.setPosition(1);
+                            builder.setHasPosition(true);
                         } else if (command == UpDownType.DOWN) {
                             builder.setHasLegacyCommand(true);
                             builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_CLOSE);
                             builder.setPosition(0);
+                            builder.setHasPosition(true);
+                        } else if (command == StopMoveType.STOP) {
+                            builder.setHasLegacyCommand(true);
+                            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_STOP);
+                            builder.setHasPosition(false);
                         }
-                        builder.setHasPosition(true);
                     }
                     case CHANNEL_TILT -> {
                         if (command instanceof QuantityType<?> number) {
