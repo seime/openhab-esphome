@@ -38,7 +38,7 @@ public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         assertEquals(4, thingHandler.getDynamicChannels().size());
 
-        // Send 40% down using PercentType
+        // Send using PercentType
         // Remove all other invocations for log readability
         reset(thingHandlerCallback);
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), POSITION_CHANNEL), new PercentType(20));
@@ -46,21 +46,21 @@ public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
         verify(thingHandlerCallback, timeout(3000)).stateUpdated(eq(new ChannelUID(thing.getUID(), POSITION_CHANNEL)),
                 percentCloseTo(20, 2f));
 
-        // Send 80% down using PercentType
+        // Send using PercentType
         reset(thingHandlerCallback);
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), POSITION_CHANNEL), new PercentType(80));
 
         verify(thingHandlerCallback, timeout(3000)).stateUpdated(eq(new ChannelUID(thing.getUID(), POSITION_CHANNEL)),
                 percentCloseTo(80, 2f));
 
-        // Send 20% down using DecimalType
+        // Send using DecimalType
         reset(thingHandlerCallback);
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), POSITION_CHANNEL), new DecimalType(20));
 
         verify(thingHandlerCallback, timeout(3000)).stateUpdated(eq(new ChannelUID(thing.getUID(), POSITION_CHANNEL)),
                 percentCloseTo(20, 2f));
 
-        // Send 80% down using QuantityType
+        // Send using QuantityType
         reset(thingHandlerCallback);
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), POSITION_CHANNEL),
                 new QuantityType<>(80, Units.PERCENT));
@@ -74,7 +74,6 @@ public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         verify(thingHandlerCallback, timeout(3000)).stateUpdated(eq(new ChannelUID(thing.getUID(), POSITION_CHANNEL)),
                 eq(new PercentType(100)));
-        reset(thingHandlerCallback);
 
         // Send up
         reset(thingHandlerCallback);
