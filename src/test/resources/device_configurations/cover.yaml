@@ -1,0 +1,39 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+switch:
+  - platform: template
+    id: open_cover_switch
+    name: "Open Cover Switch"
+    optimistic: true
+  - platform: template
+    id: close_cover_switch
+    optimistic: true
+    name: "Close Cover Switch"
+
+cover:
+  - platform: time_based
+    name: "Time-Based Cover"
+
+    open_action:
+      - switch.turn_on: open_cover_switch
+    open_duration: 2s
+
+    close_action:
+      - switch.turn_on: close_cover_switch
+    close_duration: 2s
+
+    stop_action:
+      - switch.turn_off: open_cover_switch
+      - switch.turn_off: close_cover_switch
+

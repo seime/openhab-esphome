@@ -8,7 +8,7 @@
     </encoder>
   </appender>
 
-  <logger name="no.seime.openhab.binding.esphome" level="TRACE" additivity="false">
+  <logger name="no.seime.openhab.binding.esphome" level="DEBUG" additivity="false">
     <appender-ref ref="STDOUT"/>
   </logger>
 
