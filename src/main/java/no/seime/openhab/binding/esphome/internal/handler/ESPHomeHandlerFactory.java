@@ -105,7 +105,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, stateDescriptionProvider,
-                    eventSubscriber, scheduler, packetExecutor, eventPublisher, defaultEncryptionKey);
+                    eventSubscriber, scheduler, packetExecutor, eventPublisher, defaultEncryptionKey,
+                    getBundleContext());
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
             ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry,
                     scheduler);

@@ -1,0 +1,20 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+  actions:
+    - action: set_dsmr_key
+      variables:
+        private_key: string
+      then:
+        - logger.log:
+            format: Setting private key %s. Set to empty string to disable
+            args: [ private_key.c_str() ]
