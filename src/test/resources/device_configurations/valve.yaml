@@ -1,0 +1,30 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: VERY_VERBOSE
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+valve:
+  - platform: template
+    name: "Valve"
+    id: water_valve
+    device_class: water
+    open_action:
+      - switch.turn_on: valve_switch
+    close_action:
+      - switch.turn_off: valve_switch
+    optimistic: true
+    
+
+switch:
+  - platform: template
+    name: "Valve Switch"
+    id: valve_switch
+    optimistic: true

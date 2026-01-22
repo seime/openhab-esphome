@@ -1,6 +1,6 @@
 # ESPHome Binding for openHAB
 
-### Docs updated 2025-07-01.
+### Docs updated 2026-01-20.
 
 <img src="logo.png" width="200"/>
 
@@ -323,16 +323,22 @@ time:
 
 ## Actions and Events
 
-To process actions and events sent via the [Native API Component's actions](https://esphome.io/components/api/#api-actions), the binding adds three new trigger types accessible via UI rules:
+To process actions and events sent via
+the [Native API Component's actions](https://esphome.io/components/api/#api-actions), the binding adds three new trigger
+types accessible via UI rules:
 
 ![New Triggers](triggers.png)
 
 Be sure to enable `allowActions` in the Thing configuration so that openHAB will request the device to send events.
-The event object has `getData`, `getDataTemplate`, and `getVariables` methods to access the appropriate information for action and event events.
+The event object has `getData`, `getDataTemplate`, and `getVariables` methods to access the appropriate information for
+action and event events.
 For tag scanned events, the event's payload is the tag ID.
-The event's source will be of the form `no.seime.openhab.binding.openhab$<device_id>`, where device_id is the ESPHome device ID that sent the event.
+The event's source will be of the form `no.seime.openhab.binding.openhab$<device_id>`, where device_id is the ESPHome
+device ID that sent the event.
 
-Unfortunately, these triggers are not available from Rules DSL, but some other openHAB automation languages may support setting triggers based on any event sent through the [event bus](https://www.openhab.org/docs/developer/utils/events.html).
+Unfortunately, these triggers are not available from Rules DSL, but some other openHAB automation languages may support
+setting triggers based on any event sent through
+the [event bus](https://www.openhab.org/docs/developer/utils/events.html).
 To listen for these events, they look like this:
 
 | ESPHome Action              | Topic                             | Event Type                | Payload                                                                |
@@ -341,8 +347,10 @@ To listen for these events, they look like this:
 | `homeassistant.event`       | `openhab/esphome/event/<event>`   | `esphome.EventEvent`      | JSON object with "data", "data_template", and "variables" sub-objects. |
 | `homeassistant.tag_scanned` | `openhab/esphome/tag_scanned`     | `esphome.TagScannedEvent` | The tag id.                                                            |
 
-For JRuby, use the [`event` trigger](https://openhab.github.io/openhab-jruby/main/OpenHAB/DSL/Rules/BuilderDSL.html#event-instance_method).
-For Python Scripting, use [`GenericEventTrigger`](https://www.openhab.org/addons/automation/pythonscripting/#module-openhab-triggers).
+For JRuby, use the [
+`event` trigger](https://openhab.github.io/openhab-jruby/main/OpenHAB/DSL/Rules/BuilderDSL.html#event-instance_method).
+For Python Scripting, use [
+`GenericEventTrigger`](https://www.openhab.org/addons/automation/pythonscripting/#module-openhab-triggers).
 
 ## Limitations
 
@@ -352,7 +360,6 @@ The following entity types are **not** yet supported (please submit a PR of file
 
 - `camera`
 - `voice`
-- `valve`
 - `siren`
 
 - `light` - not all modes are supported. Please create a PR if you need a specific mode.
