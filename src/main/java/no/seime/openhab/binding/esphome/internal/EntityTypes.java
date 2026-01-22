@@ -17,4 +17,5 @@ public class EntityTypes {
     public static final String DATE_TIME = "DateTime";
     public static final String TIME = "Time";
     public static final String LOCK = "Lock";
+    public static final String VALVE = "Valve";
 }
