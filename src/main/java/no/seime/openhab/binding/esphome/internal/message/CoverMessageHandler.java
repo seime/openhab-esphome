@@ -2,6 +2,7 @@ package no.seime.openhab.binding.esphome.internal.message;
 
 import static org.openhab.core.library.CoreItemFactory.STRING;
 
+import java.math.BigDecimal;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -13,7 +14,9 @@ import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.State;
 import org.openhab.core.types.StateDescription;
+import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,12 +90,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         .get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD);
                 switch (subCommand) {
                     case CHANNEL_POSITION -> {
-                        if (command instanceof QuantityType<?> qt) {
-                            builder.setPosition((1 - qt.floatValue()) / 100);
-                        } else if (command instanceof PercentType dc) {
-                            builder.setPosition((1 - dc.floatValue()));
-                        } else if (command instanceof DecimalType dc) {
-                            builder.setPosition((1 - dc.floatValue()) / 100);
+                        if (command instanceof QuantityType<?> number) {
+                            builder.setPosition(invert(number.floatValue() / 100));
+                        } else if (command instanceof PercentType number) {
+                            builder.setPosition(invert(number.floatValue() / 100));
+                        } else if (command instanceof DecimalType number) {
+                            builder.setPosition(invert(number.floatValue() / 100));
                         } else if (command == UpDownType.UP) {
                             builder.setHasLegacyCommand(true);
                             builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_OPEN);
@@ -105,10 +108,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                         builder.setHasPosition(true);
                     }
                     case CHANNEL_TILT -> {
-                        if (command instanceof QuantityType<?> qt) {
-                            builder.setTilt(qt.floatValue() / 100);
-                        } else if (command instanceof DecimalType dc) {
-                            builder.setTilt(dc.floatValue() / 100);
+                        if (command instanceof QuantityType<?> number) {
+                            builder.setTilt(invert(number.floatValue() / 100));
+                        } else if (command instanceof PercentType number) {
+                            builder.setTilt(invert(number.floatValue() / 100));
+                        } else if (command instanceof DecimalType number) {
+                            builder.setTilt(invert(number.floatValue() / 100));
                         } else if (command == UpDownType.UP) {
                             builder.setTilt(1);
                         } else if (command == UpDownType.DOWN) {
@@ -200,11 +205,23 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     }
 
     public void handleState(CoverStateResponse rsp) {
-        findChannelByKeyAndField(rsp.getKey(), CHANNEL_POSITION).ifPresent(channel -> handler
-                .updateState(channel.getUID(), toNumericState(channel, 1 - rsp.getPosition(), false)));
+        findChannelByKeyAndField(rsp.getKey(), CHANNEL_POSITION).ifPresent(
+                channel -> handler.updateState(channel.getUID(), toPercentState(invert(rsp.getPosition()), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_TILT).ifPresent(
-                channel -> handler.updateState(channel.getUID(), toNumericState(channel, rsp.getTilt(), false)));
+                channel -> handler.updateState(channel.getUID(), toPercentState(invert(rsp.getTilt()), false)));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_CURRENT_OPERATION).ifPresent(channel -> handler
                 .updateState(channel.getUID(), new StringType(stripEnumPrefix(rsp.getCurrentOperation()))));
+    }
+
+    protected State toPercentState(float state, boolean missingState) {
+        if (missingState || Float.isNaN(state)) {
+            return UnDefType.UNDEF;
+        } else {
+            return new PercentType(BigDecimal.valueOf(state * 100));
+        }
+    }
+
+    private float invert(float value) {
+        return 1f - value;
     }
 }
