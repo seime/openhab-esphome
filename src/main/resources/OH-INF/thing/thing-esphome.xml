@@ -58,20 +58,22 @@
 				<advanced>false</advanced>
 			</parameter>
 
-			<parameter name="reconnectInterval" type="integer" min="0" required="false" groupName="timeout">
+			<parameter name="reconnectInterval" type="integer" min="1" required="false" groupName="timeout">
 				<label>Initial reconnect interval in seconds</label>
 				<default>10</default>
 				<description>Seconds between reconnect attempts when connection is lost or the device restarts.
-					A random value max
-					half of the current reconnect is added to spread attempts between devices.
-					With each failed attempt the reconnect
+					A random value up to
+					half of the current reconnect interval is added to spread attempts between devices.
+					With each
+					failed attempt the
+					reconnect
 					interval is doubled.
 				</description>
 				<advanced>true</advanced>
 			</parameter>
-			<parameter name="maxReconnectInterval" type="integer" min="0" required="false" groupName="timeout">
+			<parameter name="maxReconnectInterval" type="integer" min="1" required="false" groupName="timeout">
 				<label>Maximum reconnect interval in seconds</label>
-				<default>300</default>
+				<default>120</default>
 				<description>Maximum reconnect interval in seconds. Reconnect interval is doubled after a failure.
 				</description>
 				<advanced>true</advanced>

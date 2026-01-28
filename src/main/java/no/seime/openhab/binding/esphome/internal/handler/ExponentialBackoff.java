@@ -23,7 +23,7 @@ public final class ExponentialBackoff {
 
     public synchronized int getNextDelay() {
         int delay = nextDelay;
-        int randomJitter = ThreadLocalRandom.current().nextInt(0, delay / 2);
+        int randomJitter = ThreadLocalRandom.current().nextInt(0, 1 + delay / 2);
         nextDelay = Math.min(maxDelay, delay * FACTOR);
         return delay + randomJitter;
     }
