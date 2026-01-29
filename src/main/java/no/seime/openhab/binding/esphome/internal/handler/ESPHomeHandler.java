@@ -87,6 +87,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private boolean disposed = false;
     private boolean interrogated;
     private boolean bluetoothProxyStarted = false;
+    // default is not used initialized in initialize()
+    private ExponentialBackoff exponentialBackoff = new ExponentialBackoff(10, 500);
 
     private String logPrefix;
     @Nullable
@@ -165,6 +167,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             logPrefix = String.format("%s", config.logPrefix); // To avoid nullness warning
         }
 
+        exponentialBackoff = new ExponentialBackoff(config.reconnectInterval, config.maxReconnectInterval);
         if (config.hostname != null && !config.hostname.isEmpty()) {
             scheduleConnect(0);
         } else {
@@ -253,7 +256,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             } catch (ProtocolException e) {
                 logger.warn("[{}] Error initial connection", logPrefix, e);
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-                scheduleConnect(config.reconnectInterval);
+                scheduleConnect(exponentialBackoff.getNextDelay());
             }
         }
     }
@@ -318,6 +321,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void onConnect() throws ProtocolAPIError {
         synchronized (connectionStateLock) {
             cancelConnectionTimeoutWatchdog();
+            exponentialBackoff.reset();
             logger.debug("[{}] Encrypted connection established. Starting API handshake.", logPrefix);
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
                     .setApiVersionMajor(API_VERSION_MAJOR).setApiVersionMinor(API_VERSION_MINOR).build();
@@ -373,9 +377,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 return;
             }
 
+            int nextDelay = exponentialBackoff.getNextDelay();
             String finalMessage = message;
             if (scheduleReconnect) {
-                finalMessage = String.format("%s. Will reconnect in %d seconds", message, config.reconnectInterval);
+                finalMessage = String.format("%s. Will reconnect in %d seconds", message, nextDelay);
             }
 
             logger.warn("[{}] Disconnecting. Reason: {}", logPrefix, finalMessage);
@@ -394,7 +399,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             connectionState = ConnectionState.UNINITIALIZED;
 
             if (scheduleReconnect) {
-                scheduleConnect(config.reconnectInterval);
+                scheduleConnect(nextDelay);
             }
         }
     }

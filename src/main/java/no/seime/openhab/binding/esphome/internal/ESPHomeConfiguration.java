@@ -26,7 +26,9 @@ public class ESPHomeConfiguration {
 
     public int port = 6053;
 
-    public int reconnectInterval = 20;
+    public int reconnectInterval = 10;
+
+    public int maxReconnectInterval = 120;
 
     public int pingInterval = 10;
 
