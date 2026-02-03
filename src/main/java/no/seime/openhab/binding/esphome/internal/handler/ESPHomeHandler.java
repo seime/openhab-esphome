@@ -27,6 +27,7 @@ import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.binding.ThingActions;
+import org.openhab.core.thing.binding.ThingHandlerService;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.*;
 import org.osgi.framework.BundleContext;
@@ -43,6 +44,7 @@ import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
+import no.seime.openhab.binding.esphome.internal.handler.action.AbstractESPHomeThingAction;
 import no.seime.openhab.binding.esphome.internal.handler.action.DynamicThingActionsGenerator;
 import no.seime.openhab.binding.esphome.internal.message.*;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -100,6 +102,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private String logPrefix;
     @Nullable
     private ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler;
+
+    @Nullable
+    private ClassLoader thingActionClassLoader;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
@@ -167,6 +172,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void initialize() {
         disposed = false;
+        thingActionClassLoader = new ClassLoader(getClass().getClassLoader()) {
+        };
+
         logger.debug("[{}] Initializing ESPHome handler", thing.getUID());
         config = getConfigAs(ESPHomeConfiguration.class);
 
@@ -211,8 +219,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             thingActionServiceRegistrations.forEach(sr -> sr.unregister());
 
             connectionState = ConnectionState.UNINITIALIZED;
+
+            thingActionClassLoader = null;
         }
         super.dispose();
+    }
+
+    @Override
+    public Collection<Class<? extends ThingHandlerService>> getServices() {
+        return Set.of();
     }
 
     @Override
@@ -516,10 +531,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             logger.debug("[{}] Received list entities services response {}", logPrefix, listEntitiesServicesResponse);
 
             try {
-                ThingActions thingActions = new DynamicThingActionsGenerator()
-                        .generateActions(listEntitiesServicesResponse);
-                thingActionServiceRegistrations.add(bundleContext.registerService(thingActions.getClass().getName(),
-                        thingActions, new Hashtable<>()));
+                AbstractESPHomeThingAction thingActions = new DynamicThingActionsGenerator()
+                        .generateActions(listEntitiesServicesResponse, thingActionClassLoader);
+                thingActions.setListEntitiesServicesResponse(listEntitiesServicesResponse);
+                thingActions.setThingHandler(this);
+                thingActionServiceRegistrations
+                        .add(bundleContext.registerService(ThingActions.class, thingActions, new Hashtable<>()));
 
             } catch (Exception e) {
                 logger.warn("[{}] Error generating dynamic actions from device: {}", logPrefix, e.getMessage(), e);
@@ -712,6 +729,37 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    public void executeAPIAction(int key, List<? extends Object> parameters) {
+        synchronized (connectionStateLock) {
+            if (disposed || connectionState != ConnectionState.CONNECTED) {
+                logger.warn("[{}] Not connected, cannot execute API action {}", logPrefix, key);
+                return;
+            }
+
+            try {
+                ExecuteServiceRequest cmd = ExecuteServiceRequest.newBuilder().setKey(key)
+                        .addAllArgs(parameters.stream().map(param -> {
+                            if (param instanceof String) {
+                                return ExecuteServiceArgument.newBuilder().setString((String) param).build();
+                            } else if (param instanceof Integer) {
+                                return ExecuteServiceArgument.newBuilder().setInt((Integer) param).build();
+                            } else if (param instanceof Boolean) {
+                                return ExecuteServiceArgument.newBuilder().setBool((Boolean) param).build();
+                            } else if (param instanceof Double) {
+                                return ExecuteServiceArgument.newBuilder().setFloat((Float) param).build();
+                            } else {
+                                logger.warn("[{}] Unsupported parameter type {} for API action {}", logPrefix,
+                                        param.getClass().getName(), key);
+                                return ExecuteServiceArgument.newBuilder().setString(param.toString()).build();
+                            }
+                        }).toList()).build();
+                frameHelper.send(cmd);
+            } catch (ProtocolAPIError e) {
+                logger.warn("[{}] Error sending API action {}", logPrefix, e);
+            }
+        }
+    }
+
     private void cancelPingWatchdog() {
         if (pingWatchdogFuture != null) {
             pingWatchdogFuture.cancel(true);
@@ -741,6 +789,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public boolean isInterrogated() {
         return interrogated;
+    }
+
+    // Testing purposes
+    public int countServiceRegistrations() {
+        return thingActionServiceRegistrations.size();
     }
 
     public List<Channel> getDynamicChannels() {

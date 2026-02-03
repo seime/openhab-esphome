@@ -33,6 +33,14 @@
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <proto.version>4.29.1</proto.version>
     <protobuf-maven-plugin.version>0.7.1</protobuf-maven-plugin.version>
+    <bnd.importpackage>javax.annotation;resolution:=optional, \
+      javax.annotation.meta;resolution:=optional, \
+      jdk.internal.misc;resolution:=optional, \
+      net.bytebuddy.jar.asmjdkbridge;resolution:=optional, \
+      net.bytebuddy.agent;resolution:=optional, \
+      sun.misc;resolution:=optional, \
+      *
+    </bnd.importpackage>
 
   </properties>
 
@@ -67,12 +75,6 @@
       <version>1.18.4</version>
     </dependency>
     <!-- Source: https://mvnrepository.com/artifact/jakarta.annotation/jakarta.annotation-api -->
-    <dependency>
-      <groupId>jakarta.annotation</groupId>
-      <artifactId>jakarta.annotation-api</artifactId>
-      <version>3.0.0</version>
-      <scope>compile</scope>
-    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>

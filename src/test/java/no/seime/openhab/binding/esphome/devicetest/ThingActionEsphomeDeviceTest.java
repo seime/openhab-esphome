@@ -2,10 +2,15 @@ package no.seime.openhab.binding.esphome.devicetest;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.osgi.framework.ServiceRegistration;
 
 public class ThingActionEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
@@ -16,14 +21,14 @@ public class ThingActionEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
     @Test
     public void testThingAction() {
 
-        // Things
+        doReturn(mock(ServiceRegistration.class)).when(bundleContext).registerService(anyString(),
+                ArgumentMatchers.any(), ArgumentMatchers.any());
 
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
         assertEquals(0, thingHandler.getDynamicChannels().size());
-
-        // TODO check for thing action created
+        assertEquals(1, thingHandler.countServiceRegistrations());
 
         thingHandler.dispose();
     }

@@ -11,10 +11,17 @@ api:
   encryption:
     key: !secret emulator_encryption_key
   actions:
-    - action: set_dsmr_key
+    - action: snake_case_action
       variables:
-        private_key: string
+        string_parameter: string
+        bool_parameter: bool
+        int_parameter: int
+        float_parameter: float
+        string_array_parameter: string[]
+        bool_array_parameter: bool[]
+        int_array_parameter: int[]
+        float_array_parameter: float[]
       then:
         - logger.log:
-            format: Setting private key %s. Set to empty string to disable
-            args: [ private_key.c_str() ]
+            format: Performing snake_case_action.
+

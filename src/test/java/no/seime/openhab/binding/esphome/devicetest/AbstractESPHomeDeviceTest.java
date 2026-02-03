@@ -59,10 +59,10 @@ public abstract class AbstractESPHomeDeviceTest {
     protected ESPHomeEventSubscriber eventSubscriber;
     protected ESPHomeConfiguration deviceConfiguration;
     private ConnectionSelector selector;
-    private @Mock Configuration configuration;
-    private @Mock ESPChannelTypeProvider channelTypeProvider;
-    private @Mock ESPStateDescriptionProvider stateDescriptionProvider;
-    private @Mock BundleContext bundleContext;
+    protected @Mock Configuration configuration;
+    protected @Mock ESPChannelTypeProvider channelTypeProvider;
+    protected @Mock ESPStateDescriptionProvider stateDescriptionProvider;
+    protected @Mock BundleContext bundleContext;
     private ESPHomeDeviceRunner emulator;
 
     @BeforeEach
