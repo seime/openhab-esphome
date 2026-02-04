@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.GeneratedMessage;
 
-import io.esphome.api.ConnectResponse;
+import io.esphome.api.AuthenticationResponse;
 
 public class LogParserTest {
 
@@ -29,6 +29,6 @@ public class LogParserTest {
 
     @Test
     public void testConnectResponse() {
-        logger.debug("Received packet with data {}", ConnectResponse.newBuilder().build().toByteArray());
+        logger.debug("Received packet with data {}", AuthenticationResponse.newBuilder().build().toByteArray());
     }
 }

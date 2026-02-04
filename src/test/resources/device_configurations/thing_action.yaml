@@ -24,4 +24,3 @@ api:
       then:
         - logger.log:
             format: Performing snake_case_action.
-
