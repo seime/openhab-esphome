@@ -14,6 +14,7 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.StringUtils;
@@ -47,7 +48,7 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHo
  * @author Arne Seime - Initial contribution
  */
 @NonNullByDefault
-@Component(configurationPid = "binding.esphome", service = ThingHandlerFactory.class)
+@Component(configurationPid = "binding.esphome", service = { ThingHandlerFactory.class, ESPHomeHandlerFactory.class })
 public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandlerFactory.class);
@@ -73,6 +74,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final MonitoredScheduledThreadPoolExecutor scheduler;
     private final KeySequentialExecutor packetExecutor;
     private final ConnectionSelector connectionSelector;
+
+    private final Map<ThingUID, ThingHandler> thingHandlers = new ConcurrentHashMap<>();
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
@@ -104,12 +107,16 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, stateDescriptionProvider,
-                    eventSubscriber, scheduler, packetExecutor, eventPublisher, defaultEncryptionKey);
+            ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
+                    stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
+                    defaultEncryptionKey);
+            thingHandlers.put(thing.getUID(), handler);
+            return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
             ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry,
                     scheduler);
             registerBluetoothAdapter(handler);
+            thingHandlers.put(thing.getUID(), handler);
             return handler;
         }
 
@@ -150,6 +157,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     @Override
     protected synchronized void removeHandler(ThingHandler thingHandler) {
+        thingHandlers.remove(thingHandler.getThing().getUID());
         if (thingHandler instanceof BluetoothAdapter bluetoothAdapter) {
             UID uid = bluetoothAdapter.getUID();
             ServiceRegistration<?> serviceReg = serviceRegs.remove(uid);
@@ -157,5 +165,43 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
                 serviceReg.unregister();
             }
         }
+        super.removeHandler(thingHandler);
+    }
+
+    public void onDeviceReappeared(String ip, List<String> hostnames) {
+        for (ThingHandler handler : thingHandlers.values()) {
+            if (handler instanceof ESPHomeHandler esphomeHandler) {
+                String configHostname = esphomeHandler.getHostname();
+                if (configHostname != null) {
+                    // Check IP match
+                    if (configHostname.equals(ip)) {
+                        esphomeHandler.onDeviceReappeared();
+                        continue;
+                    }
+                    // Check hostname match
+                    for (String hostname : hostnames) {
+                        if (compareHostnames(configHostname, hostname)) {
+                            esphomeHandler.onDeviceReappeared();
+                            break; // Found a match, move to next handler
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean compareHostnames(String h1, String h2) {
+        if (h1 == null || h2 == null) {
+            return false;
+        }
+        String s1 = StringUtils.stripEnd(h1, ".");
+        String s2 = StringUtils.stripEnd(h2, ".");
+        if (s1.equalsIgnoreCase(s2)) {
+            return true;
+        }
+        // Handle .local suffix
+        String s1Local = StringUtils.removeEndIgnoreCase(s1, ".local");
+        String s2Local = StringUtils.removeEndIgnoreCase(s2, ".local");
+        return s1Local.equalsIgnoreCase(s2Local);
     }
 }

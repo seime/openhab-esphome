@@ -733,6 +733,21 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         return Collections.unmodifiableMap(map);
     }
 
+    public void onDeviceReappeared() {
+        logger.debug("[{}] Device reappeared via mDNS, connection state {}", logPrefix, connectionState);
+        synchronized (connectionStateLock) {
+            if (connectionState == ConnectionState.UNINITIALIZED) {
+                logger.info("[{}] Device reappeared via mDNS, triggering immediate reconnect", logPrefix);
+                exponentialBackoff.reset();
+                scheduleConnect(0);
+            }
+        }
+    }
+
+    public @Nullable String getHostname() {
+        return config != null ? config.hostname : null;
+    }
+
     private enum ConnectionState {
         // Initial state, no connection
         UNINITIALIZED,
