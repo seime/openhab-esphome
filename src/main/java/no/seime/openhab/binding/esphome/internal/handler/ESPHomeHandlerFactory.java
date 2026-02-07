@@ -14,6 +14,7 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.StringUtils;
@@ -47,7 +48,7 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHo
  * @author Arne Seime - Initial contribution
  */
 @NonNullByDefault
-@Component(configurationPid = "binding.esphome", service = ThingHandlerFactory.class)
+@Component(configurationPid = "binding.esphome", service = { ThingHandlerFactory.class, ESPHomeHandlerFactory.class })
 public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandlerFactory.class);
@@ -73,6 +74,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final MonitoredScheduledThreadPoolExecutor scheduler;
     private final KeySequentialExecutor packetExecutor;
     private final ConnectionSelector connectionSelector;
+
+    private final Map<ThingUID, ESPHomeHandler> esphomeHandlers = new ConcurrentHashMap<>();
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
@@ -104,9 +107,11 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
-            return new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider, stateDescriptionProvider,
-                    eventSubscriber, scheduler, packetExecutor, eventPublisher, defaultEncryptionKey,
-                    getBundleContext());
+            ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
+                    stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
+                    defaultEncryptionKey, getBundleContext());
+            esphomeHandlers.put(thing.getUID(), handler);
+            return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
             ESPHomeBluetoothProxyHandler handler = new ESPHomeBluetoothProxyHandler((Bridge) thing, thingRegistry,
                     scheduler);
@@ -151,6 +156,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     @Override
     protected synchronized void removeHandler(ThingHandler thingHandler) {
+        esphomeHandlers.remove(thingHandler.getThing().getUID());
         if (thingHandler instanceof BluetoothAdapter bluetoothAdapter) {
             UID uid = bluetoothAdapter.getUID();
             ServiceRegistration<?> serviceReg = serviceRegs.remove(uid);
@@ -158,5 +164,11 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
                 serviceReg.unregister();
             }
         }
+        super.removeHandler(thingHandler);
+    }
+
+    public void onDeviceReappeared(List<String> deviceIds) {
+        esphomeHandlers.values().stream().filter(h -> deviceIds.contains(h.getDeviceId()))
+                .forEach(ESPHomeHandler::onDeviceReappeared);
     }
 }
