@@ -39,6 +39,7 @@
       net.bytebuddy.jar.asmjdkbridge;resolution:=optional, \
       net.bytebuddy.agent;resolution:=optional, \
       sun.misc;resolution:=optional, \
+      org.osgi.service.component.annotations;resolution:=optional, \
 
     </bnd.importpackage>
 
@@ -86,7 +87,6 @@
       <version>1.7.28</version>
       <scope>provided</scope>
     </dependency>
-
     <dependency>
       <groupId>com.github.tomakehurst</groupId>
       <artifactId>wiremock-standalone</artifactId>
@@ -175,7 +175,6 @@
           </execution>
         </executions>
       </plugin>
-
     </plugins>
   </build>
 
