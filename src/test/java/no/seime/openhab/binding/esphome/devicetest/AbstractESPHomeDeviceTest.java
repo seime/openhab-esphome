@@ -26,6 +26,7 @@ import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 import org.openhab.core.types.State;
+import org.osgi.framework.BundleContext;
 
 import com.jano7.executor.KeySequentialExecutor;
 
@@ -58,9 +59,10 @@ public abstract class AbstractESPHomeDeviceTest {
     protected ESPHomeEventSubscriber eventSubscriber;
     protected ESPHomeConfiguration deviceConfiguration;
     private ConnectionSelector selector;
-    private @Mock Configuration configuration;
-    private @Mock ESPChannelTypeProvider channelTypeProvider;
-    private @Mock ESPStateDescriptionProvider stateDescriptionProvider;
+    protected @Mock Configuration configuration;
+    protected @Mock ESPChannelTypeProvider channelTypeProvider;
+    protected @Mock ESPStateDescriptionProvider stateDescriptionProvider;
+    protected @Mock BundleContext bundleContext;
     private ESPHomeDeviceRunner emulator;
 
     @BeforeEach
@@ -88,23 +90,29 @@ public abstract class AbstractESPHomeDeviceTest {
         eventSubscriber = new ESPHomeEventSubscriber(thingRegistry, itemRegistry);
 
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
-                eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null);
+                eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, bundleContext);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
+
+        when(bundleContext.registerService(eq(ESPHomeHandler.class), eq(thingHandler), Mockito.any())).thenReturn(null);
     }
 
     protected abstract File getEspDeviceConfigurationYamlFileName();
 
     @AfterEach
     public void shutdown() throws InterruptedException {
-        if (thingHandler != null)
+        if (thingHandler != null) {
             thingHandler.dispose();
-        if (selector != null)
+        }
+        if (selector != null) {
             selector.stop();
-        if (emulator != null)
+        }
+        if (emulator != null) {
             emulator.shutdown();
-        if (executor != null)
+        }
+        if (executor != null) {
             executor.shutdownNow();
+        }
     }
 
     protected void registerItem(GenericItem item, State initialState) throws ItemNotFoundException {

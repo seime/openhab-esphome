@@ -35,8 +35,9 @@ public class LogReadingCommunicationListener implements CommunicationListener {
         } else if (message instanceof DeviceInfoRequest) {
             emulator.sendPacket(
                     responseMessages.stream().filter(e -> e instanceof DeviceInfoResponse).findFirst().get());
-        } else if (message instanceof ConnectRequest) {
-            emulator.sendPacket(responseMessages.stream().filter(e -> e instanceof ConnectResponse).findFirst().get());
+        } else if (message instanceof AuthenticationRequest) {
+            emulator.sendPacket(
+                    responseMessages.stream().filter(e -> e instanceof AuthenticationResponse).findFirst().get());
         } else if (message instanceof PingRequest) {
             emulator.sendPacket(PingResponse.getDefaultInstance());
         } else if (message instanceof DisconnectRequest) {
