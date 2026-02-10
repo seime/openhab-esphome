@@ -47,13 +47,15 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         this.handler = handler;
     }
 
-    protected ChannelType addChannelType(final String channelTypeSuffix, final String label, final String itemType,
+    protected ChannelType addChannelType(final String objectId, final String entityName, final String itemType,
             @Nullable final Set<String> tags, String category, EntityCategory entityCategory,
             boolean disabledByDefault) {
-        final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
-                handler.getThing().getUID().getId() + "_" + channelTypeSuffix);
 
-        final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID, label, itemType);
+        final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
+                handler.getThing().getUID().getId() + "_" + UUID.randomUUID());
+
+        final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID,
+                createChannelLabel(entityName), itemType);
         if (tags != null && !tags.isEmpty()) {
             channelTypeBuilder.withTags(tags);
         }
@@ -342,12 +344,35 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
     }
 
-    protected String createLabel(String componentName, String channelName) {
-        return String.format("%s %s", componentName, channelName).trim();
+    protected String createChannelLabel(String entityName, String channelName) {
+        return String.format("%s %s", createChannelLabel(entityName), channelName).trim();
     }
 
-    protected ChannelUID createChannelUID(String componentName, String channelName) {
-        return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", componentName, channelName));
+    protected String createChannelLabel(String entityName) {
+        if (entityName != null && !entityName.isEmpty()) {
+            return entityName;
+        } else {
+            return "None";
+        }
+    }
+
+    protected ChannelUID createChannelUID(ESPHomeHandler handler, String objectId, String entityType,
+            String channelName) {
+        String id = sanitizeObjectId(objectId, entityType);
+        return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", id, channelName));
+    }
+
+    protected ChannelUID createChannelUID(ESPHomeHandler handler, String objectId, String entityType) {
+        String id = sanitizeObjectId(objectId, entityType);
+        return new ChannelUID(handler.getThing().getUID(), id);
+    }
+
+    private String sanitizeObjectId(String objectId, String entityType) {
+        String uid = objectId;
+        if (objectId.lastIndexOf('.') == -1) {
+            uid = String.format("%s_%s", objectId, entityType);
+        }
+        return uid;
     }
 
     protected State toDateTimeState(int epochSeconds, boolean missingState) {
@@ -369,8 +394,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
                     handler.getLogPrefix(), rawDeviceClass, entity, documentationLink);
             deviceClass = defaultDeviceClass;
         }
-        if (configuration != null)
+        if (configuration != null) {
             configuration.put("deviceClass", deviceClass.getDeviceClass());
+        }
         return deviceClass;
     }
 

@@ -78,8 +78,9 @@ public class ValveMessageHandler extends AbstractMessageHandler<ListEntitiesValv
                 deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%d %%");
 
-        Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
-                .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
+        Channel channelPosition = ChannelBuilder
+                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_POSITION))
+                .withLabel(createChannelLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                 .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(EntityTypes.VALVE, rsp.getKey(), CHANNEL_POSITION)).build();
         super.registerChannel(channelPosition, channelTypePosition, stateDescription);
@@ -92,8 +93,8 @@ public class ValveMessageHandler extends AbstractMessageHandler<ListEntitiesValv
                 .filter(v -> v != ValveOperation.UNRECOGNIZED).map(v -> stripEnumPrefix(v)).toList(), true);
 
         Channel channelCurrentOperation = ChannelBuilder
-                .create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_OPERATION))
-                .withLabel(createLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
+                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_CURRENT_OPERATION))
+                .withLabel(createChannelLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType(STRING)
                 .withConfiguration(configuration(EntityTypes.VALVE, rsp.getKey(), CHANNEL_CURRENT_OPERATION)).build();
         super.registerChannel(channelCurrentOperation, channelTypeCurrentOperation, stateDescription);

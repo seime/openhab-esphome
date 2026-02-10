@@ -14,7 +14,6 @@ import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
@@ -115,9 +114,10 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
             ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), COLOR, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
-            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                    .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                    .withAcceptedItemType(COLOR).withConfiguration(configuration).build();
+            Channel channel = ChannelBuilder.create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.LIGHT))
+                    .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE)
+                    .withType(channelType.getUID()).withAcceptedItemType(COLOR).withConfiguration(configuration)
+                    .build();
 
             super.registerChannel(channel, channelType);
         } else if (capabilities.contains(LightColorCapability.BRIGHTNESS)) {
@@ -125,9 +125,10 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
             ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), DIMMER, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
-            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                    .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                    .withAcceptedItemType(DIMMER).withConfiguration(configuration).build();
+            Channel channel = ChannelBuilder.create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.LIGHT))
+                    .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE)
+                    .withType(channelType.getUID()).withAcceptedItemType(DIMMER).withConfiguration(configuration)
+                    .build();
 
             super.registerChannel(channel, channelType);
         } else if (capabilities.contains(LightColorCapability.ON_OFF)) {
@@ -135,9 +136,10 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
             ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), SWITCH, semanticTags, icon,
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
-            Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                    .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                    .withAcceptedItemType(SWITCH).withConfiguration(configuration).build();
+            Channel channel = ChannelBuilder.create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.LIGHT))
+                    .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE)
+                    .withType(channelType.getUID()).withAcceptedItemType(SWITCH).withConfiguration(configuration)
+                    .build();
 
             super.registerChannel(channel, channelType);
         }
@@ -149,9 +151,9 @@ public class LightMessageHandler extends AbstractMessageHandler<ListEntitiesLigh
             StateDescription stateDescription = optionListStateDescription(rsp.getEffectsList());
 
             Channel channel = ChannelBuilder
-                    .create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId() + "-effects"))
-                    .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
-                    .withAcceptedItemType(STRING)
+                    .create(createChannelUID(handler, rsp.getObjectId() + "-effects", EntityTypes.LIGHT))
+                    .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE)
+                    .withType(channelType.getUID()).withAcceptedItemType(STRING)
                     .withConfiguration(configuration("Light", rsp.getKey(), CHANNEL_EFFECTS)).build();
 
             super.registerChannel(channel, channelType, stateDescription);

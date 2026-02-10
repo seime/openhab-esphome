@@ -192,8 +192,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
         ChannelType channelTypeState = addChannelType(rsp.getObjectId() + CHANNEL_STATE, "State", SWITCH,
                 Set.of("Switch"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
-        Channel channelState = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_STATE))
-                .withLabel(createLabel(rsp.getName(), "State")).withKind(ChannelKind.STATE)
+        Channel channelState = ChannelBuilder
+                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.FAN, CHANNEL_STATE))
+                .withLabel(createChannelLabel(rsp.getName(), "State")).withKind(ChannelKind.STATE)
                 .withType(channelTypeState.getUID()).withAcceptedItemType(SWITCH)
                 .withConfiguration(configuration(EntityTypes.FAN, rsp.getKey(), CHANNEL_STATE)).build();
 
@@ -203,8 +204,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             ChannelType channelTypeOscillation = addChannelType(rsp.getObjectId() + CHANNEL_OSCILLATION, "Oscillation",
                     SWITCH, Set.of("Control"), icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
-            Channel channelOscillation = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_OSCILLATION))
-                    .withLabel(createLabel(rsp.getName(), "Oscillation")).withKind(ChannelKind.STATE)
+            Channel channelOscillation = ChannelBuilder
+                    .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.FAN, CHANNEL_OSCILLATION))
+                    .withLabel(createChannelLabel(rsp.getName(), "Oscillation")).withKind(ChannelKind.STATE)
                     .withType(channelTypeOscillation.getUID()).withAcceptedItemType(SWITCH)
                     .withConfiguration(configuration(EntityTypes.FAN, rsp.getKey(), CHANNEL_OSCILLATION)).build();
 
@@ -218,8 +220,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                     Arrays.stream(FanDirection.values()).filter(e -> e != FanDirection.UNRECOGNIZED)
                             .map(e -> stripEnumPrefix(e)).collect(Collectors.toList()));
 
-            Channel channelDirection = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_DIRECTION))
-                    .withLabel(createLabel(rsp.getName(), "Direction")).withKind(ChannelKind.STATE)
+            Channel channelDirection = ChannelBuilder
+                    .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.FAN, CHANNEL_DIRECTION))
+                    .withLabel(createChannelLabel(rsp.getName(), "Direction")).withKind(ChannelKind.STATE)
                     .withType(channelTypeDirection.getUID()).withAcceptedItemType(STRING)
                     .withConfiguration(configuration(EntityTypes.FAN, rsp.getKey(), CHANNEL_DIRECTION)).build();
             super.registerChannel(channelDirection, channelTypeDirection, stateDescription);
@@ -235,8 +238,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             StateDescription stateDescription = numericStateDescription(null,
                     BigDecimal.valueOf(100 / supportedSpeedLevels), BigDecimal.ZERO, BigDecimal.valueOf(100));
 
-            Channel channelSpeed = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_SPEED_LEVEL))
-                    .withLabel(createLabel(rsp.getName(), "Speed")).withKind(ChannelKind.STATE)
+            Channel channelSpeed = ChannelBuilder
+                    .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.FAN, CHANNEL_SPEED_LEVEL))
+                    .withLabel(createChannelLabel(rsp.getName(), "Speed")).withKind(ChannelKind.STATE)
                     .withType(channelTypeSpeed.getUID()).withAcceptedItemType(DIMMER)
                     .withConfiguration(configuration(EntityTypes.FAN, rsp.getKey(), CHANNEL_SPEED_LEVEL)).build();
             super.registerChannel(channelSpeed, channelTypeSpeed, stateDescription);
@@ -247,8 +251,9 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
             ChannelType channelTypePreset = addChannelType(rsp.getObjectId() + CHANNEL_PRESET, "Preset", STRING,
                     Set.of("Setpoint"), "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(rsp.getSupportedPresetModesList());
-            Channel channelPreset = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_PRESET))
-                    .withLabel(createLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
+            Channel channelPreset = ChannelBuilder
+                    .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.FAN, CHANNEL_PRESET))
+                    .withLabel(createChannelLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
                     .withType(channelTypePreset.getUID()).withAcceptedItemType(STRING)
                     .withConfiguration(configuration(EntityTypes.FAN, rsp.getKey(), CHANNEL_PRESET)).build();
             super.registerChannel(channelPreset, channelTypePreset, stateDescription);

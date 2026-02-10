@@ -108,8 +108,9 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                 deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%d %%");
 
-        Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
-                .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
+        Channel channelPosition = ChannelBuilder
+                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.COVER, CHANNEL_POSITION))
+                .withLabel(createChannelLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                 .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_POSITION)).build();
         super.registerChannel(channelPosition, channelTypePosition, stateDescription);
@@ -121,8 +122,9 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%d %%");
 
-            Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
-                    .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
+            Channel channelTilt = ChannelBuilder
+                    .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.COVER, CHANNEL_TILT))
+                    .withLabel(createChannelLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
                     .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
             super.registerChannel(channelTilt, channelTypeTilt, stateDescription);
@@ -135,8 +137,8 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         stateDescription = optionListStateDescription(Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), true);
 
         Channel channelCurrentOperation = ChannelBuilder
-                .create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_OPERATION))
-                .withLabel(createLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
+                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.COVER, CHANNEL_CURRENT_OPERATION))
+                .withLabel(createChannelLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType(STRING)
                 .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_CURRENT_OPERATION)).build();
         super.registerChannel(channelCurrentOperation, channelTypeCurrentOperation, stateDescription);

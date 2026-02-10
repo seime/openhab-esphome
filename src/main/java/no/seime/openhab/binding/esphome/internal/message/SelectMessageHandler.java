@@ -6,7 +6,6 @@ import java.util.Set;
 
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
@@ -40,8 +39,8 @@ public class SelectMessageHandler extends AbstractMessageHandler<ListEntitiesSel
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = optionListStateDescription(rsp.getOptionsList());
 
-        Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
+        Channel channel = ChannelBuilder.create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.SELECT))
+                .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(STRING).withConfiguration(configuration(EntityTypes.SELECT, rsp.getKey(), null))
                 .build();
 
