@@ -52,23 +52,23 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
         StateDescription stateDescription;
 
         if (deviceClass.getItemType().equals(DATETIME)) {
-            channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, Set.of("Status"), icon,
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            channelType = addChannelType(rsp.getName(), itemType, Set.of("Status"), icon, rsp.getEntityCategory(),
+                    rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS", true);
         } else if (deviceClass.getItemType().equals(STRING)) {
-            channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, Set.of("Status"), icon,
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            channelType = addChannelType(rsp.getName(), itemType, Set.of("Status"), icon, rsp.getEntityCategory(),
+                    rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%s", true);
         } else {
             String unitOfMeasurement = rsp.getUnitOfMeasurement();
             itemType = resolveNumericItemType(unitOfMeasurement, rsp.getName(), deviceClass, configuration);
 
-            channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, semanticTags, icon,
-                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            channelType = addChannelType(rsp.getName(), itemType, semanticTags, icon, rsp.getEntityCategory(),
+                    rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%." + rsp.getAccuracyDecimals() + "f "
                     + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), true);
         }
-        Channel channel = ChannelBuilder.create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.SENSOR))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.SENSOR))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
         super.registerChannel(channel, channelType, stateDescription);

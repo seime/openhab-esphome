@@ -47,7 +47,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         this.handler = handler;
     }
 
-    protected ChannelType addChannelType(final String objectId, final String entityName, final String itemType,
+    protected ChannelType addChannelType(final String entityName, final String itemType,
             @Nullable final Set<String> tags, String category, EntityCategory entityCategory,
             boolean disabledByDefault) {
 
@@ -356,21 +356,22 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
     }
 
-    protected ChannelUID createChannelUID(ESPHomeHandler handler, String objectId, String entityType,
-            String channelName) {
+    protected ChannelUID createChannelUID(String objectId, String entityType, String channelName) {
         String id = sanitizeObjectId(objectId, entityType);
         return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", id, channelName));
     }
 
-    protected ChannelUID createChannelUID(ESPHomeHandler handler, String objectId, String entityType) {
+    protected ChannelUID createChannelUID(String objectId, String entityType) {
         String id = sanitizeObjectId(objectId, entityType);
         return new ChannelUID(handler.getThing().getUID(), id);
     }
 
     private String sanitizeObjectId(String objectId, String entityType) {
         String uid = objectId;
-        if (objectId.lastIndexOf('.') == -1) {
-            uid = String.format("%s_%s", objectId, entityType);
+        if (objectId.equals(handler.getThing().getProperties().get("name"))) {
+            // Happens if entity has no name, and then provides the objectId as the name. Then we need to ensure unique
+            // id based on entity type as only 1 entity of each type can have no name.
+            uid = String.format("%s_%s", objectId, entityType.toLowerCase());
         }
         return uid;
     }

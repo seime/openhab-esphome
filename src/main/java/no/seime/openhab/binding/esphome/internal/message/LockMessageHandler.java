@@ -61,12 +61,12 @@ public class LockMessageHandler extends AbstractMessageHandler<ListEntitiesLockR
             commandOptions.add(stripEnumPrefix(LockCommand.LOCK_OPEN));
         }
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), STRING, Set.of("Switch"), icon,
-                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelType = addChannelType(rsp.getName(), STRING, Set.of("Switch"), icon, rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
         StateDescription stateDescription = optionListStateDescription(stateOptions);
         CommandDescription commandDescription = optionListCommandDescription(commandOptions);
 
-        Channel channel = ChannelBuilder.create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.LOCK))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.LOCK))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(STRING).withConfiguration(configuration).build();
 

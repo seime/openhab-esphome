@@ -74,26 +74,26 @@ public class ValveMessageHandler extends AbstractMessageHandler<ListEntitiesValv
 
         Set<String> semanticTags = createSemanticTags("OpenLevel", deviceClass);
 
-        ChannelType channelTypePosition = addChannelType(rsp.getObjectId() + CHANNEL_POSITION, "Position",
-                deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelTypePosition = addChannelType("Position", deviceClass.getItemType(), semanticTags, icon,
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%d %%");
 
         Channel channelPosition = ChannelBuilder
-                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_POSITION))
+                .create(createChannelUID(rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_POSITION))
                 .withLabel(createChannelLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                 .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(EntityTypes.VALVE, rsp.getKey(), CHANNEL_POSITION)).build();
         super.registerChannel(channelPosition, channelTypePosition, stateDescription);
 
         // Operation status
-        ChannelType channelTypeCurrentOperation = addChannelType(rsp.getObjectId() + CHANNEL_CURRENT_OPERATION,
-                "Current operation", STRING, createSemanticTags("Status", deviceClass), "motion",
-                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelTypeCurrentOperation = addChannelType("Current operation", STRING,
+                createSemanticTags("Status", deviceClass), "motion", rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
         stateDescription = optionListStateDescription(Arrays.stream(ValveOperation.values())
                 .filter(v -> v != ValveOperation.UNRECOGNIZED).map(v -> stripEnumPrefix(v)).toList(), true);
 
         Channel channelCurrentOperation = ChannelBuilder
-                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_CURRENT_OPERATION))
+                .create(createChannelUID(rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_CURRENT_OPERATION))
                 .withLabel(createChannelLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType(STRING)
                 .withConfiguration(configuration(EntityTypes.VALVE, rsp.getKey(), CHANNEL_CURRENT_OPERATION)).build();

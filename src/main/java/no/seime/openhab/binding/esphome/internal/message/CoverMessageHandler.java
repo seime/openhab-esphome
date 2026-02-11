@@ -104,12 +104,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         Set<String> semanticTags = createSemanticTags("OpenLevel", deviceClass);
 
-        ChannelType channelTypePosition = addChannelType(rsp.getObjectId() + CHANNEL_POSITION, "Position",
-                deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelTypePosition = addChannelType("Position", deviceClass.getItemType(), semanticTags, icon,
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%d %%");
 
         Channel channelPosition = ChannelBuilder
-                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.COVER, CHANNEL_POSITION))
+                .create(createChannelUID(rsp.getObjectId(), EntityTypes.COVER, CHANNEL_POSITION))
                 .withLabel(createChannelLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                 .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_POSITION)).build();
@@ -118,12 +118,12 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         if (rsp.getSupportsTilt()) {
             semanticTags = createSemanticTags("Tilt", deviceClass);
 
-            ChannelType channelTypeTilt = addChannelType(rsp.getObjectId() + CHANNEL_TILT, "Tilt",
-                    deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            ChannelType channelTypeTilt = addChannelType("Tilt", deviceClass.getItemType(), semanticTags, icon,
+                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%d %%");
 
             Channel channelTilt = ChannelBuilder
-                    .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.COVER, CHANNEL_TILT))
+                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.COVER, CHANNEL_TILT))
                     .withLabel(createChannelLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
                     .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
@@ -131,13 +131,13 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         }
 
         // Operation status
-        ChannelType channelTypeCurrentOperation = addChannelType(rsp.getObjectId() + CHANNEL_CURRENT_OPERATION,
-                "Current operation", STRING, createSemanticTags("Status", deviceClass), "motion",
-                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelTypeCurrentOperation = addChannelType("Current operation", STRING,
+                createSemanticTags("Status", deviceClass), "motion", rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
         stateDescription = optionListStateDescription(Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), true);
 
         Channel channelCurrentOperation = ChannelBuilder
-                .create(createChannelUID(handler, rsp.getObjectId(), EntityTypes.COVER, CHANNEL_CURRENT_OPERATION))
+                .create(createChannelUID(rsp.getObjectId(), EntityTypes.COVER, CHANNEL_CURRENT_OPERATION))
                 .withLabel(createChannelLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType(STRING)
                 .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_CURRENT_OPERATION)).build();
