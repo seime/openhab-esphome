@@ -9,7 +9,6 @@ import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
@@ -83,8 +82,8 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), itemType, semanticTags, icon,
-                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelType = addChannelType(rsp.getName(), itemType, semanticTags, icon, rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
 
         StateDescription stateDescription = numericStateDescription(
                 "%." + accuracyDecimals + "f " + (unit.equals("%") ? "%unit%" : unit),
@@ -92,8 +91,8 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
                 rsp.getMinValue() != 0f ? BigDecimal.valueOf(rsp.getMinValue()) : null,
                 rsp.getMaxValue() != 0f ? BigDecimal.valueOf(rsp.getMaxValue()) : null);
 
-        Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.NUMBER))
+                .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
         super.registerChannel(channel, channelType, stateDescription);
     }

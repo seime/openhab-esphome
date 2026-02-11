@@ -7,7 +7,6 @@ import java.util.Set;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
@@ -48,11 +47,11 @@ public class ButtonMessageHandler extends AbstractMessageHandler<ListEntitiesBut
 
         String icon = getChannelIcon(rsp.getIcon(), "switch");
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), SWITCH, Set.of("Switch"), icon,
-                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelType = addChannelType(rsp.getName(), SWITCH, Set.of("Switch"), icon, rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
 
-        Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.BUTTON))
+                .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(SWITCH).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType);

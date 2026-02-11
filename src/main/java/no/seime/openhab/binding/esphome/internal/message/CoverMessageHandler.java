@@ -104,12 +104,13 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
 
         Set<String> semanticTags = createSemanticTags("OpenLevel", deviceClass);
 
-        ChannelType channelTypePosition = addChannelType(rsp.getObjectId() + CHANNEL_POSITION, "Position",
-                deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelTypePosition = addChannelType("Position", deviceClass.getItemType(), semanticTags, icon,
+                rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%d %%");
 
-        Channel channelPosition = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_POSITION))
-                .withLabel(createLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
+        Channel channelPosition = ChannelBuilder
+                .create(createChannelUID(rsp.getObjectId(), EntityTypes.COVER, CHANNEL_POSITION))
+                .withLabel(createChannelLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                 .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_POSITION)).build();
         super.registerChannel(channelPosition, channelTypePosition, stateDescription);
@@ -117,26 +118,27 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         if (rsp.getSupportsTilt()) {
             semanticTags = createSemanticTags("Tilt", deviceClass);
 
-            ChannelType channelTypeTilt = addChannelType(rsp.getObjectId() + CHANNEL_TILT, "Tilt",
-                    deviceClass.getItemType(), semanticTags, icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+            ChannelType channelTypeTilt = addChannelType("Tilt", deviceClass.getItemType(), semanticTags, icon,
+                    rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%d %%");
 
-            Channel channelTilt = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), CHANNEL_TILT))
-                    .withLabel(createLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
+            Channel channelTilt = ChannelBuilder
+                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.COVER, CHANNEL_TILT))
+                    .withLabel(createChannelLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
                     .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
             super.registerChannel(channelTilt, channelTypeTilt, stateDescription);
         }
 
         // Operation status
-        ChannelType channelTypeCurrentOperation = addChannelType(rsp.getObjectId() + CHANNEL_CURRENT_OPERATION,
-                "Current operation", STRING, createSemanticTags("Status", deviceClass), "motion",
-                rsp.getEntityCategory(), rsp.getDisabledByDefault());
+        ChannelType channelTypeCurrentOperation = addChannelType("Current operation", STRING,
+                createSemanticTags("Status", deviceClass), "motion", rsp.getEntityCategory(),
+                rsp.getDisabledByDefault());
         stateDescription = optionListStateDescription(Set.of("IDLE", "IS_OPENING", "IS_CLOSING"), true);
 
         Channel channelCurrentOperation = ChannelBuilder
-                .create(createChannelUID(rsp.getObjectId(), CHANNEL_CURRENT_OPERATION))
-                .withLabel(createLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
+                .create(createChannelUID(rsp.getObjectId(), EntityTypes.COVER, CHANNEL_CURRENT_OPERATION))
+                .withLabel(createChannelLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType(STRING)
                 .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_CURRENT_OPERATION)).build();
         super.registerChannel(channelCurrentOperation, channelTypeCurrentOperation, stateDescription);

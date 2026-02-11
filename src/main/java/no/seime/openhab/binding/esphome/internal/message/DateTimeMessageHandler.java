@@ -8,7 +8,6 @@ import java.util.Set;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.thing.type.ChannelType;
@@ -51,12 +50,12 @@ public class DateTimeMessageHandler
 
         String icon = getChannelIcon(rsp.getIcon(), "time");
 
-        ChannelType channelType = addChannelType(rsp.getObjectId(), rsp.getName(), DATETIME, Set.of("Control"), icon,
+        ChannelType channelType = addChannelType(rsp.getName(), DATETIME, Set.of("Control"), icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS");
 
-        Channel channel = ChannelBuilder.create(new ChannelUID(handler.getThing().getUID(), rsp.getObjectId()))
-                .withLabel(rsp.getName()).withKind(ChannelKind.STATE).withType(channelType.getUID())
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.DATE_TIME))
+                .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(DATETIME).withConfiguration(configuration).build();
 
         super.registerChannel(channel, channelType, stateDescription);

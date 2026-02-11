@@ -1,0 +1,29 @@
+esphome:
+  name: virtual
+  friendly_name: Virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: VERY_VERBOSE
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+binary_sensor:
+  - platform: template
+    name: ""
+    device_class: garage_door
+    lambda: 'return true;'
+
+sensor:
+  - platform: template
+    name: ""
+    device_class: temperature
+    lambda: 'return true;'
+  - platform: template
+    name: "Temperature"
+    device_class: temperature
+    lambda: 'return true;'
