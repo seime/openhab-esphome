@@ -62,21 +62,18 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
         String application = service.getApplication();
         if ("esphomelib".equals(application)) {
             String friendlyName = service.getPropertyString("friendly_name");
-            if (friendlyName != null) {
-                // Defer discovery until TXT records are available
-                String name = service.getName();
-                String board = service.getPropertyString("board");
-                String label = String.format("%s / %s", friendlyName, board);
+            String name = service.getName();
+            String board = service.getPropertyString("board");
+            String label = String.format("%s / %s", friendlyName != null ? friendlyName : name, board);
 
-                final ThingUID deviceUID = getThingUID(service);
+            final ThingUID deviceUID = getThingUID(service);
 
-                logger.debug("Found ESPHome device via mDNS: {} ", label);
+            logger.debug("Found ESPHome device via mDNS: {} ", label);
 
-                return DiscoveryResultBuilder.create(deviceUID).withThingType(BindingConstants.THING_TYPE_DEVICE)
-                        .withProperty(PROPERTY_HOSTNAME, service.getServer())
-                        .withProperty(PROPERTY_PORT, service.getPort()).withProperty(PROPERTY_DEVICEID, name)
-                        .withLabel(label).withRepresentationProperty(PROPERTY_DEVICEID).build();
-            }
+            return DiscoveryResultBuilder.create(deviceUID).withThingType(BindingConstants.THING_TYPE_DEVICE)
+                    .withProperty(PROPERTY_HOSTNAME, service.getServer()).withProperty(PROPERTY_PORT, service.getPort())
+                    .withProperty(PROPERTY_DEVICEID, name).withLabel(label)
+                    .withRepresentationProperty(PROPERTY_DEVICEID).build();
         }
         return null;
     }
