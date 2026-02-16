@@ -1,0 +1,26 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+  actions:
+    - action: snake_case_action
+      variables:
+        string_parameter: string
+        bool_parameter: bool
+        int_parameter: int
+        float_parameter: float
+        string_array_parameter: string[]
+        bool_array_parameter: bool[]
+        int_array_parameter: int[]
+        float_array_parameter: float[]
+      then:
+        - logger.log:
+            format: Performing snake_case_action.
