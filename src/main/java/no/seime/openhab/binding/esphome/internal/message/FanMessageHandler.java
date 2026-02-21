@@ -272,6 +272,6 @@ public class FanMessageHandler extends AbstractMessageHandler<ListEntitiesFanRes
                 .ifPresent(channel -> handler.updateState(channel.getUID(), new PercentType(rsp.getSpeedLevel())));
         findChannelByKeyAndField(rsp.getKey(), CHANNEL_PRESET)
                 .ifPresent(channel -> handler.updateState(channel.getUID(),
-                        "".equals(rsp.getPresetMode()) ? UnDefType.UNDEF : new StringType(rsp.getPresetMode())));
+                        "".equals(rsp.getPresetMode()) ? UnDefType.NULL : new StringType(rsp.getPresetMode())));
     }
 }

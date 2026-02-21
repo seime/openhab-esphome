@@ -259,7 +259,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     }
 
     protected State toNumericState(Channel channel, float state, boolean missingState) {
-        if (missingState || Float.isNaN(state)) {
+        if (missingState) {
+            return UnDefType.NULL;
+        } else if (Float.isNaN(state)) {
             return UnDefType.UNDEF;
         } else {
             Configuration configuration = channel.getConfiguration();
@@ -378,7 +380,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     protected State toDateTimeState(int epochSeconds, boolean missingState) {
         if (missingState) {
-            return UnDefType.UNDEF;
+            return UnDefType.NULL;
         } else {
             return new DateTimeType(
                     ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZoneId.systemDefault()));
