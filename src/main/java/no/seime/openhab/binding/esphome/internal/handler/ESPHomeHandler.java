@@ -277,6 +277,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             } catch (ProtocolException e) {
                 logger.warn("[{}] Error initial connection", logPrefix, e);
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+                connectionState = ConnectionState.UNINITIALIZED;
                 scheduleConnect(exponentialBackoff.getNextDelay());
             }
         }
@@ -758,9 +759,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void scheduleConnect(int delaySeconds) {
-        cancelConnectFuture();
-        connectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS,
-                String.format("[%s] Connect", logPrefix), 7000);
+        synchronized (connectionStateLock) {
+            cancelConnectFuture();
+            connectFuture = executorService.schedule(this::connect, delaySeconds, TimeUnit.SECONDS,
+                    String.format("[%s] Connect", logPrefix), 7000);
+        }
     }
 
     public boolean isInterrogated() {
@@ -786,7 +789,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void onDeviceReappeared() {
         logger.debug("[{}] Device reappeared via mDNS, connection state {}", logPrefix, connectionState);
         synchronized (connectionStateLock) {
-            if (connectionState == ConnectionState.UNINITIALIZED) {
+            ScheduledFuture<?> cF = connectFuture;
+            if (connectionState == ConnectionState.UNINITIALIZED && (cF == null || cF.getDelay(TimeUnit.SECONDS) > 0)) {
                 logger.info("[{}] Device reappeared via mDNS, triggering immediate reconnect", logPrefix);
                 exponentialBackoff.reset();
                 scheduleConnect(0);
