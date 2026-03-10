@@ -33,7 +33,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
 
     @Override
     public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
-        logger.warn("Cannot send command to sensor channel {}, read only", channel.getUID());
+        logger.warn("Cannot send command {} to sensor channel {}, read only", command, channel.getUID());
     }
 
     @Override
