@@ -35,6 +35,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     @Nullable
     private ScheduledFuture<?> registrationFuture;
+    @Nullable
+    private ScheduledFuture<?> restartBluetoothPollingFuture;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeBluetoothProxyHandler.class);
 
@@ -95,67 +97,87 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Looking for BLE enabled ESPHome devices");
 
         registrationFuture = executor.scheduleWithFixedDelay(this::updateESPHomeDeviceList, 0, 5, TimeUnit.SECONDS);
+        restartBluetoothPollingFuture = executor.scheduleWithFixedDelay(this::restartBluetoothPolling, 1, 1,
+                TimeUnit.DAYS);
     }
 
     @Override
     public void dispose() {
         registrationFuture.cancel(true);
-        espHomeHandlers.forEach(ESPHomeHandler::stopListeningForBLEAdvertisements);
-        espHomeHandlers.clear();
+        restartBluetoothPollingFuture.cancel(true);
+        synchronized (espHomeHandlers) {
+            espHomeHandlers.forEach(ESPHomeHandler::stopListeningForBLEAdvertisements);
+            espHomeHandlers.clear();
+        }
         super.dispose();
     }
 
-    private synchronized void updateESPHomeDeviceList() {
+    private void restartBluetoothPolling() {
+        logger.info("Scheduled restart of Bluetooth polling for all ESPHome devices every 24 hours");
+        synchronized (espHomeHandlers) {
+            for (ESPHomeHandler handler : espHomeHandlers) {
+                logger.info("Restarting Bluetooth polling for handler {}", handler.getThing().getUID());
+                handler.stopListeningForBLEAdvertisements();
+                handler.listenForBLEAdvertisements(this);
+            }
+        }
+    }
+
+    private void updateESPHomeDeviceList() {
 
         // Get all ESPHome devices
         // For each device, check if it has BLE enabled, is enabled and ONLINE
         // If so, enable registration of BLE advertisements
         // If not, remove from list of devices
 
-        // First clean up any disposed handlers or non-ONLINE handlers
-        List<ESPHomeHandler> inactiveHandlers = espHomeHandlers.stream()
-                .filter(handler -> handler.isDisposed() || !handler.getThing().getStatus().equals(ThingStatus.ONLINE))
-                .toList();
-        logger.debug("Found {} inactive handlers to remove", inactiveHandlers.size());
-        espHomeHandlers.removeAll(inactiveHandlers);
-        inactiveHandlers.stream().forEach(handler -> {
-            try {
-                handler.stopListeningForBLEAdvertisements();
-            } catch (Exception e) {
-                // Swallow
-            }
-        });
+        synchronized (espHomeHandlers) {
+            // First clean up any disposed handlers or non-ONLINE handlers
+            List<ESPHomeHandler> inactiveHandlers = espHomeHandlers.stream().filter(
+                    handler -> handler.isDisposed() || !handler.getThing().getStatus().equals(ThingStatus.ONLINE))
+                    .toList();
+            logger.debug("Found {} inactive handlers to remove", inactiveHandlers.size());
+            espHomeHandlers.removeAll(inactiveHandlers);
+            inactiveHandlers.stream().forEach(handler -> {
+                try {
+                    handler.stopListeningForBLEAdvertisements();
+                } catch (Exception e) {
+                    logger.debug("Error stopping BLE proxy for inactive handler {}: {}", handler.getThing().getUID(),
+                            e.getMessage());
+                }
+            });
 
-        List<Thing> esphomeThings = thingRegistry.stream()
-                .filter(thing -> thing.getThingTypeUID().equals(BindingConstants.THING_TYPE_DEVICE)).toList();
-        for (Thing esphomeThing : esphomeThings) {
-            if (esphomeThing.isEnabled() && esphomeThing.getStatus().equals(ThingStatus.ONLINE)) {
-                if (esphomeThing.getConfiguration().get("enableBluetoothProxy") == Boolean.TRUE) {
-                    // Enable registration of BLE advertisements
+            List<Thing> esphomeThings = thingRegistry.stream()
+                    .filter(thing -> thing.getThingTypeUID().equals(BindingConstants.THING_TYPE_DEVICE)).toList();
+            for (Thing esphomeThing : esphomeThings) {
+                if (esphomeThing.isEnabled() && esphomeThing.getStatus().equals(ThingStatus.ONLINE)) {
+                    if (esphomeThing.getConfiguration().get("enableBluetoothProxy") == Boolean.TRUE) {
+                        // Enable registration of BLE advertisements
 
-                    ESPHomeHandler handler = (ESPHomeHandler) esphomeThing.getHandler();
-                    if (handler != null) {
-                        if (!espHomeHandlers.contains(handler)) {
-                            handler.listenForBLEAdvertisements(this);
-                            espHomeHandlers.add(handler);
+                        ESPHomeHandler handler = (ESPHomeHandler) esphomeThing.getHandler();
+                        if (handler != null) {
+                            if (!espHomeHandlers.contains(handler)) {
+                                handler.listenForBLEAdvertisements(this);
+                                espHomeHandlers.add(handler);
+                            }
+
                         }
 
                     }
-
                 }
             }
-        }
 
-        if (espHomeHandlers.isEmpty()) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
-                    "Found no ESPHome devices configured for Bluetooth proxy support. Make sure your ESPHome things are online and have the 'enableBluetoothProxy' option set to 'true'");
+            if (espHomeHandlers.isEmpty()) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE,
+                        "Found no ESPHome devices configured for Bluetooth proxy support. Make sure your ESPHome things are online and have the 'enableBluetoothProxy' option set to 'true'");
 
-        } else {
-            updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, String
-                    .format("Found %d ESPHome devices configured for Bluetooth proxy support", espHomeHandlers.size()));
+            } else {
+                updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, String.format(
+                        "Found %d ESPHome devices configured for Bluetooth proxy support", espHomeHandlers.size()));
+            }
+            logger.debug("List of {} ESPHome devices: {}", espHomeHandlers.size(),
+                    espHomeHandlers.stream().map(e -> e.getThing().getUID()).toList());
+
         }
-        logger.debug("List of {} ESPHome devices: {}", espHomeHandlers.size(),
-                espHomeHandlers.stream().map(e -> e.getThing().getUID()).toList());
     }
 
     @Override
