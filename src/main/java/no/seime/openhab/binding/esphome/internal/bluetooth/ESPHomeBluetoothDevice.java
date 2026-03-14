@@ -35,10 +35,11 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     private final Object stateLock = new Object();
 
     @Nullable
-    private volatile ESPHomeHandler lockToHandler;
+    private volatile ESPHomeHandler espHomeHandler;
 
     private final ESPHomeBluetoothProxyHandler proxyHandler;
 
+    // Client Characteristic Configuration
     private static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
     private volatile boolean connecting;
@@ -112,7 +113,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     public void handleConnectionsMessage(BluetoothDeviceConnectionResponse rsp) {
         if (!rsp.getConnected()) {
             synchronized (stateLock) {
-                if (!connecting && lockToHandler == null) {
+                if (!connecting && espHomeHandler == null) {
                     logger.debug("Ignoring redundant disconnect message for {}", address);
                     return;
                 }
@@ -130,7 +131,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
             if (!rsp.getConnected()) {
                 logger.debug("Device {} disconnected. Error code: {}", address, rsp.getError());
                 proxyHandler.unlinkDevice(this);
-                lockToHandler = null;
+                espHomeHandler = null;
             }
         }
 
@@ -144,7 +145,6 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         // Complete any outstanding futures if we disconnected
         if (!rsp.getConnected()) {
             characteristicsByHandle.clear();
-            descriptorsByHandle.clear();
             notifyingCharacteristics.clear();
             supportedServices.clear();
             String errorMessage = "Device disconnected";
@@ -169,7 +169,6 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     private final ConcurrentHashMap<Integer, CompletableFuture<@Nullable Void>> notifyFutures = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, Boolean> requestedNotifyState = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, BluetoothCharacteristic> characteristicsByHandle = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Integer, BluetoothDescriptor> descriptorsByHandle = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, Boolean> notifyingCharacteristics = new ConcurrentHashMap<>();
 
     public void handleGattServicesMessage(BluetoothGATTGetServicesResponse rsp) {
@@ -189,7 +188,6 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
                     UUID descUuid = getUuid(descriptor.getUuidList(), descriptor.getShortUuid());
                     BluetoothDescriptor ohDescriptor = new BluetoothDescriptor(ohCharacteristic, descUuid, descHandle);
                     ohCharacteristic.addDescriptor(ohDescriptor);
-                    descriptorsByHandle.put(descHandle, ohDescriptor);
                 }
                 ohService.addCharacteristic(ohCharacteristic);
                 characteristicsByHandle.put(charHandle, ohCharacteristic);
@@ -224,17 +222,19 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         ESPHomeHandler handlerToSendTo = null;
         BluetoothDeviceRequest request = null;
         synchronized (stateLock) {
-            if (connecting || lockToHandler != null) {
+            if (connecting || espHomeHandler != null) {
                 return true;
             }
             ESPHomeHandler nearestESPHomeDevice = proxyHandler
                     .getNearestESPHomeDevice(BluetoothAddressUtil.convertAddressToLong(address));
             if (nearestESPHomeDevice != null) {
+                logger.info("Connecting to ESPHome device with address: {} via ESPHomeDevice {}", address,
+                        nearestESPHomeDevice.getDeviceId());
                 connecting = true;
                 connectionState = ConnectionState.CONNECTING;
                 lastConnectTime = System.currentTimeMillis();
-                lockToHandler = nearestESPHomeDevice;
-                proxyHandler.linkDevice(this, nearestESPHomeDevice);
+                espHomeHandler = nearestESPHomeDevice;
+                proxyHandler.linkDevice(this);
                 handlerToSendTo = nearestESPHomeDevice;
                 request = BluetoothDeviceRequest.newBuilder()
                         .setAddress(BluetoothAddressUtil.convertAddressToLong(address)).setAddressType(addressType)
@@ -253,16 +253,16 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public boolean disconnect() {
-        ESPHomeHandler handler = lockToHandler;
-        if (handler != null) {
+        ESPHomeHandler handler = espHomeHandler;
+        if (handler != null && connectionState == ConnectionState.CONNECTED) {
             // Disconnect from the device
 
-            // notifyListeners(BluetoothEventType.CONNECTION_STATE,
-            // new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTING));
             handler.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder()
                     .setAddress(BluetoothAddressUtil.convertAddressToLong(address))
                     .setRequestType(BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_DISCONNECT).build());
 
+            notifyListeners(BluetoothEventType.CONNECTION_STATE,
+                    new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTED));
             return true;
 
         }
@@ -271,7 +271,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public boolean discoverServices() {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler = espHomeHandler;
         if (handler != null) {
             notifyListeners(BluetoothEventType.CONNECTION_STATE,
                     new BluetoothConnectionStatusNotification(ConnectionState.DISCOVERING));
@@ -284,7 +284,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public CompletableFuture<byte[]> readCharacteristic(BluetoothCharacteristic characteristic) {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler = espHomeHandler;
         if (handler == null) {
             return CompletableFuture.failedFuture(new RuntimeException("Not connected to any proxy"));
         }
@@ -300,7 +300,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public CompletableFuture<@Nullable Void> writeCharacteristic(BluetoothCharacteristic characteristic, byte[] value) {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler = espHomeHandler;
         if (handler == null) {
             return CompletableFuture.failedFuture(new RuntimeException("Not connected to any proxy"));
         }
@@ -320,7 +320,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     }
 
     public CompletableFuture<byte[]> readDescriptor(BluetoothDescriptor descriptor) {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler = espHomeHandler;
         if (handler == null) {
             return CompletableFuture.failedFuture(new RuntimeException("Not connected to any proxy"));
         }
@@ -335,7 +335,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     }
 
     public CompletableFuture<@Nullable Void> writeDescriptor(BluetoothDescriptor descriptor, byte[] value) {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler = espHomeHandler;
         if (handler == null) {
             return CompletableFuture.failedFuture(new RuntimeException("Not connected to any proxy"));
         }
@@ -351,7 +351,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public CompletableFuture<@Nullable Void> enableNotifications(BluetoothCharacteristic characteristic) {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler = espHomeHandler;
         if (handler == null) {
             return CompletableFuture.failedFuture(new RuntimeException("Not connected to any proxy"));
         }
@@ -374,7 +374,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public CompletableFuture<@Nullable Void> disableNotifications(BluetoothCharacteristic characteristic) {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler = espHomeHandler;
         if (handler == null) {
             return CompletableFuture.failedFuture(new RuntimeException("Not connected to any proxy"));
         }
@@ -434,10 +434,6 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         }
     }
 
-    public @Nullable BluetoothCharacteristic getCharacteristic(int handle) {
-        return characteristicsByHandle.get(handle);
-    }
-
     public void handleGattErrorResponse(BluetoothGATTErrorResponse rsp) {
         int handle = rsp.getHandle();
         int error = rsp.getError();
@@ -465,5 +461,9 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     @Override
     public boolean disableNotifications(BluetoothDescriptor descriptor) {
         return false;
+    }
+
+    public @Nullable ESPHomeHandler getEspHomeHandler() {
+        return espHomeHandler;
     }
 }

@@ -133,10 +133,10 @@ public class BluetoothProxyTest {
         proxyHandlerField.set(device, proxyHandler);
 
         // "Connect" the device via the real proxy handler
-        proxyHandler.linkDevice(device, thingHandler);
+        proxyHandler.linkDevice(device);
         // Directly set lockToHandler via reflection since we are in a test and the normal discovery/linking is complex
         // to mock
-        java.lang.reflect.Field lockToHandlerField = ESPHomeBluetoothDevice.class.getDeclaredField("lockToHandler");
+        java.lang.reflect.Field lockToHandlerField = ESPHomeBluetoothDevice.class.getDeclaredField("espHomeHandler");
         lockToHandlerField.setAccessible(true);
         lockToHandlerField.set(device, thingHandler);
 
@@ -169,8 +169,8 @@ public class BluetoothProxyTest {
         assertNotNull(device);
 
         // "Connect" the device
-        proxyHandler.linkDevice(device, thingHandler);
-        java.lang.reflect.Field lockToHandlerField = ESPHomeBluetoothDevice.class.getDeclaredField("lockToHandler");
+        proxyHandler.linkDevice(device);
+        java.lang.reflect.Field lockToHandlerField = ESPHomeBluetoothDevice.class.getDeclaredField("espHomeHandler");
         lockToHandlerField.setAccessible(true);
         lockToHandlerField.set(device, thingHandler);
 
@@ -186,7 +186,9 @@ public class BluetoothProxyTest {
                 .build();
         proxyHandler.handleBluetoothMessage(servicesResponse, thingHandler);
 
-        BluetoothCharacteristic characteristic = device.getCharacteristic(charHandle);
+        BluetoothCharacteristic characteristic = device.getServices().stream()
+                .flatMap(s -> s.getCharacteristics().stream()).filter(c -> c.getHandle() == charHandle).findFirst()
+                .orElse(null);
         assertNotNull(characteristic);
 
         // Enable notifications
@@ -272,7 +274,7 @@ public class BluetoothProxyTest {
         doNothing().when(thingHandler).sendBluetoothCommand(any());
 
         // Before connecting, link the device (this is what ESPHomeBluetoothDevice.connect() does)
-        proxyHandler.linkDevice(device, thingHandler);
+        proxyHandler.linkDevice(device);
 
         // Simulate Connection Response
         BluetoothDeviceConnectionResponse response = BluetoothDeviceConnectionResponse.newBuilder()

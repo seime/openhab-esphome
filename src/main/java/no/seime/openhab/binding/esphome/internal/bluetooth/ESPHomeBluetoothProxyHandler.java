@@ -31,6 +31,7 @@ import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThrea
 @NonNullByDefault
 public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler<ESPHomeBluetoothDevice> {
 
+    private ScheduledFuture<?> dumpFuture;
     private final ThingRegistry thingRegistry;
 
     @Nullable
@@ -96,12 +97,14 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Looking for BLE enabled ESPHome devices");
 
         registrationFuture = executor.scheduleWithFixedDelay(this::updateESPHomeDeviceList, 0, 5, TimeUnit.SECONDS);
+        dumpFuture = scheduler.scheduleWithFixedDelay(this::dumpDeviceList, 5, 60, TimeUnit.SECONDS);
     }
 
     @Override
     public void dispose() {
         registrationFuture.cancel(true);
-        espHomeHandlers.forEach(ESPHomeHandler::stopListeningForBLEAdvertisements);
+        dumpFuture.cancel(true);
+        espHomeHandlers.forEach(ESPHomeHandler::unsubscribeBLEAdvertisements);
         espHomeHandlers.clear();
         super.dispose();
     }
@@ -121,7 +124,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         espHomeHandlers.removeAll(inactiveHandlers);
         inactiveHandlers.stream().forEach(handler -> {
             try {
-                handler.stopListeningForBLEAdvertisements();
+                handler.unsubscribeBLEAdvertisements();
             } catch (Exception e) {
                 // Swallow
             }
@@ -137,7 +140,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                     ESPHomeHandler handler = (ESPHomeHandler) esphomeThing.getHandler();
                     if (handler != null) {
                         if (!espHomeHandlers.contains(handler)) {
-                            handler.listenForBLEAdvertisements(this);
+                            handler.subscribeBLEAdvertisements(this);
                             espHomeHandlers.add(handler);
                         }
 
@@ -374,7 +377,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         return null;
     }
 
-    public void linkDevice(ESPHomeBluetoothDevice espHomeBluetoothDevice, ESPHomeHandler lockToHandler) {
+    public void linkDevice(ESPHomeBluetoothDevice espHomeBluetoothDevice) {
         connectionMap.put(espHomeBluetoothDevice.getAddress(), espHomeBluetoothDevice);
     }
 
@@ -382,11 +385,35 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         connectionMap.remove(espHomeBluetoothDevice.getAddress());
     }
 
+    public void disconnect(ESPHomeHandler espHomeHandler) {
+        connectionMap.values().stream().filter(e -> e.getEspHomeHandler() == espHomeHandler).forEach(device -> {
+            device.disconnect();
+            unlinkDevice(device);
+        });
+        updateESPHomeDeviceList();
+    }
+
     private record DeviceAndRSSI(ThingUID device, int rssi, Instant lastSeen) implements Comparable<DeviceAndRSSI> {
 
         @Override
         public int compareTo(DeviceAndRSSI o) {
             return Integer.compare(o.rssi, rssi);
+        }
+
+        @Override
+        public String toString() {
+            return "DeviceAndRSSI{" + "thing=" + device + ", rssi=" + rssi + ", lastSeen=" + lastSeen + '}';
+        }
+    }
+
+    private void dumpDeviceList() {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Known devices: {}", knownDevices.keySet());
+
+            knownDevices.forEach((address, deviceAndRSSIS) -> {
+                logger.debug("Bluetooth device {} seen by :{}", BluetoothAddressUtil.createAddress(address),
+                        deviceAndRSSIS);
+            });
         }
     }
 }
