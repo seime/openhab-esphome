@@ -380,7 +380,8 @@ public class BluetoothConnectionRaceTest {
         }
         assertTrue(device.isServicesDiscovered(), "Services should be marked as discovered");
         assertNotNull(device.getServices(serviceUuid), "Service should be found by UUID");
-        org.openhab.binding.bluetooth.BluetoothCharacteristic characteristic = device.getCharacteristic(2);
+        org.openhab.binding.bluetooth.BluetoothCharacteristic characteristic = device.getServices().stream()
+                .flatMap(s -> s.getCharacteristics().stream()).filter(c -> c.getHandle() == 2).findFirst().orElse(null);
         assertNotNull(characteristic);
         assertTrue(characteristic.canRead());
         assertTrue(characteristic.canNotify());
