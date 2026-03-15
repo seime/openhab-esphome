@@ -409,8 +409,6 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private void dumpDeviceList() {
         if (logger.isDebugEnabled()) {
-            logger.debug("Known devices: {}", knownDevices.keySet());
-
             knownDevices.forEach((address, deviceAndRSSIS) -> {
                 logger.debug("Bluetooth device {} seen by :{}", BluetoothAddressUtil.createAddress(address),
                         deviceAndRSSIS);
