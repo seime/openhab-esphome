@@ -221,6 +221,11 @@ Bridge bluetooth:esphome:proxy "ESPHome Virtual Bluetooth adapter" [backgroundDi
 }
 ```
 
+> **NOTE:** If you use OH Main UI / managed mode to configure your thing, you must first save your `Thing` without
+> linking it to a
+> bridge. Then go to the code tab and add the bridge manually, ie `bridgeUID: bluetooth:esphome:proxy` (no identation).
+> This is due to a limitation in the Main UI (all Bluetooth Things must hardcode all possible bridges it supports)
+
 ## Streaming logs from ESPHome device to openHAB
 
 As an alternative to manually streaming device logs via ESPHome dashboard, you can have openHAB stream
