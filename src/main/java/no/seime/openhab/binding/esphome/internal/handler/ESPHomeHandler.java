@@ -92,7 +92,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private boolean disposed = false;
     private boolean interrogated;
-    private boolean bluetoothProxyStarted = false;
+    private boolean bluetoothProxyRunning = false;
     // default is not used initialized in initialize()
     private ExponentialBackoff exponentialBackoff = new ExponentialBackoff(10, 500);
 
@@ -196,6 +196,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             disposed = true;
             eventSubscriber.removeEventSubscriptions(this);
             stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
+            disconnectBluetooth();
+
             setUndefToAllChannels();
             cancelConnectFuture();
             cancelPingWatchdog();
@@ -222,6 +224,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             thingActionClassLoader = null;
         }
         super.dispose();
+    }
+
+    private void disconnectBluetooth() {
+        if (espHomeBluetoothProxyHandler != null && bluetoothProxyRunning) {
+            espHomeBluetoothProxyHandler.disconnect(this);
+            espHomeBluetoothProxyHandler = null;
+            bluetoothProxyRunning = false;
+        }
     }
 
     @Override
@@ -399,6 +409,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 return;
             }
 
+            disconnectBluetooth();
+
             int nextDelay = exponentialBackoff.getNextDelay();
             String finalMessage = message;
             if (scheduleReconnect) {
@@ -520,7 +532,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 || message instanceof BluetoothDeviceClearCacheResponse
                 || message instanceof BluetoothScannerStateResponse) {
             if (espHomeBluetoothProxyHandler != null) {
-                espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this);
+                // Re-queue with a much longer timeout since the OH bluetooth stack seems to block
+                executorService.execute(() -> espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this),
+                        "Handle Bluetooth message", 15000);
             }
         } else if (message instanceof ListEntitiesServicesResponse listEntitiesServicesResponse) {
             logger.debug("[{}] Received list entities services response {}", logPrefix, listEntitiesServicesResponse);
@@ -692,14 +706,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         return disposed;
     }
 
-    public void listenForBLEAdvertisements(ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler) {
+    public void subscribeBLEAdvertisements(ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler) {
         synchronized (connectionStateLock) {
             this.espHomeBluetoothProxyHandler = espHomeBluetoothProxyHandler;
-            if (config.enableBluetoothProxy && !bluetoothProxyStarted && connectionState == ConnectionState.CONNECTED) {
+            if (config.enableBluetoothProxy && !bluetoothProxyRunning && connectionState == ConnectionState.CONNECTED) {
                 try {
                     logger.info("[{}] Starting BLE proxy", logPrefix);
                     frameHelper.send(SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
-                    bluetoothProxyStarted = true;
+                    bluetoothProxyRunning = true;
                 } catch (Exception e) {
                     logger.error("[{}] Error starting BLE proxy", logPrefix, e);
                 }
@@ -707,9 +721,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    public void stopListeningForBLEAdvertisements() {
+    public void unsubscribeBLEAdvertisements() {
         synchronized (connectionStateLock) {
-            if (connectionState == ConnectionState.CONNECTED) {
+            if (connectionState == ConnectionState.CONNECTED && bluetoothProxyRunning) {
                 try {
                     logger.info("[{}] Stopping BLE proxy", logPrefix);
                     frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
@@ -718,7 +732,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }
             }
 
-            bluetoothProxyStarted = false;
+            bluetoothProxyRunning = false;
             espHomeBluetoothProxyHandler = null;
         }
     }

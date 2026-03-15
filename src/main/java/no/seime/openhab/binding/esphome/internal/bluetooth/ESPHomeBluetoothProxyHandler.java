@@ -35,6 +35,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     @Nullable
     private ScheduledFuture<?> registrationFuture;
+    @Nullable
+    private ScheduledFuture<?> dumpFuture;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeBluetoothProxyHandler.class);
 
@@ -48,7 +50,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private final Map<Long, SortedSet<DeviceAndRSSI>> knownDevices = new ConcurrentHashMap<>();
 
-    private final Map<ESPHomeBluetoothDevice, ESPHomeHandler> connectionMap = new ConcurrentHashMap<>();
+    private final Map<BluetoothAddress, ESPHomeBluetoothDevice> connectionMap = new ConcurrentHashMap<>();
+    private final Map<ThingUID, Integer> freeConnectionsMap = new ConcurrentHashMap<>();
 
     private final MonitoredScheduledThreadPoolExecutor executor;
 
@@ -95,12 +98,14 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Looking for BLE enabled ESPHome devices");
 
         registrationFuture = executor.scheduleWithFixedDelay(this::updateESPHomeDeviceList, 0, 5, TimeUnit.SECONDS);
+        dumpFuture = scheduler.scheduleWithFixedDelay(this::dumpDeviceList, 5, 60, TimeUnit.SECONDS);
     }
 
     @Override
     public void dispose() {
         registrationFuture.cancel(true);
-        espHomeHandlers.forEach(ESPHomeHandler::stopListeningForBLEAdvertisements);
+        dumpFuture.cancel(true);
+        espHomeHandlers.forEach(ESPHomeHandler::unsubscribeBLEAdvertisements);
         espHomeHandlers.clear();
         super.dispose();
     }
@@ -120,7 +125,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         espHomeHandlers.removeAll(inactiveHandlers);
         inactiveHandlers.stream().forEach(handler -> {
             try {
-                handler.stopListeningForBLEAdvertisements();
+                handler.unsubscribeBLEAdvertisements();
             } catch (Exception e) {
                 // Swallow
             }
@@ -136,7 +141,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                     ESPHomeHandler handler = (ESPHomeHandler) esphomeThing.getHandler();
                     if (handler != null) {
                         if (!espHomeHandlers.contains(handler)) {
-                            handler.listenForBLEAdvertisements(this);
+                            handler.subscribeBLEAdvertisements(this);
                             espHomeHandlers.add(handler);
                         }
 
@@ -180,26 +185,47 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
             });
             handleRawAdvertisement(rawAdvertisementsResponse, handler);
         } else if (message instanceof BluetoothDeviceConnectionResponse rsp) {
-            Optional<Map.Entry<ESPHomeBluetoothDevice, ESPHomeHandler>> deviceEntry = connectionMap.entrySet().stream()
-                    .filter(device -> device.getKey().getAddress()
-                            .equals(BluetoothAddressUtil.createAddress(rsp.getAddress())))
-                    .findFirst();
-
-            deviceEntry.ifPresent(device -> device.getKey().handleConnectionsMessage(rsp));
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleConnectionsMessage(rsp);
+            }
         } else if (message instanceof BluetoothGATTGetServicesResponse rsp) {
-            Optional<Map.Entry<ESPHomeBluetoothDevice, ESPHomeHandler>> deviceEntry = connectionMap.entrySet().stream()
-                    .filter(device -> device.getKey().getAddress()
-                            .equals(BluetoothAddressUtil.createAddress(rsp.getAddress())))
-                    .findFirst();
-
-            deviceEntry.ifPresent(device -> device.getKey().handleGattServicesMessage(rsp));
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleGattServicesMessage(rsp);
+            }
         } else if (message instanceof BluetoothGATTGetServicesDoneResponse rsp) {
-            Optional<Map.Entry<ESPHomeBluetoothDevice, ESPHomeHandler>> deviceEntry = connectionMap.entrySet().stream()
-                    .filter(device -> device.getKey().getAddress()
-                            .equals(BluetoothAddressUtil.createAddress(rsp.getAddress())))
-                    .findFirst();
-
-            deviceEntry.ifPresent(device -> device.getKey().handleGattServicesDoneMessage(rsp));
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleGattServicesDoneMessage(rsp);
+            }
+        } else if (message instanceof BluetoothGATTReadResponse rsp) {
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleGattReadResponse(rsp);
+            }
+        } else if (message instanceof BluetoothGATTWriteResponse rsp) {
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleGattWriteResponse(rsp);
+            }
+        } else if (message instanceof BluetoothGATTNotifyResponse rsp) {
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleGattNotifyResponse(rsp);
+            }
+        } else if (message instanceof BluetoothGATTNotifyDataResponse rsp) {
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleGattNotifyDataResponse(rsp);
+            }
+        } else if (message instanceof BluetoothGATTErrorResponse rsp) {
+            ESPHomeBluetoothDevice device = connectionMap.get(BluetoothAddressUtil.createAddress(rsp.getAddress()));
+            if (device != null) {
+                device.handleGattErrorResponse(rsp);
+            }
+        } else if (message instanceof BluetoothConnectionsFreeResponse rsp) {
+            freeConnectionsMap.put(handler.getThing().getUID(), rsp.getFree());
         } else if (message instanceof BluetoothScannerStateResponse rsp) {
             logger.debug("Received BluetoothScannerStateResponse from {} with status {}, currently ignored",
                     handler.getThing().getUID(), rsp.getState());
@@ -303,14 +329,20 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
             return null;
         }
 
-        ThingUID device = deviceAndRSSIS.first().device;
-        @Nullable
-        Thing esphomeThing = thingRegistry.get(device);
-        if (esphomeThing != null) {
-            return (ESPHomeHandler) esphomeThing.getHandler();
-        } else {
-            return null;
+        for (DeviceAndRSSI deviceAndRSSI : deviceAndRSSIS) {
+            ThingUID deviceUid = deviceAndRSSI.device;
+            Integer freeConnections = freeConnectionsMap.get(deviceUid);
+            if (freeConnections == null || freeConnections > 0) {
+                @Nullable
+                Thing esphomeThing = thingRegistry.get(deviceUid);
+                if (esphomeThing != null) {
+                    return (ESPHomeHandler) esphomeThing.getHandler();
+                }
+            } else {
+                logger.debug("Skipping ESPHome device {} because it has no free Bluetooth connection slots", deviceUid);
+            }
         }
+        return null;
     }
 
     private void updateDeviceLocation(long address, int rssi, ESPHomeHandler handler) {
@@ -346,12 +378,20 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         return null;
     }
 
-    public void linkDevice(ESPHomeBluetoothDevice espHomeBluetoothDevice, ESPHomeHandler lockToHandler) {
-        connectionMap.put(espHomeBluetoothDevice, lockToHandler);
+    public void linkDevice(ESPHomeBluetoothDevice espHomeBluetoothDevice) {
+        connectionMap.put(espHomeBluetoothDevice.getAddress(), espHomeBluetoothDevice);
     }
 
     public void unlinkDevice(ESPHomeBluetoothDevice espHomeBluetoothDevice) {
-        connectionMap.remove(espHomeBluetoothDevice);
+        connectionMap.remove(espHomeBluetoothDevice.getAddress());
+    }
+
+    public void disconnect(ESPHomeHandler espHomeHandler) {
+        connectionMap.values().stream().filter(e -> e.getEspHomeHandler() == espHomeHandler).forEach(device -> {
+            device.disconnect();
+            unlinkDevice(device);
+        });
+        updateESPHomeDeviceList();
     }
 
     private record DeviceAndRSSI(ThingUID device, int rssi, Instant lastSeen) implements Comparable<DeviceAndRSSI> {
@@ -359,6 +399,20 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         @Override
         public int compareTo(DeviceAndRSSI o) {
             return Integer.compare(o.rssi, rssi);
+        }
+
+        @Override
+        public String toString() {
+            return "DeviceAndRSSI{" + "thing=" + device + ", rssi=" + rssi + ", lastSeen=" + lastSeen + '}';
+        }
+    }
+
+    private void dumpDeviceList() {
+        if (logger.isDebugEnabled()) {
+            knownDevices.forEach((address, deviceAndRSSIS) -> {
+                logger.debug("Bluetooth device {} seen by :{}", BluetoothAddressUtil.createAddress(address),
+                        deviceAndRSSIS);
+            });
         }
     }
 }
