@@ -31,11 +31,12 @@ import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThrea
 @NonNullByDefault
 public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler<ESPHomeBluetoothDevice> {
 
-    private ScheduledFuture<?> dumpFuture;
     private final ThingRegistry thingRegistry;
 
     @Nullable
     private ScheduledFuture<?> registrationFuture;
+    @Nullable
+    private ScheduledFuture<?> dumpFuture;
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeBluetoothProxyHandler.class);
 
