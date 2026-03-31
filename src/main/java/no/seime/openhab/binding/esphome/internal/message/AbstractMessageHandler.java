@@ -372,7 +372,12 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             // Happens if entity has no name, and then provides the objectId as the name. Then we need to ensure unique
             // id based on entity type as only 1 entity of each type can have no name.
             uid = String.format("%s_%s", objectId, entityType.toLowerCase());
+        } else if (handler.getDynamicChannels().stream()
+                .anyMatch(channel -> channel.getUID().getId().equals(objectId))) {
+            // Happens if multiple entities have same name. Then we need to ensure unique id based on entity type.
+            uid = String.format("%s_%s", objectId, entityType.toLowerCase());
         }
+
         return uid;
     }
 
