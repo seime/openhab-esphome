@@ -11,6 +11,8 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
 
     final long defaultMaxExecutionTimeMs;
 
+    private volatile int counter = 0;
+
     public MonitoredScheduledThreadPoolExecutor(int corePoolSize, ThreadFactory threadFactory,
             long defaultMaxExecutionTimeMs) {
         super(corePoolSize, threadFactory);
@@ -19,10 +21,12 @@ public class MonitoredScheduledThreadPoolExecutor extends ScheduledThreadPoolExe
     }
 
     private void logQueue() {
-        if (getQueue().size() > 20)
+        counter++;
+        if (getQueue().size() > 20 && counter % 100 == 0) {
             logger.warn(
                     "Queue size for processing packets from ESP device as well as maintaining the watchdog is high: {}",
                     getQueue().size());
+        }
     }
 
     @Override
