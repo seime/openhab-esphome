@@ -171,8 +171,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void initialize() {
         disposed = false;
-        thingActionClassLoader = new ClassLoader(getClass().getClassLoader()) {
-        };
 
         logger.debug("[{}] Initializing ESPHome handler", thing.getUID());
         config = getConfigAs(ESPHomeConfiguration.class);
@@ -215,7 +213,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
 
             // ThingActions
-            thingActionServiceRegistrations.stream().filter(e -> e != null).forEach(ServiceRegistration::unregister);
+            clearThingActions();
 
             connectionState = ConnectionState.UNINITIALIZED;
 
@@ -224,9 +222,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         super.dispose();
     }
 
+    private void clearThingActions() {
+        thingActionServiceRegistrations.stream().filter(e -> e != null).forEach(ServiceRegistration::unregister);
+        thingActionServiceRegistrations.clear();
+    }
+
     @Override
     public void handleRemoval() {
         dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
+
         super.handleRemoval();
     }
 
@@ -237,8 +241,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     return;
                 }
                 connectionState = ConnectionState.CONNECTING;
-
-                dynamicChannels.clear();
 
                 String hostname = config.hostname;
                 int port = config.port;
@@ -614,8 +616,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         if (message instanceof HelloResponse helloResponse) {
             synchronized (connectionStateLock) {
                 logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
-                logger.info(
-                        "[{}] API handshake successful. Device '{}' running '{}' on protocol version '{}.{}'. Logging in.",
+                logger.info("[{}] Connected successfully. Device '{}' is running '{}' on protocol version '{}.{}'",
                         logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
                         helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
                 connectionState = ConnectionState.CONNECTED;
@@ -663,6 +664,17 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     }
                 }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS,
                         String.format("[%s] Ping watchdog", logPrefix));
+
+                // Clean up old channels and channel types
+                dynamicChannels.clear();
+                dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
+
+                // Clean up old actions
+                clearThingActions();
+                // Create a new classloader for the ThingActions generated from this device, to allow for proper
+                // unloading of old classes when the device reappears with different actions after a reconnect
+                thingActionClassLoader = new ClassLoader(getClass().getClassLoader()) {
+                };
 
                 // Start interrogation
                 frameHelper.send(DeviceInfoRequest.getDefaultInstance());
