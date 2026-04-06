@@ -1,26 +1,25 @@
 # ESPHome Binding for openHAB
 
-### Docs updated 2026-01-20.
+### Docs updated 2026-03-14.
 
-<img src="logo.png" width="200"/>
+<img src="images/logo.png" width="200"/>
 
 [<img src="https://github.com/seime/support-me/blob/main/openHAB_workswith.png" width=300>](https://www.openhab.org)
 
 [<img src="https://github.com/seime/support-me/blob/main/beer_me.png" width=150>](https://buymeacoffee.com/arnes)
 
 This binding makes [ESPHome](https://esphome.io) devices available in openHAB through the ESPHome Home Assistant Native
-API. This is an
-alternative to using MQTT and/or running Home Assistant in addition to openHAB.
+API. This is an alternative to using MQTT and/or running Home Assistant in addition to openHAB.
 
-It does _NOT_ provide any webpage for managing the ESP themselves. Use
+It does _NOT_ provide any tool for managing/programming the ESP themselves. Use
 the [ESPHome dashboard](https://esphome.io/guides/installing_esphome.html) for that.
 
-<img src="esphomedashboard.png" alt="ESPHome dashboard" width="30%"/>
+<img src="images/esphomedashboard.png" alt="ESPHome dashboard" width="30%"/>
 
 Benefits of using the native API over MQTT:
 
 - Very tight integration with openHAB, state patterns, options, icons etc fully integrated
-- Robust and reliable communication - 2 way keep-alive pings at fairly short intervals lets you know if the device has
+- Robust and reliable communication – 2-way keep-alive pings at fairly short intervals lets you know if the device has
   gone offline
 - No need for an MQTT broker (but that is nice to have anyway for other things :))
 - Slightly faster than messaging over MQTT (according to the ESPHome documentation)
@@ -35,7 +34,7 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 4. Install the openHAB ESPHome binding by copying the jar file
    here https://github.com/seime/openhab-esphome/releases/tag/latest_oh4 into your `addons` folder, or by installing
    from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849
-5. Wait for discovery to find your device - or add manually in a thing file.
+5. Wait for the discovery process (mDNS) to find your device or add one manually.
 
 > **Note:** Remember to edit your things and add the `encryptionKey` .
 
@@ -58,21 +57,21 @@ to `$OH_CONFDIR/services/runtime.cfg` .
 
 ### `device` Thing Configuration
 
-| Name                   | Type      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                         | Default  | Required                         | Advanced |
-|------------------------|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------|----------|
-| `deviceId`             | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device. Use value from `esphome.name` in ESPHome device configuration                                                                                                                                                                                                                                                                                            |          | yes                              | no       |
-| `hostname`             | `text`    | Hostname or IP address of the device. Typically something like `myboard.local` or `192.168.0.123`. *It is recommended to configure your ESP with a static IP address and use that here, it will allow for quicker reconnects*                                                                                                                                                                                                                       |          | yes                              | no       |
-| `port`                 | `integer` | IP Port of the device                                                                                                                                                                                                                                                                                                                                                                                                                               | 6053     | no                               | no       |
-| `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables. *Can also be set on the binding level if your ESPs all use the same key.*                                                                                                                                                                                                                                   |          | yes or via binding configuration | no       |
-| `allowActions`         | `boolean` | Allow the device to send actions and events.                                                                                                                                                                                                                                                                                                                                                                                                        | false    | no                               | no       |
-| `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                                                                                                                                                                                                                                                                                                                   | 10       | no                               | yes      |
-| `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                                                                                                                                                                                                                                                                                                                  | 4        | no                               | yes      |
-| `reconnectInterval`    | `integer` | Seconds for 1st reconnect attempt when connection is lost or the device restarts. Random number between 0 and reconnectInterval / 2 is added to spread load. NOTE: The binding listens for mDNS announcements from devices coming online, and will reconnect automatically. If this works well on your setup (network wise), this value should be raised to avoid continous re-connect attempts for offline devices (ie devices running on battery) | 10       | no                               | yes      |
-| `maxReconnectInterval` | `integer` | Maximum reconnect interval in seconds. Reconnect interval will increase exponentially until this value is reached.                                                                                                                                                                                                                                                                                                                                  | 120      | no                               | yes      |
-| `connectTimeout`       | `integer` | Seconds until a connection attempt to a device is declared as failed.                                                                                                                                                                                                                                                                                                                                                                               | 60       | no                               | yes      |
-| `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                                                                                                                                                                                                                                                                                                                  | deviceId | no                               | yes      |
-| `deviceLogLevel`       | `text`    | ESPHome device log level to stream from the device.                                                                                                                                                                                                                                                                                                                                                                                                 | NONE     | no                               | yes      |
-| `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                                                                                                                                                                                                                                                                                                                       | false    | no                               | yes      |
+| Name                   | Type      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Default  | Required                         | Advanced |
+|------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------|----------|
+| `deviceId`             | `text`    | Expected name of ESPHome. Used to ensure that we're communicating with the correct device. Use value from `esphome.name` in ESPHome device configuration                                                                                                                                                                                                                                                                                                           |          | yes                              | no       |
+| `hostname`             | `text`    | Hostname or IP address of the device. Typically something like `myboard.local` or `192.168.0.123`. *It is recommended to configure your ESP with a static IP address and use that here, it will allow for quicker reconnects*                                                                                                                                                                                                                                      |          | yes                              | no       |
+| `port`                 | `integer` | IP Port of the device                                                                                                                                                                                                                                                                                                                                                                                                                                              | 6053     | no                               | no       |
+| `encryptionKey`        | `text`    | Encryption key as defined in `api: encryption: key: <BASE64ENCODEDKEY>`. See https://esphome.io/components/api#configuration-variables. *Can also be set on the binding level if your ESPs all use the same key.*                                                                                                                                                                                                                                                  |          | yes or via binding configuration | no       |
+| `allowActions`         | `boolean` | Allow the device to send actions and events.                                                                                                                                                                                                                                                                                                                                                                                                                       | false    | no                               | no       |
+| `pingInterval`         | `integer` | Seconds between sending ping requests to device to check if alive                                                                                                                                                                                                                                                                                                                                                                                                  | 10       | no                               | yes      |
+| `maxPingTimeouts`      | `integer` | Number of missed ping requests before deeming device unresponsive.                                                                                                                                                                                                                                                                                                                                                                                                 | 4        | no                               | yes      |
+| `reconnectInterval`    | `integer` | Seconds for 1st reconnect attempt when connection is lost or the device restarts. <br/>Random number between 0 and reconnectInterval / 2 is added to spread load. <br/>NOTE: The binding listens for mDNS announcements from devices coming online, and will reconnect automatically. <br/>If this works well on your setup (network wise), this value should be raised to avoid continous re-connect attempts for offline devices (ie devices running on battery) | 10       | no                               | yes      |
+| `maxReconnectInterval` | `integer` | Maximum reconnect interval in seconds. Reconnect interval will increase exponentially until this value is reached.                                                                                                                                                                                                                                                                                                                                                 | 120      | no                               | yes      |
+| `connectTimeout`       | `integer` | Seconds until a connection attempt to a device is declared as failed.                                                                                                                                                                                                                                                                                                                                                                                              | 60       | no                               | yes      |
+| `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                                                                                                                                                                                                                                                                                                                                 | deviceId | no                               | yes      |
+| `deviceLogLevel`       | `text`    | ESPHome device log level to stream from the device.                                                                                                                                                                                                                                                                                                                                                                                                                | NONE     | no                               | yes      |
+| `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                                                                                                                                                                                                                                                                                                                                      | false    | no                               | yes      |
 
 ## Channels
 
@@ -144,7 +143,7 @@ with log messages like
 > This is because the ESP sensor does not report a `device_class`. This field is used to determine item and category
 > type in openHAB.
 > Solution: Specify a `device_class` to your ESPHome configuration. Example: <br/>
-> ![img.png](esphomeconfig_deviceclass.png)
+> ![img.png](images/esphomeconfig_deviceclass.png)
 > <br/>See https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes for valid device_class
 > values (**use lowercase values**)
 > Also note that you may override default device_class by specifying `device_class: ""` to remove any device class from
@@ -154,30 +153,40 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 
 ## Bluetooth proxy support
 
-It is now possible to use the built-in Bluetooth proxy in ESPHome. This allows you to use ESPHome devices as proxies
-for other Bluetooth devices such as BTHome sensors or a range of other Bluetooth devices.
+ESPHome supports proxying Bluetooth traffic between openHAB and Bluetooth devices. This can basically replace the need
+for any dedicated Bluetooth adapters running on Pi's or other devices.
 
-> NOTE: Only beacons / devices broadcasting data are supported at the moment. Connectable devices will be supported in a
-> future release.
+Typical setup (image borrowed from https://www.seeedstudio.com/blog/2026/03/11/esphome-bluetooth-proxy)
 
-> NOTE: The proxy bridge *CANNOT* be created in the UI, you *must* file based configuration!
+![Network setup](images/bluetooth-setup.png)
 
-The feature is still experimental and may not work as expected.
+The binding only proxies Bluetooth traffic, so you need an appropriate OH binding for any particular Bluetooth device.
 
-1. Configure the ESPHome device with the `bluetooth_proxy` component. See https://esphome.io/components/bluetooth_proxy
+1. For Shelly's BLE product range of device, you can use
+   the [BTHome](https://github.com/seime/openhab-bthome/blob/main/README.md)
+2. Other devices supported by OH are listed here: https://www.openhab.org/addons/bindings/bluetooth/
+
+The feature is still experimental and may not work as expected. Please help test it and report any issues.
+
+### 1. Add Bluetooth proxy support on ESPHome device
+
+Configure the ESPHome device with the `bluetooth_proxy` component. See https://esphome.io/components/bluetooth_proxy
 
 ```yaml
 bluetooth_proxy:
-  active: true
 ```
 
-2. Configure the ESPHome `device` in openHAB with `enableBluetoothProxy = true`
+### 2 Activate the Bluetooth proxy in openHAB
+
+Configure the ESPHome `device` in openHAB with `enableBluetoothProxy = true`
 
 ```yaml
 esphome:device:garage-opener  "Garage ESP32" [ ... enableBluetoothProxy=true ]
 ```
 
-3. Configure a Bluetooth Proxy bridge of type `esphome`
+### 3 Add the Bluetooth bridge to OH
+
+Configure a Bluetooth Proxy bridge of type `esphome`
 
 This is the standard configuration for any type of Bluetooth adapter in openHAB (not documented elsewhere)
 
@@ -188,13 +197,34 @@ This is the standard configuration for any type of Bluetooth adapter in openHAB 
 | `inactiveDeviceCleanupThreshold` | `integer` |                                                                             | 300     | no       | no       |
 
 ```
-Bridge bluetooth:esphome:proxy "ESPHome BLE Advertisement listener" [backgroundDiscovery = false] {
-    bthome parasite1 "b-Parasite #4354" [address="XX:XX:XX:XX:18:91", expectedReportingIntervalSeconds = 600]
+Bridge bluetooth:esphome:proxy "ESPHome Virtual Bluetooth adapter" [backgroundDiscovery = false] {
 }
 ```
 
 > **NOTE:** Set backgroundDiscovery to true if you want to automatically add discovered devices to the inbox. If not use
 > manual scanning from the inbox.
+
+> **NOTE:** If you use OH Main UI / managed mode to configure your `Things` and `Items`, you will find any Bluetooth
+> related things under the `Bluetooth binding` addon, **not** the `ESPHome binding` or `BTHome binding`.
+
+![Click on Bluetooth binding](images/bluetooth-binding-selection.png)
+
+### 4. Add OH Things for each Bluetooth device
+
+Configure your Bluetooth devices:
+
+```
+Bridge bluetooth:esphome:proxy "ESPHome Virtual Bluetooth adapter" [backgroundDiscovery = false] {
+    bthome parasite1 "b-Parasite #4354" [address="XX:XX:XX:XX:18:91", expectedReportingIntervalSeconds = 600]
+    bthome blubutton_1 "Shelly BLU button " [address = "90:AB:XX:XX:XX:XX", encryptionKey="...",expectedReportingIntervalSeconds=25200]
+    secuyou_smart_lock terrassedor "Terrassedør Secuyou" [ address="AB:XX:XX:XX:XX:A7", pinCode="00000", encryptionKey="..."]    
+}
+```
+
+> **NOTE:** If you use OH Main UI / managed mode to configure your thing, you must first save your `Thing` without
+> linking it to a
+> bridge. Then go to the code tab and add the bridge manually, ie `bridgeUID: bluetooth:esphome:proxy` (no identation).
+> This is due to a limitation in the Main UI (all Bluetooth Things must hardcode all possible bridges it supports)
 
 ## Streaming logs from ESPHome device to openHAB
 
@@ -328,7 +358,7 @@ To process actions and events sent via
 the [Native API Component's actions](https://esphome.io/components/api/#api-actions), the binding adds three new trigger
 types accessible via UI rules:
 
-![New Triggers](triggers.png)
+![New Triggers](images/triggers.png)
 
 Be sure to enable `allowActions` in the Thing configuration so that openHAB will request the device to send events.
 The event object has `getData`, `getDataTemplate`, and `getVariables` methods to access the appropriate information for
@@ -365,5 +395,4 @@ The following entity types are **not** yet supported (please submit a PR of file
 
 - `light` - not all modes are supported. Please create a PR if you need a specific mode.
 
-In addition, the Bluetooth proxy isn't fully ready yet.
 
