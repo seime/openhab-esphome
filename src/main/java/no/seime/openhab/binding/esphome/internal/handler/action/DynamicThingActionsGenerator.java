@@ -53,6 +53,16 @@ public class DynamicThingActionsGenerator {
         String className = String.format("no.seime.openhab.binding.esphome.internal.handler.action.%s",
                 classNameAsString);
 
+        // Check if the class was already loaded (e.g. from a previous connection)
+        try {
+            @SuppressWarnings("unchecked")
+            final Class<? extends AbstractESPHomeThingAction> existingClass = (Class<? extends AbstractESPHomeThingAction>) thingActionClassLoader
+                    .loadClass(className);
+            return existingClass.getDeclaredConstructor().newInstance();
+        } catch (ClassNotFoundException e) {
+            // fall through
+        }
+
         DynamicType.Builder<AbstractESPHomeThingAction> thingActionType = new ByteBuddy()
                 .subclass(AbstractESPHomeThingAction.class).name(className).annotateType(componentAnnotation)
                 .annotateType(thingScopeAction);
