@@ -52,7 +52,7 @@ public class TimeMessageHandler extends AbstractMessageHandler<ListEntitiesTimeR
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%1$tH:%1$tM:%1$tS");
 
-        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.TIME))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.TIME))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
 

@@ -59,7 +59,7 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.Event
 public class ESPHomeHandler extends BaseThingHandler implements CommunicationListener {
 
     private static final int API_VERSION_MAJOR = 1;
-    private static final int API_VERSION_MINOR = 9;
+    private static final int API_VERSION_MINOR = 14;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
     private static final String ACTION_TAG_SCANNED = "esphome.tag_scanned";
 

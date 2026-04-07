@@ -79,7 +79,7 @@ public class ValveMessageHandler extends AbstractMessageHandler<ListEntitiesValv
         StateDescription stateDescription = patternStateDescription("%d %%");
 
         Channel channelPosition = ChannelBuilder
-                .create(createChannelUID(rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_POSITION))
+                .create(createChannelUID(rsp.getName(), EntityTypes.VALVE, CHANNEL_POSITION))
                 .withLabel(createChannelLabel(rsp.getName(), "Position")).withKind(ChannelKind.STATE)
                 .withType(channelTypePosition.getUID()).withAcceptedItemType(deviceClass.getItemType())
                 .withConfiguration(configuration(EntityTypes.VALVE, rsp.getKey(), CHANNEL_POSITION)).build();
@@ -93,7 +93,7 @@ public class ValveMessageHandler extends AbstractMessageHandler<ListEntitiesValv
                 .filter(v -> v != ValveOperation.UNRECOGNIZED).map(v -> stripEnumPrefix(v)).toList(), true);
 
         Channel channelCurrentOperation = ChannelBuilder
-                .create(createChannelUID(rsp.getObjectId(), EntityTypes.VALVE, CHANNEL_CURRENT_OPERATION))
+                .create(createChannelUID(rsp.getName(), EntityTypes.VALVE, CHANNEL_CURRENT_OPERATION))
                 .withLabel(createChannelLabel(rsp.getName(), "Current operation")).withKind(ChannelKind.STATE)
                 .withType(channelTypeCurrentOperation.getUID()).withAcceptedItemType(STRING)
                 .withConfiguration(configuration(EntityTypes.VALVE, rsp.getKey(), CHANNEL_CURRENT_OPERATION)).build();

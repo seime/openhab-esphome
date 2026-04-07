@@ -91,7 +91,7 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
                 rsp.getMinValue() != 0f ? BigDecimal.valueOf(rsp.getMinValue()) : null,
                 rsp.getMaxValue() != 0f ? BigDecimal.valueOf(rsp.getMaxValue()) : null);
 
-        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.NUMBER))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.NUMBER))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
         super.registerChannel(channel, channelType, stateDescription);
