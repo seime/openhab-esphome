@@ -55,7 +55,7 @@ public class DateMessageHandler extends AbstractMessageHandler<ListEntitiesDateR
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = patternStateDescription("%1$tY-%1$tm-%1$td");
 
-        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.DATE))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.DATE))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(DATETIME).withConfiguration(configuration).build();
 

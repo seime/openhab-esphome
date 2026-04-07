@@ -41,7 +41,7 @@ public class TextMessageHandler extends AbstractMessageHandler<ListEntitiesTextR
         ChannelType channelType = addChannelType(rsp.getName(), STRING, Set.of("Status"), icon, rsp.getEntityCategory(),
                 rsp.getDisabledByDefault());
 
-        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.TEXT))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.TEXT))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(STRING).withConfiguration(configuration).build();
 

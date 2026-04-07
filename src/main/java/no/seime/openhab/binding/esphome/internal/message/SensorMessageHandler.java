@@ -68,7 +68,7 @@ public class SensorMessageHandler extends AbstractMessageHandler<ListEntitiesSen
             stateDescription = patternStateDescription("%." + rsp.getAccuracyDecimals() + "f "
                     + (unitOfMeasurement.equals("%") ? "%unit%" : unitOfMeasurement), true);
         }
-        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.SENSOR))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.SENSOR))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(itemType).withConfiguration(configuration).build();
         super.registerChannel(channel, channelType, stateDescription);
