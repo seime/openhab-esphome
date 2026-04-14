@@ -367,7 +367,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     }
 
     private String sanitizeObjectId(String entityName, String entityType) {
-        String objectId = entityName.toLowerCase().replaceAll("[^a-z0-9_-]", "_");
+        String normalizedEntityName = entityName == null ? "" : entityName.trim();
+        String objectId = normalizedEntityName.isEmpty() ? "none"
+                : normalizedEntityName.toLowerCase().replaceAll("[^a-z0-9_-]", "_");
         String uid = objectId;
         if (objectId.equals(handler.getThing().getProperties().get("name"))) {
             // Happens if entity has no name, and then provides the objectId as the name. Then we need to ensure unique
