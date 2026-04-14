@@ -59,7 +59,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         public int getFlag() {
             return flag;
         }
-    };
+    }
 
     public static final String CHANNEL_TARGET_TEMPERATURE = "target_temperature";
     public static final String CHANNEL_TARGET_TEMPERATURE_LOW = CHANNEL_TARGET_TEMPERATURE + "_low";
