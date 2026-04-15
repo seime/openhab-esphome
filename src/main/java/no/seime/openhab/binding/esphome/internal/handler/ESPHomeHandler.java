@@ -716,7 +716,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     configuredHostname, configuredHostname, true);
         } catch (UnknownHostException e) {
             String lastKnownIpAddress = thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS);
-            if (StringUtils.isNotBlank(lastKnownIpAddress)) {
+            if (lastKnownIpAddress != null && !lastKnownIpAddress.isEmpty()) {
                 logger.warn("[{}] Failed to resolve '{}'. Falling back to cached IP {}", logPrefix, configuredHostname,
                         lastKnownIpAddress);
                 return new ResolvedConnectionTarget(lastKnownIpAddress, lastKnownIpAddress,
