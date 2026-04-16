@@ -3,11 +3,16 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Dictionary;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -16,25 +21,32 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openhab.core.audio.AudioHTTPServer;
+import org.openhab.core.audio.AudioSink;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.library.CoreItemFactory;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.core.library.types.PlayPauseType;
+import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceRegistration;
 
 import com.jano7.executor.KeySequentialExecutor;
 
+import io.esphome.api.ListEntitiesDoneResponse;
 import io.esphome.api.ListEntitiesMediaPlayerResponse;
 import io.esphome.api.MediaPlayerCommand;
 import io.esphome.api.MediaPlayerCommandRequest;
 import io.esphome.api.MediaPlayerState;
 import io.esphome.api.MediaPlayerStateResponse;
+import io.esphome.api.MediaPlayerSupportedFormat;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
@@ -55,6 +67,12 @@ class ESPHomeHandlerAudioServicesTest {
     @Mock
     private BundleContext bundleContext;
     @Mock
+    private AudioHTTPServer audioHTTPServer;
+    @Mock
+    private NetworkAddressService networkAddressService;
+    @Mock
+    private ServiceRegistration<AudioSink> audioSinkRegistration;
+    @Mock
     private EncryptedFrameHelper frameHelper;
     @Mock
     private ThingHandlerCallback callback;
@@ -68,9 +86,12 @@ class ESPHomeHandlerAudioServicesTest {
         executor = new MonitoredScheduledThreadPoolExecutor(1, Executors.defaultThreadFactory(), 1000);
         packetProcessorExecutor = Executors.newSingleThreadExecutor();
 
+        Mockito.lenient().when(networkAddressService.getPrimaryIpv4HostAddress()).thenReturn("127.0.0.1");
+
         handler = new ESPHomeHandler(new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "device"),
                 new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider, eventSubscriber, executor,
-                new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null, bundleContext);
+                new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null, bundleContext,
+                audioHTTPServer, networkAddressService);
         handler.setCallback(callback);
         setField("connectionState", enumValue(getFieldType("connectionState"), "CONNECTED"));
         setField("frameHelper", frameHelper);
@@ -81,6 +102,41 @@ class ESPHomeHandlerAudioServicesTest {
         handler.dispose();
         executor.shutdownNow();
         packetProcessorExecutor.shutdownNow();
+    }
+
+    @Test
+    void registersAudioSinkForEachMediaPlayerEntity() throws Exception {
+        when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").build()).build());
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(12).setObjectId("speaker_two")
+                .setName("Speaker Two")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("WAV").build()).build());
+
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        verify(bundleContext, times(2)).registerService(eq(AudioSink.class), any(AudioSink.class),
+                any(Dictionary.class));
+    }
+
+    @Test
+    void unregistersAudioServicesOnDisconnect() throws Exception {
+        when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").build()).build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        invokeMethod("handleDisconnection",
+                new Class<?>[] { org.openhab.core.thing.ThingStatusDetail.class, String.class, boolean.class },
+                org.openhab.core.thing.ThingStatusDetail.COMMUNICATION_ERROR, "test", false);
+
+        verify(audioSinkRegistration).unregister();
     }
 
     @Test

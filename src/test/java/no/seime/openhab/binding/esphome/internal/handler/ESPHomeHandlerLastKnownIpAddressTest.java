@@ -20,7 +20,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.events.EventPublisher;
+import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 import org.osgi.framework.BundleContext;
@@ -48,6 +50,10 @@ class ESPHomeHandlerLastKnownIpAddressTest {
     private BundleContext bundleContext;
     @Mock
     private ThingHandlerCallback callback;
+    @Mock
+    private AudioHTTPServer audioHTTPServer;
+    @Mock
+    private NetworkAddressService networkAddressService;
 
     private ESPHomeHandler handler;
     private ThingImpl thing;
@@ -61,7 +67,7 @@ class ESPHomeHandlerLastKnownIpAddressTest {
         packetProcessorExecutor = Executors.newSingleThreadExecutor();
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
-                bundleContext);
+                bundleContext, audioHTTPServer, networkAddressService);
         handler.setCallback(callback);
     }
 
