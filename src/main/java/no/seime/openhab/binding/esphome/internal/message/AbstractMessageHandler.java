@@ -356,17 +356,20 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
     }
 
-    protected ChannelUID createChannelUID(String objectId, String entityType, String channelName) {
-        String id = sanitizeObjectId(objectId, entityType);
+    protected ChannelUID createChannelUID(String entityName, String entityType, String channelName) {
+        String id = sanitizeObjectId(entityName, entityType);
         return new ChannelUID(handler.getThing().getUID(), String.format("%s#%s", id, channelName));
     }
 
-    protected ChannelUID createChannelUID(String objectId, String entityType) {
-        String id = sanitizeObjectId(objectId, entityType);
+    protected ChannelUID createChannelUID(String entityName, String entityType) {
+        String id = sanitizeObjectId(entityName, entityType);
         return new ChannelUID(handler.getThing().getUID(), id);
     }
 
-    private String sanitizeObjectId(String objectId, String entityType) {
+    private String sanitizeObjectId(String entityName, String entityType) {
+        String normalizedEntityName = entityName == null ? "" : entityName.trim();
+        String objectId = normalizedEntityName.isEmpty() ? "none"
+                : normalizedEntityName.toLowerCase().replaceAll("[^a-z0-9_-]", "_");
         String uid = objectId;
         if (objectId.equals(handler.getThing().getProperties().get("name"))) {
             // Happens if entity has no name, and then provides the objectId as the name. Then we need to ensure unique

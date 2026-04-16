@@ -362,6 +362,7 @@ The following entity types are **not** yet supported (please submit a PR of file
 - `camera`
 - `voice`
 - `siren`
+- `water_heater`
 
 - `light` - not all modes are supported. Please create a PR if you need a specific mode.
 

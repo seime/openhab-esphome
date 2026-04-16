@@ -39,7 +39,7 @@ public class SelectMessageHandler extends AbstractMessageHandler<ListEntitiesSel
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
         StateDescription stateDescription = optionListStateDescription(rsp.getOptionsList());
 
-        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.SELECT))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.SELECT))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(STRING).withConfiguration(configuration(EntityTypes.SELECT, rsp.getKey(), null))
                 .build();

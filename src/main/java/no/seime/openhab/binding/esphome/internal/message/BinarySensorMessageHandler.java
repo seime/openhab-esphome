@@ -61,7 +61,7 @@ public class BinarySensorMessageHandler
         ChannelType channelType = addChannelType(rsp.getName(), deviceClass.getItemType(), tags, icon,
                 rsp.getEntityCategory(), rsp.getDisabledByDefault());
 
-        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getObjectId(), EntityTypes.BINARY_SENSOR))
+        Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.BINARY_SENSOR))
                 .withLabel(createChannelLabel(rsp.getName())).withKind(ChannelKind.STATE).withType(channelType.getUID())
                 .withAcceptedItemType(deviceClass.getItemType()).withConfiguration(configuration).build();
 

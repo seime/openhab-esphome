@@ -20,6 +20,9 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 @NonNullByDefault
 public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
+    private static final long BLUETOOTH_BASE_UUID_MSB = 0x0000000000001000L;
+    private static final long BLUETOOTH_BASE_UUID_LSB = 0x800000805F9B34FBL;
+
     /**
      * Construct a Bluetooth device taking the Bluetooth address
      *
@@ -95,17 +98,25 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
         for (BluetoothGATTService service : rsp.getServicesList()) {
             int handle = service.getHandle();
-            for (int i = 0; i < service.getUuidCount(); i++) {
-                long uuid = service.getUuid(i);
+            UUID uuid;
+            if (service.getShortUuid() != 0) {
+                uuid = to128BitUUID(service.getShortUuid());
+            } else {
+                uuid = new UUID(service.getUuid(0), service.getUuid(1));
+            }
+            for (int i = 0; i < service.getCharacteristicsCount(); i++) {
                 BluetoothGATTCharacteristic characteristics = service.getCharacteristics(i);
 
-                BluetoothService ohService = new BluetoothService(new UUID(uuid, 0), false, handle, handle); // TODO?
-                for (int j = 0; j < characteristics.getUuidCount(); j++) {
-                    long charUuid = characteristics.getUuid(j);
-                    BluetoothCharacteristic ohCharacteristic = new BluetoothCharacteristic(new UUID(charUuid, 0),
-                            handle); // TODO?
-                    ohService.addCharacteristic(ohCharacteristic);
+                BluetoothService ohService = new BluetoothService(uuid, false, handle, handle); // TODO?
+                UUID charUuid;
+                if (characteristics.getShortUuid() != 0) {
+                    charUuid = to128BitUUID(characteristics.getShortUuid());
+                } else {
+                    charUuid = new UUID(characteristics.getUuid(0), characteristics.getUuid(1));
                 }
+
+                BluetoothCharacteristic ohCharacteristic = new BluetoothCharacteristic(charUuid, handle); // TODO?
+                ohService.addCharacteristic(ohCharacteristic);
 
                 notifyListeners(BluetoothEventType.SERVICES_DISCOVERED, ohService);
             }
@@ -120,6 +131,11 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     private String to128BitUUID(String UUID16bit) {
         String uuid = "0000" + UUID16bit.substring(2) + "-0000-1000-8000-00805F9B34FB"; // Trim 0x
         return uuid.toLowerCase();
+    }
+
+    static UUID to128BitUUID(long shortUuid) {
+        long mostSigBits = ((shortUuid & 0xFFFFFFFFL) << 32) | BLUETOOTH_BASE_UUID_MSB;
+        return new UUID(mostSigBits, BLUETOOTH_BASE_UUID_LSB);
     }
 
     @Override

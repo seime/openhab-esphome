@@ -35,6 +35,32 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesClimateResponse, ClimateStateResponse> {
 
+    private enum ClimateFeature {
+        // Reporting current temperature is supported
+        CLIMATE_SUPPORTS_CURRENT_TEMPERATURE(1 << 0),
+        // Setting two target temperatures is supported (used in conjunction with CLIMATE_MODE_HEAT_COOL)
+        CLIMATE_SUPPORTS_TWO_POINT_TARGET_TEMPERATURE(1 << 1),
+        // Single-point mode is NOT supported (UI always displays two handles, setting 'target_temperature' is not
+        // supported)
+        CLIMATE_REQUIRES_TWO_POINT_TARGET_TEMPERATURE(1 << 2),
+        // Reporting current humidity is supported
+        CLIMATE_SUPPORTS_CURRENT_HUMIDITY(1 << 3),
+        // Setting a target humidity is supported
+        CLIMATE_SUPPORTS_TARGET_HUMIDITY(1 << 4),
+        // Reporting current climate action is supported
+        CLIMATE_SUPPORTS_ACTION(1 << 5);
+
+        public final int flag;
+
+        ClimateFeature(int flag) {
+            this.flag = flag;
+        }
+
+        public int getFlag() {
+            return flag;
+        }
+    }
+
     public static final String CHANNEL_TARGET_TEMPERATURE = "target_temperature";
     public static final String CHANNEL_TARGET_TEMPERATURE_LOW = CHANNEL_TARGET_TEMPERATURE + "_low";
     public static final String CHANNEL_TARGET_TEMPERATURE_HIGH = CHANNEL_TARGET_TEMPERATURE + "_high";
@@ -186,14 +212,33 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
     }
 
     public void buildChannels(ListEntitiesClimateResponse rsp) {
+        boolean supportsTwoPointTemperature, supportsCurrentTemperature, supportsTargetHumidity,
+                supportsCurrentHumidity, supportsAction;
+        if (rsp.getFeatureFlags() != 0) {
+            supportsTwoPointTemperature = (rsp.getFeatureFlags()
+                    & ClimateFeature.CLIMATE_SUPPORTS_TWO_POINT_TARGET_TEMPERATURE.getFlag()) != 0;
+            supportsCurrentTemperature = (rsp.getFeatureFlags()
+                    & ClimateFeature.CLIMATE_SUPPORTS_CURRENT_TEMPERATURE.getFlag()) != 0;
+            supportsTargetHumidity = (rsp.getFeatureFlags()
+                    & ClimateFeature.CLIMATE_SUPPORTS_TARGET_HUMIDITY.getFlag()) != 0;
+            supportsCurrentHumidity = (rsp.getFeatureFlags()
+                    & ClimateFeature.CLIMATE_SUPPORTS_CURRENT_HUMIDITY.getFlag()) != 0;
+            supportsAction = (rsp.getFeatureFlags() & ClimateFeature.CLIMATE_SUPPORTS_ACTION.getFlag()) != 0;
+        } else {
+            supportsTwoPointTemperature = rsp.getSupportsTwoPointTargetTemperature();
+            supportsCurrentTemperature = rsp.getSupportsCurrentTemperature();
+            supportsTargetHumidity = rsp.getSupportsTargetHumidity();
+            supportsCurrentHumidity = rsp.getSupportsCurrentHumidity();
+            supportsAction = rsp.getSupportsAction();
+        }
 
-        if (rsp.getSupportsTwoPointTargetTemperature()) {
+        if (supportsTwoPointTemperature) {
             addTargetTemperatureChannel(CHANNEL_TARGET_TEMPERATURE_LOW, "Target temperature (low)", rsp);
             addTargetTemperatureChannel(CHANNEL_TARGET_TEMPERATURE_HIGH, "Target temperature (high)", rsp);
         } else {
             addTargetTemperatureChannel(CHANNEL_TARGET_TEMPERATURE, "Target temperature", rsp);
         }
-        if (rsp.getSupportsCurrentTemperature()) {
+        if (supportsCurrentTemperature) {
             ChannelType channelType = addChannelType("Current temperature", ITEM_TYPE_TEMPERATURE,
                     Set.of(SEMANTIC_TYPE_MEASUREMENT, "Temperature"), "temperature", rsp.getEntityCategory(),
                     rsp.getDisabledByDefault());
@@ -208,20 +253,20 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             Configuration configuration = configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_CURRENT_TEMPERATURE);
             configuration.put("unit", "°C"); // ESPHome always uses Celsius for temperature
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_CURRENT_TEMPERATURE))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_CURRENT_TEMPERATURE))
                     .withLabel(createChannelLabel(rsp.getName(), "Current temperature")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(ITEM_TYPE_TEMPERATURE)
                     .withConfiguration(configuration).build();
             super.registerChannel(channel, channelType, stateDescription);
         }
-        if (rsp.getSupportsTargetHumidity()) {
+        if (supportsTargetHumidity) {
             ChannelType channelTypeTargetHumidity = addChannelType("Target humidity", ITEM_TYPE_NUMBER_DIMENSIONLESS,
                     Set.of(SEMANTIC_TYPE_SETPOINT, "Humidity"), "humidity", rsp.getEntityCategory(),
                     rsp.getDisabledByDefault());
             StateDescription stateDescription = numericStateDescription("%.0f %unit%", null,
                     BigDecimal.valueOf(rsp.getVisualMinHumidity()), BigDecimal.valueOf(rsp.getVisualMaxHumidity()));
             Channel channelTargetHumidity = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_TARGET_HUMIDITY))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_TARGET_HUMIDITY))
                     .withLabel(createChannelLabel(rsp.getName(), "Target humidity")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTargetHumidity.getUID()).withAcceptedItemType(ITEM_TYPE_NUMBER_DIMENSIONLESS)
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_TARGET_HUMIDITY))
@@ -229,13 +274,13 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             super.registerChannel(channelTargetHumidity, channelTypeTargetHumidity, stateDescription);
         }
 
-        if (rsp.getSupportsCurrentHumidity()) {
+        if (supportsCurrentHumidity) {
             ChannelType channelType = addChannelType("Current humidity", ITEM_TYPE_NUMBER_DIMENSIONLESS,
                     Set.of(SEMANTIC_TYPE_MEASUREMENT, "Humidity"), "humidity", rsp.getEntityCategory(),
                     rsp.getDisabledByDefault());
             StateDescription stateDescription = patternStateDescription("%.0f %unit%", true);
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_CURRENT_HUMIDITY))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_CURRENT_HUMIDITY))
                     .withLabel(createChannelLabel(rsp.getName(), "Current humidity")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(ITEM_TYPE_NUMBER_DIMENSIONLESS)
                     .withConfiguration(configuration(null, rsp.getKey(), CHANNEL_CURRENT_HUMIDITY)).build();
@@ -248,19 +293,18 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(
                     rsp.getSupportedModesList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList());
-            Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_MODE))
+            Channel channel = ChannelBuilder.create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_MODE))
                     .withLabel(createChannelLabel(rsp.getName(), "Mode")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_MODE)).build();
             super.registerChannel(channel, channelType, stateDescription);
         }
-        if (rsp.getSupportsAction()) {
+        if (supportsAction) {
             ChannelType channelType = addChannelType("Action", itemTypeString, Set.of(SEMANTIC_TYPE_STATUS), "climate",
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(ACTIONS, true);
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_ACTION))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_ACTION))
                     .withLabel(createChannelLabel(rsp.getName(), "Action")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_ACTION)).build();
@@ -272,7 +316,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             StateDescription stateDescription = optionListStateDescription(
                     rsp.getSupportedFanModesList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList());
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_FAN_MODE))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_FAN_MODE))
                     .withLabel(createChannelLabel(rsp.getName(), "Fan Mode")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_FAN_MODE)).build();
@@ -283,7 +327,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     Set.of(SEMANTIC_TYPE_CONTROL, "Wind"), "fan", rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(rsp.getSupportedCustomFanModesList());
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_CUSTOM_FAN_MODE))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_CUSTOM_FAN_MODE))
                     .withLabel(createChannelLabel(rsp.getName(), "Custom Fan Mode")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_CUSTOM_FAN_MODE))
@@ -296,7 +340,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             StateDescription stateDescription = optionListStateDescription(
                     rsp.getSupportedPresetsList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList());
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_PRESET))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_PRESET))
                     .withLabel(createChannelLabel(rsp.getName(), "Preset")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_PRESET)).build();
@@ -307,7 +351,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
                     "climate", rsp.getEntityCategory(), rsp.getDisabledByDefault());
             StateDescription stateDescription = optionListStateDescription(rsp.getSupportedCustomPresetsList());
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_CUSTOM_PRESET))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_CUSTOM_PRESET))
                     .withLabel(createChannelLabel(rsp.getName(), "Custom Preset")).withKind(ChannelKind.STATE)
                     .withType(channelType.getUID()).withAcceptedItemType(itemTypeString)
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_CUSTOM_PRESET)).build();
@@ -319,7 +363,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
             StateDescription stateDescription = optionListStateDescription(
                     rsp.getSupportedSwingModesList().stream().map(ClimateEnumHelper::stripEnumPrefix).toList());
             Channel channel = ChannelBuilder
-                    .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, CHANNEL_SWING_MODE))
+                    .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, CHANNEL_SWING_MODE))
                     .withAcceptedItemType(itemTypeString).withLabel(createChannelLabel(rsp.getName(), "Swing Mode"))
                     .withKind(ChannelKind.STATE).withType(channelType.getUID())
                     .withConfiguration(configuration(EntityTypes.CLIMATE, rsp.getKey(), CHANNEL_SWING_MODE)).build();
@@ -342,7 +386,7 @@ public class ClimateMessageHandler extends AbstractMessageHandler<ListEntitiesCl
         Configuration configuration = configuration(EntityTypes.CLIMATE, rsp.getKey(), channelID);
         configuration.put("unit", "°C"); // ESPHome always uses Celsius for temperature
         Channel channelTargetTemperatureLow = ChannelBuilder
-                .create(createChannelUID(rsp.getObjectId(), EntityTypes.CLIMATE, channelID))
+                .create(createChannelUID(rsp.getName(), EntityTypes.CLIMATE, channelID))
                 .withLabel(createChannelLabel(rsp.getName(), label)).withKind(ChannelKind.STATE)
                 .withType(channelTypeTargetTemperature.getUID()).withAcceptedItemType(ITEM_TYPE_TEMPERATURE)
                 .withConfiguration(configuration).build();
