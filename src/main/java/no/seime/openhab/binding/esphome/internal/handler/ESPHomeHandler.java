@@ -163,6 +163,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 LockStateResponse.class);
         registerMessageHandler(EntityTypes.VALVE, new ValveMessageHandler(this), ListEntitiesValveResponse.class,
                 ValveStateResponse.class);
+        registerMessageHandler(EntityTypes.MEDIA_PLAYER, new MediaPlayerMessageHandler(this),
+                ListEntitiesMediaPlayerResponse.class, MediaPlayerStateResponse.class);
     }
 
     private void registerMessageHandler(String entityType,
