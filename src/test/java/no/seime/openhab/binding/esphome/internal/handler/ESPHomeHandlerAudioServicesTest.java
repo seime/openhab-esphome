@@ -25,6 +25,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.audio.AudioSink;
+import org.openhab.core.audio.AudioSource;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.library.CoreItemFactory;
 import org.openhab.core.library.types.OnOffType;
@@ -40,6 +41,7 @@ import org.osgi.framework.ServiceRegistration;
 
 import com.jano7.executor.KeySequentialExecutor;
 
+import io.esphome.api.DeviceInfoResponse;
 import io.esphome.api.ListEntitiesDoneResponse;
 import io.esphome.api.ListEntitiesMediaPlayerResponse;
 import io.esphome.api.MediaPlayerCommand;
@@ -50,6 +52,7 @@ import io.esphome.api.MediaPlayerSupportedFormat;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
+import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler.VoiceAssistantFeature;
 import no.seime.openhab.binding.esphome.internal.message.MediaPlayerMessageHandler.MediaPlayerFeature;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
@@ -72,6 +75,8 @@ class ESPHomeHandlerAudioServicesTest {
     private NetworkAddressService networkAddressService;
     @Mock
     private ServiceRegistration<AudioSink> audioSinkRegistration;
+    @Mock
+    private ServiceRegistration<AudioSource> audioSourceRegistration;
     @Mock
     private EncryptedFrameHelper frameHelper;
     @Mock
@@ -123,10 +128,29 @@ class ESPHomeHandlerAudioServicesTest {
     }
 
     @Test
+    void registersAudioSourceWhenVoiceAssistantApiAudioIsAdvertised() throws Exception {
+        when(bundleContext.registerService(eq(AudioSource.class), any(AudioSource.class), any(Dictionary.class)))
+                .thenReturn(audioSourceRegistration);
+
+        invokeHandleConnected(DeviceInfoResponse.newBuilder().setName("virtual").setMacAddress("AA").setModel("ESP32")
+                .setManufacturer("Espressif").setEsphomeVersion("2026.1.0").setCompilationTime("now")
+                .setVoiceAssistantFeatureFlags(VoiceAssistantFeature.API_AUDIO.getFlag()).build());
+
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        verify(bundleContext).registerService(eq(AudioSource.class), any(AudioSource.class), any(Dictionary.class));
+    }
+
+    @Test
     void unregistersAudioServicesOnDisconnect() throws Exception {
         when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
                 .thenReturn(audioSinkRegistration);
+        when(bundleContext.registerService(eq(AudioSource.class), any(AudioSource.class), any(Dictionary.class)))
+                .thenReturn(audioSourceRegistration);
 
+        invokeHandleConnected(DeviceInfoResponse.newBuilder().setName("virtual").setMacAddress("AA").setModel("ESP32")
+                .setManufacturer("Espressif").setEsphomeVersion("2026.1.0").setCompilationTime("now")
+                .setVoiceAssistantFeatureFlags(VoiceAssistantFeature.API_AUDIO.getFlag()).build());
         invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
                 .setName("Speaker One")
                 .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").build()).build());
@@ -137,6 +161,7 @@ class ESPHomeHandlerAudioServicesTest {
                 org.openhab.core.thing.ThingStatusDetail.COMMUNICATION_ERROR, "test", false);
 
         verify(audioSinkRegistration).unregister();
+        verify(audioSourceRegistration).unregister();
     }
 
     @Test
