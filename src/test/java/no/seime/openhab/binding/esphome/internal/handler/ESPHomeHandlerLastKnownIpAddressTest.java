@@ -83,7 +83,30 @@ class ESPHomeHandlerLastKnownIpAddressTest {
     }
 
     @Test
+    void fallsBackToTrimmedCachedIpAddressWhenHostnameResolutionFails() throws Exception {
+        thing.setProperties(Map.of(ESPHomeHandler.PROPERTY_LAST_KNOWN_IP_ADDRESS, " 127.0.0.1 "));
+
+        Object target = invokeMethod("resolveConnectionTarget", new Class<?>[] { String.class }, "device.invalid");
+
+        assertEquals("127.0.0.1", invokeRecordAccessor(target, "connectHost"));
+        assertEquals("127.0.0.1", invokeRecordAccessor(target, "ipAddress"));
+    }
+
+    @Test
     void throwsWhenHostnameResolutionFailsWithoutCachedIpAddress() {
+        Exception error = assertThrows(Exception.class,
+                () -> invokeMethod("resolveConnectionTarget", new Class<?>[] { String.class }, "device.invalid"));
+
+        Throwable cause = error.getCause();
+        assertNotNull(cause);
+        assertInstanceOf(ProtocolAPIError.class, cause);
+        assertEquals("Failed to resolve hostname 'device.invalid'", cause.getMessage());
+    }
+
+    @Test
+    void throwsWhenHostnameResolutionFailsWithInvalidCachedIpAddress() {
+        thing.setProperties(Map.of(ESPHomeHandler.PROPERTY_LAST_KNOWN_IP_ADDRESS, " not-an-ip "));
+
         Exception error = assertThrows(Exception.class,
                 () -> invokeMethod("resolveConnectionTarget", new Class<?>[] { String.class }, "device.invalid"));
 
