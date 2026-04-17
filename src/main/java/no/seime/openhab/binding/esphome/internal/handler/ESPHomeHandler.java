@@ -13,6 +13,8 @@
 package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.math.BigDecimal;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
@@ -34,6 +36,7 @@ import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.net.InetAddresses;
 import com.google.protobuf.GeneratedMessage;
 import com.jano7.executor.KeySequentialExecutor;
 
@@ -62,6 +65,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private static final int API_VERSION_MINOR = 14;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
     private static final String ACTION_TAG_SCANNED = "esphome.tag_scanned";
+    static final String PROPERTY_LAST_KNOWN_IP_ADDRESS = "lastKnownIpAddress";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
@@ -95,6 +99,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private boolean bluetoothProxyStarted = false;
     // default is not used initialized in initialize()
     private ExponentialBackoff exponentialBackoff = new ExponentialBackoff(10, 500);
+    @Nullable
+    private String resolvedIpAddressForCurrentConnection;
 
     private final Set<ServiceRegistration<?>> thingActionServiceRegistrations = new HashSet<>();
 
@@ -244,10 +250,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
                 String hostname = config.hostname;
                 int port = config.port;
+                ResolvedConnectionTarget connectionTarget = resolveConnectionTarget(hostname);
+                resolvedIpAddressForCurrentConnection = connectionTarget.cacheLastKnownIpAddress
+                        ? connectionTarget.ipAddress
+                        : null;
+                applyLastKnownIpAddressPolicy(connectionTarget);
 
-                logger.info("[{}] Trying to connect to {}:{}", logPrefix, hostname, port);
+                logger.info("[{}] Trying to connect to {}:{}", logPrefix, connectionTarget.logTarget(), port);
                 updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
-                        String.format("Connecting to %s:%d", hostname, port));
+                        String.format("Connecting to %s:%d", connectionTarget.statusTarget(), port));
 
                 // Default to using the default encryption key from the binding if not set in device configuration
                 String encryptionKey = config.encryptionKey;
@@ -267,7 +278,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper = new EncryptedFrameHelper(connectionSelector, this, encryptionKey, config.deviceId,
                         logPrefix, packetProcessor);
 
-                frameHelper.connect(hostname, port);
+                frameHelper.connect(connectionTarget.connectHost, port);
 
                 cancelConnectionTimeoutWatchdog();
                 connectionTimeoutFuture = executorService.schedule(() -> {
@@ -280,6 +291,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 logger.warn("[{}] Error initial connection", logPrefix, e);
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
                 connectionState = ConnectionState.UNINITIALIZED;
+                resolvedIpAddressForCurrentConnection = null;
                 scheduleConnect(exponentialBackoff.getNextDelay());
             }
         }
@@ -421,6 +433,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
 
             connectionState = ConnectionState.UNINITIALIZED;
+            resolvedIpAddressForCurrentConnection = null;
 
             if (scheduleReconnect) {
                 scheduleConnect(nextDelay);
@@ -448,7 +461,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
 
         if (message instanceof DeviceInfoResponse rsp) {
-            Map<String, String> props = new HashMap<>();
+            Map<String, String> props = new HashMap<>(thing.getProperties());
             props.put(Thing.PROPERTY_FIRMWARE_VERSION, rsp.getEsphomeVersion());
             props.put(Thing.PROPERTY_MAC_ADDRESS, rsp.getMacAddress());
             props.put(Thing.PROPERTY_MODEL_ID, rsp.getModel());
@@ -457,9 +470,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             props.put("compilationTime", rsp.getCompilationTime());
             if (!rsp.getProjectName().isEmpty()) {
                 props.put("projectName", rsp.getProjectName());
+            } else {
+                props.remove("projectName");
             }
             if (!rsp.getProjectVersion().isEmpty()) {
                 props.put("projectVersion", rsp.getProjectVersion());
+            } else {
+                props.remove("projectVersion");
             }
             updateThing(editThing().withProperties(props).build());
         } else if (message instanceof ListEntitiesDoneResponse) {
@@ -620,6 +637,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
                         helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
                 connectionState = ConnectionState.CONNECTED;
+                persistLastKnownIpAddress();
 
                 if (config.allowActions) {
                     logger.debug("[{}] Requesting device to send actions and events", logPrefix);
@@ -682,6 +700,64 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
             }
         }
+    }
+
+    private ResolvedConnectionTarget resolveConnectionTarget(String configuredHostname) throws ProtocolAPIError {
+        if (InetAddresses.isInetAddress(configuredHostname)) {
+            InetAddress configuredAddress = InetAddresses.forString(configuredHostname);
+            String configuredIpAddress = configuredAddress.getHostAddress();
+            return new ResolvedConnectionTarget(configuredIpAddress, configuredIpAddress, configuredHostname,
+                    configuredHostname, false);
+        }
+
+        try {
+            InetAddress resolvedAddress = InetAddress.getByName(configuredHostname);
+            return new ResolvedConnectionTarget(resolvedAddress.getHostAddress(), resolvedAddress.getHostAddress(),
+                    configuredHostname, configuredHostname, true);
+        } catch (UnknownHostException e) {
+            String lastKnownIpAddress = StringUtils
+                    .trimToNull(thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS));
+            if (lastKnownIpAddress != null && InetAddresses.isInetAddress(lastKnownIpAddress)) {
+                logger.warn("[{}] Failed to resolve '{}'. Falling back to cached IP {}", logPrefix, configuredHostname,
+                        lastKnownIpAddress);
+                return new ResolvedConnectionTarget(lastKnownIpAddress, lastKnownIpAddress,
+                        configuredHostname + " (cached " + lastKnownIpAddress + ")", lastKnownIpAddress, true);
+            }
+            throw new ProtocolAPIError("Failed to resolve hostname '" + configuredHostname + "'", e);
+        }
+    }
+
+    private void applyLastKnownIpAddressPolicy(ResolvedConnectionTarget connectionTarget) {
+        if (connectionTarget.cacheLastKnownIpAddress) {
+            return;
+        }
+        removeLastKnownIpAddressProperty();
+    }
+
+    private void persistLastKnownIpAddress() {
+        String ipAddress = resolvedIpAddressForCurrentConnection;
+        if (StringUtils.isBlank(ipAddress)
+                || ipAddress.equals(thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS))) {
+            return;
+        }
+
+        Map<String, String> props = new HashMap<>(thing.getProperties());
+        props.put(PROPERTY_LAST_KNOWN_IP_ADDRESS, ipAddress);
+        updateThing(editThing().withProperties(props).build());
+    }
+
+    private void removeLastKnownIpAddressProperty() {
+        if (!thing.getProperties().containsKey(PROPERTY_LAST_KNOWN_IP_ADDRESS)) {
+            return;
+        }
+
+        Map<String, String> props = new HashMap<>(thing.getProperties());
+        props.remove(PROPERTY_LAST_KNOWN_IP_ADDRESS);
+        updateThing(editThing().withProperties(props).build());
+    }
+
+    private record ResolvedConnectionTarget(String connectHost, String ipAddress, String logTarget, String statusTarget,
+            boolean cacheLastKnownIpAddress) {
     }
 
     public void addChannelType(ChannelType channelType) {
