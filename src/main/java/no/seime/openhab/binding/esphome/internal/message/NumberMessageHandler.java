@@ -77,8 +77,7 @@ public class NumberMessageHandler extends AbstractMessageHandler<ListEntitiesNum
         Set<String> semanticTags = createSemanticTags("Setpoint", deviceClass);
         String unit = rsp.getUnitOfMeasurement();
         String itemType = resolveNumericItemType(unit, rsp.getName(), deviceClass, configuration);
-        String step = "" + rsp.getStep();
-        int accuracyDecimals = step.indexOf('.') > 0 ? step.length() - step.indexOf('.') - 1 : 0;
+        int accuracyDecimals = Math.max(0, BigDecimal.valueOf(rsp.getStep()).stripTrailingZeros().scale());
 
         String icon = getChannelIcon(rsp.getIcon(), deviceClass.getCategory());
 
