@@ -1,0 +1,22 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+number:
+  - platform: template
+    name: "Water Total"
+    optimistic: true
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 10
+    unit_of_measurement: gal
