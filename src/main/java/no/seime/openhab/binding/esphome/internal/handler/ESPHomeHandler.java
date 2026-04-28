@@ -71,6 +71,7 @@ import no.seime.openhab.binding.esphome.internal.handler.action.FirmwareUpgradeA
 import no.seime.openhab.binding.esphome.internal.message.*;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.EventSubscription;
+import no.seime.openhab.binding.esphome.internal.serial.ESPHomeSerialPortProvider;
 
 /**
  * The {@link ESPHomeHandler} is responsible for handling commands, which are
@@ -121,6 +122,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
     private final AudioHTTPServer audioHTTPServer;
     private final NetworkAddressService networkAddressService;
+    private final ESPHomeSerialPortProvider serialPortProvider;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -165,6 +167,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private String logPrefix;
     @Nullable
     private ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler;
+    private @Nullable String espHomeDeviceName;
 
     @Nullable
     private ClassLoader thingActionClassLoader;
@@ -177,7 +180,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             BundleContext bundleContext, ESPHomeVersionService versionService,
             FirmwareUpgradeService firmwareUpgradeService, ESPHomeMDNSHostnameResolver mdnsHostnameResolver,
             AudioHTTPServer audioHTTPServer, NetworkAddressService networkAddressService,
-            @Nullable ManagedThingProvider managedThingProvider) {
+            @Nullable ManagedThingProvider managedThingProvider, ESPHomeSerialPortProvider serialPortProvider) {
         super(thing);
         this.managedThingProvider = managedThingProvider;
         this.connectionSelector = connectionSelector;
@@ -196,6 +199,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.mdnsHostnameResolver = mdnsHostnameResolver;
         this.audioHTTPServer = audioHTTPServer;
         this.networkAddressService = networkAddressService;
+        this.serialPortProvider = serialPortProvider;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -303,6 +307,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             mediaPlayerStates.clear();
             // AudioSource
             unregisterAudioSource();
+            // SerialProxies
+            unregisterSerialProxies();
 
             if (frameHelper != null) {
                 if (connectionState == ConnectionState.CONNECTED) {
@@ -603,6 +609,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    private void unregisterSerialProxies() {
+        serialPortProvider.unregister(this);
+    }
+
     private void connect() {
         synchronized (connectionStateLock) {
             try {
@@ -630,7 +640,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 provisioningKeyPending = false;
                 String encryptionKey = config.encryptionKey;
                 if (StringUtils.isBlank(encryptionKey)) {
-                    encryptionKey = bindingPropertyDefaultEncryptionKey;
+                    encryptionKey = StringUtils.defaultString(bindingPropertyDefaultEncryptionKey);
                 }
                 if (StringUtils.isBlank(encryptionKey)) {
                     if (managedThingProvider == null || managedThingProvider.get(thing.getUID()) == null) {
@@ -891,6 +901,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             // unregistering above schedules a restart
             cancelVoiceDialogRestart();
             voiceAssistantFeatureFlags = 0;
+            unregisterSerialProxies();
 
             if (frameHelper != null) {
                 frameHelper.close();
@@ -970,6 +981,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             props.put("name", rsp.getName());
             props.put(Thing.PROPERTY_VENDOR, rsp.getManufacturer());
             props.put("compilationTime", rsp.getCompilationTime());
+            espHomeDeviceName = rsp.getName();
             if (!rsp.getProjectName().isEmpty()) {
                 props.put("projectName", rsp.getProjectName());
             } else {
@@ -988,7 +1000,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
 
             voiceAssistantFeatureFlags = rsp.getVoiceAssistantFeatureFlags();
+
+            serialPortProvider.register(this, rsp.getSerialProxiesList());
+
             updateThing(editThing().withProperties(props).build());
+
             String compilationTime = rsp.getCompilationTime();
             if (!compilationTime.isEmpty() && compilationTime.equals(interrogatedCompilationTime)) {
                 logger.debug(
@@ -1007,6 +1023,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         } else if (message instanceof ListEntitiesMediaPlayerResponse mediaPlayerResponse) {
             handleMediaPlayerEntity(mediaPlayerResponse);
             classToHandlerMap.get(message.getClass()).handleMessage(message);
+        } else if (message instanceof SerialProxyDataReceived serialProxyDataReceived) {
+            serialPortProvider.handleData(this, serialProxyDataReceived);
+        } else if (message instanceof SerialProxyGetModemPinsResponse serialProxyGetModemPinsResponse) {
+            serialPortProvider.handleModemPins(this, serialProxyGetModemPinsResponse);
         } else if (message instanceof ListEntitiesDoneResponse) {
 
             addFirmwareChannels();
@@ -1600,6 +1620,18 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         updateAvailable ? OpenClosedType.OPEN : OpenClosedType.CLOSED);
             }
         }
+    }
+
+    public @Nullable String getHostname() {
+        return config != null ? config.hostname : null;
+    }
+
+    public int getPort() {
+        return config != null ? config.port : 6053;
+    }
+
+    public @Nullable String getEspHomeDeviceName() {
+        return espHomeDeviceName;
     }
 
     private enum ConnectionState {

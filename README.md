@@ -282,6 +282,47 @@ Bridge bluetooth:esphome:proxy "ESPHome BLE Advertisement listener" [backgroundD
 > **NOTE:** Set backgroundDiscovery to true if you want to automatically add discovered devices to the inbox. If not use
 > manual scanning from the inbox.
 
+## Serial proxy support
+
+The binding exposes ESPHome serial proxies through openHAB's serial transport. This allows other bindings that use
+the serial transport to communicate with a serial device connected to an ESPHome node over the native API connection.
+
+1. Configure a UART and a `serial_proxy` on the ESPHome device. For example, add the following to your device
+   configuration, adjusting the pins, baud rate and port type for your hardware:
+
+```yaml
+uart:
+  id: device_uart
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 9600
+
+serial_proxy:
+  name: device-port
+  uart_id: device_uart
+  port_type: TTL
+```
+
+2. Add the ESPHome device as a normal `esphome:device` Thing and bring it online. Serial proxies reported by the
+   device are registered automatically; no additional enable setting or separate proxy Thing is required.
+3. In the binding that will communicate with the serial device, use an ESPHome URI as its serial port:
+
+```text
+esphome://my-device/device-port
+```
+
+The URI format is `esphome://<device>[:<api-port>]/<proxy-name-or-index>`:
+
+- `<device>` can be the ESPHome Thing's ID, its configured `deviceId`, the ESPHome device name, or its hostname/IP address.
+- `<api-port>` defaults to `6053`. Specify it when the ESPHome Thing uses a different native API port.
+- The path selects the proxy by its reported name or zero-based index, for example `esphome://my-device/0`.
+  Omitting the path also selects the first proxy.
+
+The consuming binding can set baud rate, data bits, stop bits and parity through the serial transport. RTS/CTS hardware
+flow control and RTS/DTR control are supported where the ESPHome hardware and configuration provide them; software
+flow control is not supported. Each proxy can be opened by one openHAB consumer at a time. If the ESPHome device
+disconnects, its ports are closed and removed until the device reconnects; the consuming binding must reopen the port.
+
 ## Streaming logs from ESPHome device to openHAB
 
 As an alternative to manually streaming device logs via ESPHome dashboard, you can have openHAB stream
@@ -480,7 +521,6 @@ The following entity types are **not** yet supported (please submit a PR of file
 
 Other functions are not yet supported:
 
-- Serial proxy
 - Infrared
 
 ### Device Builder discovery
