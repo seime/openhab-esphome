@@ -94,9 +94,6 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         packetExecutor = new KeySequentialExecutor(scheduler);
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
-        // All channel types are created with unique IDs at device interrogation, so removing all existing ones at
-        // startup to avoid stale entries being kept in the jsondb (actually in memory)
-        this.dynamicChannelTypeProvider.removeAllChannelTypes();
         this.stateDescriptionProvider = stateDescriptionProvider;
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
