@@ -38,7 +38,7 @@ public class ESPChannelTypeProvider extends AbstractStorageBasedTypeProvider {
     public void removeChannelTypesForThing(ThingUID uid) {
 
         String thingUid = uid.getId();
-        getChannelTypes(null).stream().map(ChannelType::getUID).filter(c -> c.getAsString().endsWith(thingUid))
+        getChannelTypes(null).stream().map(ChannelType::getUID).filter(c -> c.getAsString().startsWith(thingUid))
                 .forEach(this::removeChannelType);
     }
 }
