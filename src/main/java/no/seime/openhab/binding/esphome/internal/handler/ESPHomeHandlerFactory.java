@@ -21,7 +21,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
+import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.events.EventPublisher;
+import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
@@ -71,6 +73,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final ThingRegistry thingRegistry;
     private final EventPublisher eventPublisher;
+    private final AudioHTTPServer audioHTTPServer;
+    private final NetworkAddressService networkAddressService;
     private final MonitoredScheduledThreadPoolExecutor scheduler;
     private final KeySequentialExecutor packetExecutor;
     private final ConnectionSelector connectionSelector;
@@ -81,7 +85,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPStateDescriptionProvider stateDescriptionProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry,
-            @Reference EventPublisher eventPublisher) throws IOException {
+            @Reference EventPublisher eventPublisher, @Reference AudioHTTPServer audioHTTPServer,
+            @Reference NetworkAddressService networkAddressService) throws IOException {
         scheduler = new MonitoredScheduledThreadPoolExecutor(4, r -> {
             long currentCount = threadCounter.incrementAndGet();
             logger.debug("Creating new worker thread {} for scheduler", currentCount);
@@ -98,6 +103,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
         this.eventPublisher = eventPublisher;
+        this.audioHTTPServer = audioHTTPServer;
+        this.networkAddressService = networkAddressService;
 
         connectionSelector = new ConnectionSelector();
     }
@@ -109,7 +116,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
-                    defaultEncryptionKey, getBundleContext());
+                    defaultEncryptionKey, getBundleContext(), audioHTTPServer, networkAddressService);
             esphomeHandlers.put(thing.getUID(), handler);
             return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {

@@ -1,0 +1,23 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+external_components:
+  - source:
+      type: local
+      path: media_player_external_components
+    components: [fake_media_player_component]
+
+media_player:
+  - platform: fake_media_player_component
+    id: media_player_entity
+    name: "Player"
