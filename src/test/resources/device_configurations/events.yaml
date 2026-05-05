@@ -1,0 +1,30 @@
+esphome:
+  name: virtual
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret emulator_encryption_key
+
+event:
+  - platform: template
+    name: "Scene Dag"
+    id: ev_dag
+    event_types: [ "dag" ]
+  - platform: template
+    name: "Scene Avond"
+    id: ev_avond
+    event_types: [ "avond" ]
+
+switch:
+  - platform: template
+    name: "Trigger Scene Dag"
+    turn_on_action:
+      - event.trigger:
+          id: ev_dag
+          event_type: "dag"

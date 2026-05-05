@@ -29,6 +29,7 @@ import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.binding.ThingActions;
+import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.types.*;
 import org.osgi.framework.BundleContext;
@@ -163,6 +164,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 LockStateResponse.class);
         registerMessageHandler(EntityTypes.VALVE, new ValveMessageHandler(this), ListEntitiesValveResponse.class,
                 ValveStateResponse.class);
+        registerMessageHandler(EntityTypes.EVENT, new EventMessageHandler(this), ListEntitiesEventResponse.class,
+                EventResponse.class);
     }
 
     private void registerMessageHandler(String entityType,
@@ -627,6 +630,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void updateState(ChannelUID channelUID, State state) {
         super.updateState(channelUID, state);
+    }
+
+    public void triggerChannel(ChannelUID channelUID, String event) {
+        ThingHandlerCallback callback = getCallback();
+        if (callback != null) {
+            callback.channelTriggered(thing, channelUID, event);
+        }
     }
 
     private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {

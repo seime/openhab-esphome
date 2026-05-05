@@ -79,6 +79,39 @@ to `$OH_CONFDIR/services/runtime.cfg` .
 Channels are auto-generated based on actual device configuration. Bring the device online, and the binding will
 interrogate the device and create channels based on the device configuration.
 
+Most channels are of `STATE` kind, meaning they are linked to an Item and hold a state (e.g., Temperature, Switch
+status).
+
+### Event channels
+
+The ESPHome `event` entity type is mapped to an openHAB `TRIGGER` channel. These channels do not hold a state and cannot
+be linked to an Item. Instead, they fire an event on the openHAB event bus when the device reports an event.
+
+You can use these in rules like this:
+
+```js
+configuration: {}
+triggers:
+  - id: "1"
+    label: My Event Channel triggered
+    pluginId: core.ChannelEventTrigger
+    type: core.ChannelEventTrigger
+    configuration:
+      event: dag
+      channelUID: esphome:device:mydevice:scene_dag
+```
+
+Or in Rules DSL:
+
+```xtend
+rule "ESPHome Event"
+when
+    Channel "esphome:device:mydevice:scene_dag" triggered dag
+then
+    logInfo("rules", "Event 'dag' was triggered")
+end
+```
+
 ## Full Example file example
 
 ### Thing Configuration for ESPHome device
