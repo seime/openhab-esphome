@@ -27,7 +27,7 @@ public class ThingActionEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
-        assertEquals(0, thingHandler.getDynamicChannels().size());
+        assertEquals(2, thingHandler.getDynamicChannels().size());
 
         thingHandler.dispose();
     }

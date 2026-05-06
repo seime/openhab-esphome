@@ -22,7 +22,7 @@ public class LightEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
         await().until(() -> thingHandler.isInterrogated());
 
         // Only brightness channel should be created
-        assertEquals(1, thingHandler.getDynamicChannels().size());
+        assertEquals(3, thingHandler.getDynamicChannels().size());
 
         thingHandler.dispose();
     }

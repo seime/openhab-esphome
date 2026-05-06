@@ -33,4 +33,7 @@ public class BindingConstants {
     public static final String CHANNEL_CONFIGURATION_ENTITY_KEY = "entity_key";
     public static final String CHANNEL_CONFIGURATION_ENTITY_TYPE = "entity_type";
     public static final String CHANNEL_CONFIGURATION_ENTITY_FIELD = "entity_field";
+
+    public static final String CHANNEL_LATEST_FIRMWARE_VERSION = "latestFirmwareVersion";
+    public static final String CHANNEL_FIRMWARE_UPDATE_AVAILABLE = "firmwareUpdateAvailable";
 }

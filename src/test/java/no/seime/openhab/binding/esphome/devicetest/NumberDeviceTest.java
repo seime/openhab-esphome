@@ -25,7 +25,7 @@ public class NumberDeviceTest extends AbstractESPHomeDeviceTest {
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
-        assertEquals(1, thingHandler.getDynamicChannels().size());
+        assertEquals(3, thingHandler.getDynamicChannels().size());
 
         verify(stateDescriptionProvider, timeout(2000)).setDescription(
                 eq(new ChannelUID(thing.getUID(), "water_total")),

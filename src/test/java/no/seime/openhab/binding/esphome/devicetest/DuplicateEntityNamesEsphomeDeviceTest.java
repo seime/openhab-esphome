@@ -22,9 +22,11 @@ public class DuplicateEntityNamesEsphomeDeviceTest extends AbstractESPHomeDevice
         await().until(() -> thingHandler.isInterrogated());
 
         // Only brightness channel should be created
-        assertEquals(2, thingHandler.getDynamicChannels().size());
-        assertEquals("climate", thingHandler.getDynamicChannels().get(0).getUID().getId());
-        assertEquals("climate_sensor", thingHandler.getDynamicChannels().get(1).getUID().getId());
+        assertEquals(4, thingHandler.getDynamicChannels().size());
+        assertEquals("latestFirmwareVersion", thingHandler.getDynamicChannels().get(0).getUID().getId());
+        assertEquals("firmwareUpdateAvailable", thingHandler.getDynamicChannels().get(1).getUID().getId());
+        assertEquals("climate", thingHandler.getDynamicChannels().get(2).getUID().getId());
+        assertEquals("climate_sensor", thingHandler.getDynamicChannels().get(3).getUID().getId());
 
         thingHandler.dispose();
     }

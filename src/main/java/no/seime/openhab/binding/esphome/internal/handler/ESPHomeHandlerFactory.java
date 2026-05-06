@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import com.jano7.executor.KeySequentialExecutor;
 
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -74,6 +75,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final MonitoredScheduledThreadPoolExecutor scheduler;
     private final KeySequentialExecutor packetExecutor;
     private final ConnectionSelector connectionSelector;
+    private final ESPHomeVersionService versionService;
 
     private final Map<ThingUID, ESPHomeHandler> esphomeHandlers = new ConcurrentHashMap<>();
 
@@ -100,6 +102,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         this.eventPublisher = eventPublisher;
 
         connectionSelector = new ConnectionSelector();
+
+        versionService = new ESPHomeVersionService(scheduler);
     }
 
     @Override
@@ -109,7 +113,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
-                    defaultEncryptionKey, getBundleContext());
+                    defaultEncryptionKey, getBundleContext(), versionService);
             esphomeHandlers.put(thing.getUID(), handler);
             return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
@@ -126,6 +130,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     protected void activate(ComponentContext componentContext) {
         super.activate(componentContext);
         connectionSelector.start();
+        versionService.start();
         Dictionary<String, Object> properties = componentContext.getProperties();
         defaultEncryptionKey = StringUtils.trimToNull((String) properties.get("defaultEncryptionKey"));
         if (defaultEncryptionKey != null) {
@@ -137,6 +142,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     @Override
     protected void deactivate(ComponentContext componentContext) {
         connectionSelector.stop();
+        versionService.stop();
         scheduler.shutdown();
         try {
             scheduler.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);

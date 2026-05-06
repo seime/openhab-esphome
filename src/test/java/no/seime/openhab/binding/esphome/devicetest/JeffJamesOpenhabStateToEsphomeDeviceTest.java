@@ -30,7 +30,7 @@ public class JeffJamesOpenhabStateToEsphomeDeviceTest extends AbstractESPHomeDev
 
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
-        assertEquals(1, thingHandler.getDynamicChannels().size());
+        assertEquals(3, thingHandler.getDynamicChannels().size());
 
         // Verify that initial state is copied via the copy sensor and transferred back
         verify(thingHandlerCallback, timeout(2000))

@@ -33,6 +33,7 @@ import com.jano7.executor.KeySequentialExecutor;
 import no.seime.openhab.binding.esphome.deviceutil.ESPHomeDeviceRunner;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
+import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
@@ -89,8 +90,24 @@ public abstract class AbstractESPHomeDeviceTest {
         when(itemRegistry.getItems()).thenReturn(registryItems);
         eventSubscriber = new ESPHomeEventSubscriber(thingRegistry, itemRegistry);
 
+        ESPHomeVersionService versionService = Mockito.mock(ESPHomeVersionService.class);
+        when(versionService.getLatestVersion()).thenReturn("2024.3.0");
+        when(versionService.createLatestFirmwareVersionChannelType(Mockito.any()))
+                .thenAnswer(invocation -> new ESPHomeVersionService(executor)
+                        .createLatestFirmwareVersionChannelType(invocation.getArgument(0)));
+        when(versionService.createFirmwareUpdateAvailableChannelType(Mockito.any()))
+                .thenAnswer(invocation -> new ESPHomeVersionService(executor)
+                        .createFirmwareUpdateAvailableChannelType(invocation.getArgument(0)));
+        when(versionService.createLatestFirmwareVersionChannel(Mockito.any(), Mockito.any()))
+                .thenAnswer(invocation -> new ESPHomeVersionService(executor)
+                        .createLatestFirmwareVersionChannel(invocation.getArgument(0), invocation.getArgument(1)));
+        when(versionService.createFirmwareUpdateAvailableChannel(Mockito.any(), Mockito.any()))
+                .thenAnswer(invocation -> new ESPHomeVersionService(executor)
+                        .createFirmwareUpdateAvailableChannel(invocation.getArgument(0), invocation.getArgument(1)));
+
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
-                eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, bundleContext);
+                eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, bundleContext,
+                versionService);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 

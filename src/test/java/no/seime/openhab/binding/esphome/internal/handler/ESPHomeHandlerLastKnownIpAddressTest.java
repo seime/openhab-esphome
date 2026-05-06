@@ -1,12 +1,8 @@
 package no.seime.openhab.binding.esphome.internal.handler;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -29,6 +25,7 @@ import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.DeviceInfoResponse;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -61,7 +58,7 @@ class ESPHomeHandlerLastKnownIpAddressTest {
         packetProcessorExecutor = Executors.newSingleThreadExecutor();
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
-                bundleContext);
+                bundleContext, mock(ESPHomeVersionService.class));
         handler.setCallback(callback);
     }
 

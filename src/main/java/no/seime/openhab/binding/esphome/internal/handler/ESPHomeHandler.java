@@ -17,6 +17,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -26,6 +27,8 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.events.AbstractEvent;
 import org.openhab.core.events.EventPublisher;
+import org.openhab.core.library.types.OpenClosedType;
+import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.binding.ThingActions;
@@ -60,7 +63,7 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.Event
  * @author Arne Seime - Initial contribution
  */
 @NonNullByDefault
-public class ESPHomeHandler extends BaseThingHandler implements CommunicationListener {
+public class ESPHomeHandler extends BaseThingHandler implements CommunicationListener, ESPHomeVersionListener {
 
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 14;
@@ -76,7 +79,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ESPStateDescriptionProvider stateDescriptionProvider;
     private final Map<String, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> commandTypeToHandlerMap = new HashMap<>();
     private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
-    private final List<Channel> dynamicChannels = new ArrayList<>();
+    private final List<Channel> dynamicChannels = new CopyOnWriteArrayList<>();
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredScheduledThreadPoolExecutor executorService;
     private final KeySequentialExecutor packetProcessor;
@@ -84,6 +87,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Nullable
     private final String defaultEncryptionKey;
     private final BundleContext bundleContext;
+    private final ESPHomeVersionService versionService;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -116,7 +120,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
             ESPHomeEventSubscriber eventSubscriber, MonitoredScheduledThreadPoolExecutor executorService,
             KeySequentialExecutor packetProcessor, EventPublisher eventPublisher, @Nullable String defaultEncryptionKey,
-            BundleContext bundleContext) {
+            BundleContext bundleContext, ESPHomeVersionService versionService) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -128,6 +132,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.eventPublisher = eventPublisher;
         this.defaultEncryptionKey = defaultEncryptionKey;
         this.bundleContext = bundleContext;
+        this.versionService = versionService;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -189,6 +194,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             logPrefix = String.format("%s", config.logPrefix); // To avoid nullness warning
         }
 
+        versionService.addListener(this);
+
         exponentialBackoff = new ExponentialBackoff(config.reconnectInterval, config.maxReconnectInterval);
         if (config.hostname != null && !config.hostname.isEmpty()) {
             scheduleConnect(0);
@@ -201,6 +208,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void dispose() {
         synchronized (connectionStateLock) {
             disposed = true;
+            versionService.removeListener(this);
             eventSubscriber.removeEventSubscriptions(this);
             stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
             setUndefToAllChannels();
@@ -481,12 +489,20 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             } else {
                 props.remove("projectVersion");
             }
+
             updateThing(editThing().withProperties(props).build());
         } else if (message instanceof ListEntitiesDoneResponse) {
+
+            addFirmwareChannels();
+
             updateThing(editThing().withChannels(dynamicChannels).build());
             logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
             interrogated = true;
             frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
+
+            updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
+                    versionService.getLatestVersion());
+
         } else if (message instanceof PingRequest) {
             logger.debug("[{}] Responding to ping request", logPrefix);
             frameHelper.send(PingResponse.getDefaultInstance());
@@ -570,6 +586,21 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         logPrefix, message.getClass().getName(), message);
             }
         }
+    }
+
+    private void addFirmwareChannels() {
+        ChannelType latestFirmwareVersionChannelType = versionService
+                .createLatestFirmwareVersionChannelType(thing.getUID());
+        ChannelType firmwareUpdateAvailableChannelType = versionService
+                .createFirmwareUpdateAvailableChannelType(thing.getUID());
+
+        addChannelType(latestFirmwareVersionChannelType);
+        addChannelType(firmwareUpdateAvailableChannelType);
+
+        dynamicChannels.add(0, versionService.createFirmwareUpdateAvailableChannel(thing.getUID(),
+                firmwareUpdateAvailableChannelType.getUID()));
+        dynamicChannels.add(0, versionService.createLatestFirmwareVersionChannel(thing.getUID(),
+                latestFirmwareVersionChannelType.getUID()));
     }
 
     public void sendBluetoothCommand(GeneratedMessage message) {
@@ -898,6 +929,25 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public @Nullable String getDeviceId() {
         return config != null ? config.deviceId : null;
+    }
+
+    @Override
+    public void onVersionUpdate(String version) {
+        String currentVersion = thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION);
+        updateVersionChannels(currentVersion, version);
+    }
+
+    private void updateVersionChannels(@Nullable String currentVersion, @Nullable String latestVersion) {
+        if (latestVersion != null) {
+            updateState(new ChannelUID(thing.getUID(), BindingConstants.CHANNEL_LATEST_FIRMWARE_VERSION),
+                    new StringType(latestVersion));
+            if (currentVersion != null) {
+                boolean updateAvailable = ESPHomeVersionService.isVersionNewer(latestVersion, currentVersion,
+                        logPrefix);
+                updateState(new ChannelUID(thing.getUID(), BindingConstants.CHANNEL_FIRMWARE_UPDATE_AVAILABLE),
+                        updateAvailable ? OpenClosedType.OPEN : OpenClosedType.CLOSED);
+            }
+        }
     }
 
     private enum ConnectionState {

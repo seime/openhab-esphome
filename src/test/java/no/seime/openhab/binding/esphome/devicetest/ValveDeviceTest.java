@@ -25,8 +25,8 @@ public class ValveDeviceTest extends AbstractESPHomeDeviceTest {
 
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
-        // Valve 2, Switch 1
-        assertEquals(3, thingHandler.getDynamicChannels().size());
+        // Valve 2, Switch 1, Firmware version 1, Firmware update available 1 = 5
+        assertEquals(5, thingHandler.getDynamicChannels().size());
 
         // Valve will stay in IDLE all the time
         verify(thingHandlerCallback, timeout(2000)).stateUpdated(

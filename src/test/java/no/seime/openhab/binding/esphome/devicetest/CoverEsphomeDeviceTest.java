@@ -35,7 +35,7 @@ public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
         // Cover position
         // Cover state
 
-        assertEquals(4, thingHandler.getDynamicChannels().size());
+        assertEquals(6, thingHandler.getDynamicChannels().size());
 
         // Send using PercentType
         // Remove all other invocations for log readability
