@@ -326,6 +326,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
 
             if (command == RefreshType.REFRESH) {
+                if (channelUID.getId().equals(BindingConstants.CHANNEL_LATEST_FIRMWARE_VERSION)
+                        || channelUID.getId().equals(BindingConstants.CHANNEL_FIRMWARE_UPDATE_AVAILABLE)) {
+                    updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
+                            versionService.getLatestVersion());
+                    return;
+                }
+
                 try {
                     frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
                 } catch (ProtocolAPIError e) {
