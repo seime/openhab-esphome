@@ -73,6 +73,7 @@ to `$OH_CONFDIR/services/runtime.cfg` .
 | `logPrefix`            | `text`    | Log prefix to use for this device.                                                                                                                                                                                                                                                                                                                                                                                                                  | deviceId | no                               | yes      |
 | `deviceLogLevel`       | `text`    | ESPHome device log level to stream from the device.                                                                                                                                                                                                                                                                                                                                                                                                 | NONE     | no                               | yes      |
 | `enableBluetoothProxy` | `boolean` | Allow this device to proxy Bluetooth traffic. Requires ESPHome device to be configured with `bluetooth_proxy`                                                                                                                                                                                                                                                                                                                                       | false    | no                               | yes      |
+| `configFileFullPath`   | `string`  | Fully qualified path to esphome yaml for this device. Used for firmware upgrades.                                                                                                                                                                                                                                                                                                                                                                   | false    | no                               | yes      |
 
 ## Channels
 
@@ -90,15 +91,21 @@ be linked to an Item. Instead, they fire an event on the openHAB event bus when 
 You can use these in rules like this:
 
 ```js
-configuration: {}
+configuration: {
+}
 triggers:
-  - id: "1"
-    label: My Event Channel triggered
-    pluginId: core.ChannelEventTrigger
-    type: core.ChannelEventTrigger
-    configuration:
-      event: dag
-      channelUID: esphome:device:mydevice:scene_dag
+    -id
+:
+"1"
+label: My
+Event
+Channel
+triggered
+pluginId: core.ChannelEventTrigger
+type: core.ChannelEventTrigger
+configuration:
+    event: dag
+channelUID: esphome:device:mydevice:scene_dag
 ```
 
 Or in Rules DSL:
@@ -385,6 +392,32 @@ For JRuby, use the [
 `event` trigger](https://openhab.github.io/openhab-jruby/main/OpenHAB/DSL/Rules/BuilderDSL.html#event-instance_method).
 For Python Scripting, use [
 `GenericEventTrigger`](https://www.openhab.org/addons/automation/pythonscripting/#module-openhab-triggers).
+
+## Firmware upgrade support
+
+The binding can now trigger firmware updates via a `Thing` action.
+
+It finds the latest firmware version by checking https://github.com/esphome/esphome/releases/latest at startup
+and every 24 hours.
+
+2 channels are automatically added to each thing:
+
+- `latestFirmwareVersion` (`String`) which contains the latest firmware version.
+- `firmwareUpdateAvailable` (`Contact`) where `OPEN` indicates a newer esphome version is available
+
+The following configuration must be in place for firmware **upgrade** to work:
+
+1. Set the `Thing` configuration parameter `configFileFullPath` to the fully qualified path of the esphome yaml file.
+2. In the addon/binding configuration, add the fully qualified path to `esphome` binary. Parameter is
+   `esphomeExecutable`
+   if not done via MainUI
+3. Similarly, add the command to run to upgrade your local installation of esphome to the latest version. For Homebrew (
+   MacOS) this could be `brew upgrade esphome`. Parameter is `esphomeUpgradeExecutable` if not done via MainUI.
+
+> Note: Point 2 and 3 really depend on what OS your machine is running and whether Docker is involved or not. If you get
+> it working, feel free to add an example section below for your OS and Docker setup.
+
+> Note2: The upgrade process runs even if the device is running the latest esphome version available.
 
 ## Limitations
 

@@ -31,10 +31,7 @@ import org.osgi.framework.BundleContext;
 import com.jano7.executor.KeySequentialExecutor;
 
 import no.seime.openhab.binding.esphome.deviceutil.ESPHomeDeviceRunner;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
-import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
-import no.seime.openhab.binding.esphome.internal.LogLevel;
+import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
@@ -105,9 +102,11 @@ public abstract class AbstractESPHomeDeviceTest {
                 .thenAnswer(invocation -> new ESPHomeVersionService(executor)
                         .createFirmwareUpdateAvailableChannel(invocation.getArgument(0), invocation.getArgument(1)));
 
+        FirmwareUpgradeService firmwareUpgradeService = Mockito.mock(FirmwareUpgradeService.class);
+
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, bundleContext,
-                versionService);
+                versionService, firmwareUpgradeService);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 

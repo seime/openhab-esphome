@@ -26,6 +26,9 @@
 			<parameter-group name="bluetooth">
 				<label>Bluetooth proxy</label>
 			</parameter-group>
+			<parameter-group name="firmware">
+				<label>Firmware upgrading</label>
+			</parameter-group>
 
 			<parameter name="deviceId" type="text" required="true" groupName="network">
 				<label>ESPHome device ID</label>
@@ -130,6 +133,10 @@
 					yet supported. See https://bthome.io/</description>
 				<default>false</default>
 				<advanced>false</advanced>
+			</parameter>
+			<parameter name="configFileFullPath" type="text" required="false" groupName="firmware">
+				<label>Full path to ESPHome configuration file</label>
+				<description>Full path to the ESPHome configuration file, ie '/var/lib/esphome/configfolder/mydevice.yaml'</description>
 			</parameter>
 
 		</config-description>

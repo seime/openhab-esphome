@@ -48,4 +48,6 @@ public class ESPHomeConfiguration {
     public LogLevel deviceLogLevel = LogLevel.NONE;
 
     public boolean enableBluetoothProxy = false;
+
+    public String configFileFullPath;
 }

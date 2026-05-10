@@ -20,8 +20,8 @@ public abstract class AbstractESPHomeThingAction implements ThingActions {
 
     @Override
     public void setThingHandler(@Nullable ThingHandler handler) {
-        if (handler instanceof ESPHomeHandler bridgeHandler) {
-            this.handler = bridgeHandler;
+        if (handler instanceof ESPHomeHandler espHomeHandler) {
+            this.handler = espHomeHandler;
         }
     }
 

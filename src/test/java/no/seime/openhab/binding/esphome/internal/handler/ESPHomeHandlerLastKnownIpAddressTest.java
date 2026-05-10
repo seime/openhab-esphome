@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
@@ -26,6 +27,7 @@ import com.jano7.executor.KeySequentialExecutor;
 import io.esphome.api.DeviceInfoResponse;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
+import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -56,9 +58,12 @@ class ESPHomeHandlerLastKnownIpAddressTest {
         thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "device");
         executor = new MonitoredScheduledThreadPoolExecutor(1, Executors.defaultThreadFactory(), 1000);
         packetProcessorExecutor = Executors.newSingleThreadExecutor();
+
+        FirmwareUpgradeService firmwareUpgradeService = Mockito.mock(FirmwareUpgradeService.class);
+
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
-                bundleContext, mock(ESPHomeVersionService.class));
+                bundleContext, mock(ESPHomeVersionService.class), firmwareUpgradeService);
         handler.setCallback(callback);
     }
 

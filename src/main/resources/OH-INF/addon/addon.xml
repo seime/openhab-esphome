@@ -14,6 +14,16 @@
 				https://esphome.io/components/api#configuration-variables. Will be used as default if not configured on the device
 				thing.</description>
 		</parameter>
+		<parameter name="esphomeExecutable" type="text" required="false">
+			<label>Fully qualified path for 'esphome' binary</label>
+			<description>Used for firmware upgrades. Make sure you have given OH the necessary permissions to execute this
+				command.</description>
+		</parameter>
+		<parameter name="esphomeUpgradeExecutable" type="text" required="false">
+			<label>Fully qualified path to the command you use to upgrade esphome.</label>
+			<description>This depends on your package manager. If using homebrew, the correct command would be 'brew upgrade
+				esphome'. Make sure you have given OH the necessary permissions to execute this command.</description>
+		</parameter>
 
 	</config-description>
 

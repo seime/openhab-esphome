@@ -47,11 +47,11 @@ import com.jano7.executor.KeySequentialExecutor;
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 import no.seime.openhab.binding.esphome.internal.*;
-import no.seime.openhab.binding.esphome.internal.LogLevel;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
 import no.seime.openhab.binding.esphome.internal.handler.action.AbstractESPHomeThingAction;
 import no.seime.openhab.binding.esphome.internal.handler.action.DynamicThingActionsGenerator;
+import no.seime.openhab.binding.esphome.internal.handler.action.FirmwareUpgradeAction;
 import no.seime.openhab.binding.esphome.internal.message.*;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.EventSubscription;
@@ -85,9 +85,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final KeySequentialExecutor packetProcessor;
     private final EventPublisher eventPublisher;
     @Nullable
-    private final String defaultEncryptionKey;
+    private final String bindingPropertyDefaultEncryptionKey;
     private final BundleContext bundleContext;
     private final ESPHomeVersionService versionService;
+    private final FirmwareUpgradeService firmwareUpgradeService;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -119,8 +120,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
             ESPHomeEventSubscriber eventSubscriber, MonitoredScheduledThreadPoolExecutor executorService,
-            KeySequentialExecutor packetProcessor, EventPublisher eventPublisher, @Nullable String defaultEncryptionKey,
-            BundleContext bundleContext, ESPHomeVersionService versionService) {
+            KeySequentialExecutor packetProcessor, EventPublisher eventPublisher,
+            @Nullable String bindingPropertyDefaultEncryptionKey, BundleContext bundleContext,
+            ESPHomeVersionService versionService, FirmwareUpgradeService firmwareUpgradeService) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -130,9 +132,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.executorService = executorService;
         this.packetProcessor = packetProcessor;
         this.eventPublisher = eventPublisher;
-        this.defaultEncryptionKey = defaultEncryptionKey;
+        this.bindingPropertyDefaultEncryptionKey = bindingPropertyDefaultEncryptionKey;
         this.bundleContext = bundleContext;
         this.versionService = versionService;
+        this.firmwareUpgradeService = firmwareUpgradeService;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -274,8 +277,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 // Default to using the default encryption key from the binding if not set in device configuration
                 String encryptionKey = config.encryptionKey;
                 if (encryptionKey == null || encryptionKey.isEmpty()) {
-                    if (defaultEncryptionKey != null) {
-                        encryptionKey = defaultEncryptionKey;
+                    if (bindingPropertyDefaultEncryptionKey != null) {
+                        encryptionKey = bindingPropertyDefaultEncryptionKey;
                         logger.info("[{}] Using binding default encryption key", logPrefix);
                     } else {
                         logger.warn("[{}] No encryption key configured on neither binding nor thing. Cannot continue",
@@ -502,6 +505,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
             addFirmwareChannels();
 
+            thingActionServiceRegistrations.add(bundleContext.registerService(ThingActions.class,
+                    new FirmwareUpgradeAction(this), new Hashtable<>()));
+
             updateThing(editThing().withChannels(dynamicChannels).build());
             logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
             interrogated = true;
@@ -691,7 +697,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     logger.debug("[{}] Requesting device to send actions and events", logPrefix);
                     frameHelper.send(SubscribeHomeassistantServicesRequest.getDefaultInstance());
                 }
-                if (config.deviceLogLevel != LogLevel.NONE) {
+                if (config.deviceLogLevel != no.seime.openhab.binding.esphome.internal.LogLevel.NONE) {
                     logger.info("[{}] Starting to stream logs to logger " + DEVICE_LOGGER_NAME, logPrefix);
 
                     frameHelper.send(SubscribeLogsRequest.newBuilder()
@@ -968,5 +974,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         // Connection established
         CONNECTED
 
+    }
+
+    public FirmwareUpgradeService getFirmwareUpgradeService() {
+        return firmwareUpgradeService;
+    }
+
+    public ESPHomeVersionService getVersionService() {
+        return versionService;
     }
 }
