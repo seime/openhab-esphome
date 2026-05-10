@@ -24,8 +24,8 @@ public class EventDeviceTest extends AbstractESPHomeDeviceTest {
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
-        // 2 Events, 1 Switch
-        assertEquals(3, thingHandler.getDynamicChannels().size());
+        // 2 Events, 1 Switch + 2 for firmware
+        assertEquals(5, thingHandler.getDynamicChannels().size());
 
         ChannelUID switchChannelUID = new ChannelUID(thing.getUID(), "trigger_scene_dag");
         ChannelUID eventChannelUID = new ChannelUID(thing.getUID(), "scene_dag");
