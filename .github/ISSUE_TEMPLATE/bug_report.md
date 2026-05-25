@@ -17,8 +17,9 @@ assignees: ''
 - [ ] The output above is from the latest version obtained from https://github.com/seime/openhab-esphome/releases/tag/latest_oh4
 
 **OH Logs**
-- [ ] Binding logs from logger `no.seime.openhab.binding.esphome` at level `DEBUG` is attached
+- [ ] Binding logs from logger `no.seime.openhab.binding.esphome` at level `DEBUG` is attached (HOWTO: https://www.openhab.org/docs/administration/logging.html#defining-what-to-log)
 - [ ] If the issue is connectivity, I have included logs from binding startup to the issue has manifested itself
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
