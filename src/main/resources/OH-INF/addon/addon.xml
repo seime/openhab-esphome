@@ -6,6 +6,8 @@
 	<type>binding</type>
 	<name>ESPHome Binding</name>
 	<description>This is the binding for ESPHome native protocol.</description>
+	<connection>local</connection>
+	<service-id>binding.esphome</service-id>
 	<config-description>
 		<parameter name="defaultEncryptionKey" type="text" required="false">
 			<context>password</context>
@@ -26,5 +28,18 @@
 		</parameter>
 
 	</config-description>
+
+
+	<discovery-methods>
+		<discovery-method>
+			<service-type>mdns</service-type>
+			<discovery-parameters>
+				<discovery-parameter>
+					<name>mdnsServiceType</name>
+					<value>esphomelib._tcp.local.</value>
+				</discovery-parameter>
+			</discovery-parameters>
+		</discovery-method>
+	</discovery-methods>
 
 </addon:addon>
