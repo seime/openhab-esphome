@@ -94,6 +94,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Nullable
     private ScheduledFuture<?> pingWatchdogFuture;
     @Nullable
+    private ScheduledFuture<?> deepSleepWatchdogFuture;
+    @Nullable
     private ScheduledFuture<?> connectionTimeoutFuture;
     private Instant lastPong = Instant.now();
     @Nullable
@@ -199,11 +201,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         versionService.addListener(this);
 
-        exponentialBackoff = new ExponentialBackoff(config.reconnectInterval, config.maxReconnectInterval);
-        if (config.hostname != null && !config.hostname.isEmpty()) {
-            scheduleConnect(0);
+        if (config.deepSleep) {
+            updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Waiting for device to wake up from deep sleep");
         } else {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No hostname configured");
+            exponentialBackoff = new ExponentialBackoff(config.reconnectInterval, config.maxReconnectInterval);
+            if (config.hostname != null && !config.hostname.isEmpty()) {
+                scheduleConnect(0);
+            } else {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No hostname configured");
+            }
         }
     }
 
@@ -271,8 +277,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 applyLastKnownIpAddressPolicy(connectionTarget);
 
                 logger.info("[{}] Trying to connect to {}:{}", logPrefix, connectionTarget.logTarget(), port);
-                updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
-                        String.format("Connecting to %s:%d", connectionTarget.statusTarget(), port));
+                if (config.deepSleep && getThing().getStatus() != ThingStatus.ONLINE) {
+                    updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
+                            String.format("Connecting to %s:%d", connectionTarget.statusTarget(), port));
+                }
 
                 // Default to using the default encryption key from the binding if not set in device configuration
                 String encryptionKey = config.encryptionKey;
@@ -298,7 +306,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 connectionTimeoutFuture = executorService.schedule(() -> {
                     logger.warn("[{}] Connection attempt timed out after {} seconds.", logPrefix,
                             config.connectTimeout);
-                    handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, "Connection attempt timed out", true);
+                    handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, "Connection attempt timed out");
                 }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
 
             } catch (ProtocolException e) {
@@ -306,7 +314,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
                 connectionState = ConnectionState.UNINITIALIZED;
                 resolvedIpAddressForCurrentConnection = null;
-                scheduleConnect(exponentialBackoff.getNextDelay());
+
+                if (config.deepSleep) {
+                    logger.info("[{}] Error connecting to device in deep sleep mode. Will wait for next wakeup",
+                            logPrefix, e);
+                } else {
+                    scheduleConnect(exponentialBackoff.getNextDelay());
+                }
             }
         }
     }
@@ -415,36 +429,31 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void onEndOfStream(String message) {
         String reason = "ESPHome device abruptly closed connection: " + message;
-        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason, true);
+        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason);
     }
 
     @Override
     public void onParseError(CommunicationError error) {
-        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, error.toString(), true);
+        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, error.toString());
     }
 
     private void remoteDisconnect() {
+        if (config.deepSleep) {
+            logger.info("[{}] Disconnecting from device in deep sleep mode", logPrefix);
+            updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, "Deep sleep");
+            scheduleDeepSleepWatchdog();
+        }
         String reason = "ESPHome device requested disconnect";
-        handleDisconnection(ThingStatusDetail.NONE, reason, true);
+        handleDisconnection(ThingStatusDetail.NONE, reason);
     }
 
-    private void handleDisconnection(ThingStatusDetail detail, String message, boolean scheduleReconnect) {
+    private void handleDisconnection(ThingStatusDetail detail, String message) {
         synchronized (connectionStateLock) {
             if (connectionState == ConnectionState.UNINITIALIZED || disposed) {
                 return;
             }
 
-            int nextDelay = exponentialBackoff.getNextDelay();
-            String finalMessage = message;
-            if (scheduleReconnect) {
-                finalMessage = String.format("%s. Will reconnect in %d seconds", message, nextDelay);
-            }
-
-            logger.warn("[{}] Disconnecting. Reason: {}", logPrefix, finalMessage);
-            updateStatus(ThingStatus.OFFLINE, detail, finalMessage);
-
             eventSubscriber.removeEventSubscriptions(this);
-            setUndefToAllChannels();
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
 
@@ -456,13 +465,28 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             connectionState = ConnectionState.UNINITIALIZED;
             resolvedIpAddressForCurrentConnection = null;
 
-            if (scheduleReconnect) {
+            if (!config.deepSleep) {
+                setUndefToAllChannels();
+
+                int nextDelay = exponentialBackoff.getNextDelay();
+                String finalMessage = String.format("%s. Will reconnect in %d seconds", message, nextDelay);
+
+                logger.warn("[{}] Disconnecting. Reason: {}", logPrefix, finalMessage);
+                updateStatus(ThingStatus.OFFLINE, detail, finalMessage);
+
                 scheduleConnect(nextDelay);
             }
         }
     }
 
+    @Override
+    public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
+        handleDisconnection(ThingStatusDetail.CONFIGURATION_PENDING, "Configuration updated");
+    }
+
     private void handleConnected(GeneratedMessage message) throws ProtocolAPIError {
+        cancelDeepSleepWatchdog();
+
         if (logger.isDebugEnabled()) {
             // ToString method costs a bit
             logger.debug("[{}] Received message type {} with content '{}'", logPrefix,
@@ -476,7 +500,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             if (connectResponse.getInvalidPassword()) {
                 logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
 
-                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password", false);
+                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
             }
             return;
         }
@@ -498,6 +522,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 props.put("projectVersion", rsp.getProjectVersion());
             } else {
                 props.remove("projectVersion");
+            }
+
+            if (!rsp.getHasDeepSleep() && config.deepSleep) {
+                logger.warn(
+                        "[{}] Thing is configured with deep sleep, but the ESPHome device does not support it. Disabling deep sleep mode",
+                        logPrefix);
+                config.deepSleep = false;
             }
 
             updateThing(editThing().withProperties(props).build());
@@ -707,36 +738,40 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
                 updateStatus(ThingStatus.ONLINE);
                 logger.debug("[{}] Device login complete, starting device interrogation", logPrefix);
-                // Reset last pong
-                lastPong = Instant.now();
 
-                pingWatchdogFuture = executorService.scheduleAtFixedRate(() -> {
-                    synchronized (connectionStateLock) {
-                        if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval)
-                                .isBefore(Instant.now())) {
-                            logger.warn(
-                                    "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
-                                    logPrefix, config.maxPingTimeouts, config.pingInterval,
-                                    config.maxPingTimeouts * config.pingInterval, lastPong);
+                if (!config.deepSleep) {
+                    // Reset last pong
+                    lastPong = Instant.now();
 
-                            String reason = String.format(
-                                    "ESPHome did not respond to ping requests. %d pings sent with %d s delay",
-                                    config.maxPingTimeouts, config.pingInterval);
-                            handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason, true);
-                        } else {
-                            if (connectionState == ConnectionState.CONNECTED) {
-                                try {
-                                    logger.debug("[{}] Sending ping", logPrefix);
-                                    frameHelper.send(PingRequest.getDefaultInstance());
-                                } catch (ProtocolAPIError e) {
-                                    logger.warn("[{}] Error sending ping request", logPrefix, e);
+                    pingWatchdogFuture = executorService.scheduleAtFixedRate(() -> {
+                        synchronized (connectionStateLock) {
+                            if (lastPong.plusSeconds((long) config.maxPingTimeouts * config.pingInterval)
+                                    .isBefore(Instant.now())) {
+                                logger.warn(
+                                        "[{}] Ping responses lacking. Waited {} times {}s, total of {}s. Last pong received at {}. Assuming connection lost and disconnecting",
+                                        logPrefix, config.maxPingTimeouts, config.pingInterval,
+                                        config.maxPingTimeouts * config.pingInterval, lastPong);
+
+                                String reason = String.format(
+                                        "ESPHome did not respond to ping requests. %d pings sent with %d s delay",
+                                        config.maxPingTimeouts, config.pingInterval);
+                                handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, reason);
+                            } else {
+                                if (connectionState == ConnectionState.CONNECTED) {
+                                    try {
+                                        logger.debug("[{}] Sending ping", logPrefix);
+                                        frameHelper.send(PingRequest.getDefaultInstance());
+                                    } catch (ProtocolAPIError e) {
+                                        logger.warn("[{}] Error sending ping request", logPrefix, e);
+                                    }
                                 }
                             }
                         }
-                    }
-                }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS,
-                        String.format("[%s] Ping watchdog", logPrefix));
-
+                    }, config.pingInterval, config.pingInterval, TimeUnit.SECONDS,
+                            String.format("[%s] Ping watchdog", logPrefix));
+                } else {
+                    scheduleDeepSleepWatchdog();
+                }
                 // Clean up old channels and channel types
                 dynamicChannels.clear();
                 dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
@@ -753,6 +788,17 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.send(ListEntitiesRequest.getDefaultInstance());
                 frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
             }
+        }
+    }
+
+    private void scheduleDeepSleepWatchdog() {
+        cancelDeepSleepWatchdog();
+        if (config.deepSleepTimeoutSeconds > 0) {
+            deepSleepWatchdogFuture = executorService.schedule(() -> {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
+                        String.format("Device in deep sleep mode was not made connectable within timeout of %ds",
+                                config.deepSleepTimeoutSeconds));
+            }, config.deepSleepTimeoutSeconds, TimeUnit.SECONDS);
         }
     }
 
@@ -886,6 +932,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    private void cancelDeepSleepWatchdog() {
+        if (deepSleepWatchdogFuture != null) {
+            deepSleepWatchdogFuture.cancel(true);
+            deepSleepWatchdogFuture = null;
+        }
+    }
+
     private void cancelConnectFuture() {
         if (connectFuture != null) {
             connectFuture.cancel(true);
@@ -932,7 +985,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         logger.debug("[{}] Device reappeared via mDNS, connection state {}", logPrefix, connectionState);
         synchronized (connectionStateLock) {
             ScheduledFuture<?> cF = connectFuture;
-            if (connectionState == ConnectionState.UNINITIALIZED && (cF == null || cF.getDelay(TimeUnit.SECONDS) > 0)) {
+            if (connectionState == ConnectionState.UNINITIALIZED
+                    && (cF == null || cF.getDelay(TimeUnit.SECONDS) > 0 || config.deepSleep)) {
                 logger.info("[{}] Device reappeared via mDNS, triggering immediate reconnect", logPrefix);
                 exponentialBackoff.reset();
                 scheduleConnect(0);

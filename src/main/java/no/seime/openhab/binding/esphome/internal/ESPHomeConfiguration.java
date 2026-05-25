@@ -50,4 +50,8 @@ public class ESPHomeConfiguration {
     public boolean enableBluetoothProxy = false;
 
     public String configFileFullPath;
+
+    public boolean deepSleep = false;
+
+    public long deepSleepTimeoutSeconds;
 }
