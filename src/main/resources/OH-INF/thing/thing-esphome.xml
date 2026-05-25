@@ -6,7 +6,7 @@
 
 	<thing-type id="device">
 		<label>ESPHome Device</label>
-		<description>ESP32 / ESP8266 device flashed with ESPHome firmware. See esphome.io</description>
+		<description>Device flashed with ESPHome firmware. See esphome.io</description>
 		<representation-property>deviceId</representation-property>
 
 		<config-description>
@@ -64,18 +64,19 @@
 				<default>false</default>
 				<advanced>true</advanced>
 			</parameter>
-			<parameter name="deepSleepTimeoutSeconds" type="integer" min="600" required="false" groupName="deepSleep">
+			<parameter name="deepSleepTimeoutSeconds" type="integer" min="0" required="false" groupName="deepSleep">
 				<label>Deep sleep watchdog (seconds)</label>
-				<default>600</default>
-				<description>Watchdog interval in seconds for devices in deep sleep mode. The binding will wait this amount of
+				<default>3600</default>
+				<description>Watchdog interval in seconds for devices in deep sleep mode. The binding will wait this number of
 					seconds after the last
-					communication before assuming the device has failed to wake up and is offline. This is not a
-					reconnect interval as the binding will not attempt to reconnect until it sees the device wake up again (via mDNS
+					communication before assuming the device has failed to wake up and is indeed offline. This is
+					not a
+					reconnect interval as the binding will not attempt to reconnect until it sees the device wake up again (via
+					mDNS
 					announcement).
 				</description>
 				<advanced>true</advanced>
 			</parameter>
-
 
 			<parameter name="reconnectInterval" type="integer" min="1" required="false" groupName="timeout">
 				<label>Initial reconnect interval in seconds</label>
@@ -151,6 +152,7 @@
 				<default>NONE</default>
 				<advanced>true</advanced>
 			</parameter>
+
 			<parameter name="enableBluetoothProxy" type="boolean" required="false" groupName="bluetooth">
 				<label>Enable Bluetooth proxying (experimental)</label>
 				<description>Ensure your ESPHome configuration contains the bluetooth_proxy configuration element. Only works for
@@ -159,6 +161,7 @@
 				<default>false</default>
 				<advanced>false</advanced>
 			</parameter>
+
 			<parameter name="configFileFullPath" type="text" required="false" groupName="firmware">
 				<label>Full path to ESPHome configuration file</label>
 				<description>Full path to the ESPHome configuration file, ie '/var/lib/esphome/configfolder/mydevice.yaml'</description>

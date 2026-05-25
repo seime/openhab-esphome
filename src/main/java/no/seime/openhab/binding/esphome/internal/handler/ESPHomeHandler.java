@@ -793,11 +793,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private void scheduleDeepSleepWatchdog() {
         cancelDeepSleepWatchdog();
-        deepSleepWatchdogFuture = executorService.schedule(() -> {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
-                    String.format("Device in deep sleep mode was not made connectable within timeout of %ds",
-                            config.deepSleepTimeoutSeconds));
-        }, config.deepSleepTimeoutSeconds, TimeUnit.SECONDS);
+        if (config.deepSleepTimeoutSeconds > 0) {
+            deepSleepWatchdogFuture = executorService.schedule(() -> {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
+                        String.format("Device in deep sleep mode was not made connectable within timeout of %ds",
+                                config.deepSleepTimeoutSeconds));
+            }, config.deepSleepTimeoutSeconds, TimeUnit.SECONDS);
+        }
     }
 
     private ResolvedConnectionTarget resolveConnectionTarget(String configuredHostname) throws ProtocolAPIError {
