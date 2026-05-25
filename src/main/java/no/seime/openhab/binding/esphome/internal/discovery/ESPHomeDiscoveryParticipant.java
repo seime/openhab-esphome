@@ -60,10 +60,11 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
     @Override
     public @Nullable DiscoveryResult createResult(ServiceInfo service) {
         String application = service.getApplication();
-        if ("esphomelib".equals(application)) {
+        String board = service.getPropertyString("board");
+        if ("esphomelib".equals(application) && board != null) {
             String friendlyName = service.getPropertyString("friendly_name");
             String name = service.getName();
-            String board = service.getPropertyString("board");
+            // Might be null before service discovery is complete, so await
             String label = String.format("%s / %s", friendlyName != null ? friendlyName : name, board);
 
             final ThingUID deviceUID = getThingUID(service);
