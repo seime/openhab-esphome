@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,17 +38,14 @@ import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 import no.seime.openhab.binding.esphome.internal.handler.ESPStateDescriptionProvider;
-import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThreadPoolExecutor;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 public abstract class AbstractESPHomeDeviceTest {
 
-    private final MonitoredScheduledThreadPoolExecutor executor = new MonitoredScheduledThreadPoolExecutor(2,
-            r -> new Thread(r), 1000);
-    private final MonitoredScheduledThreadPoolExecutor packetProcessor = new MonitoredScheduledThreadPoolExecutor(1,
-            r -> new Thread(r), 1000);
+    private final MonitoredCompositeExecutorService executor = new MonitoredCompositeExecutorService(
+            Executors.newScheduledThreadPool(1), (ThreadPoolExecutor) Executors.newCachedThreadPool(), 1000);
     private final List<Item> registryItems = new ArrayList<>();
     protected ESPHomeHandler thingHandler;
     protected ThingHandlerCallback thingHandlerCallback;

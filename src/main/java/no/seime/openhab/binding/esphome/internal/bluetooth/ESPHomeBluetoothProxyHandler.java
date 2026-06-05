@@ -25,8 +25,8 @@ import com.neovisionaries.bluetooth.ble.advertising.LocalName;
 
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.MonitoredCompositeExecutorService;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
-import no.seime.openhab.binding.esphome.internal.handler.MonitoredScheduledThreadPoolExecutor;
 
 @NonNullByDefault
 public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler<ESPHomeBluetoothDevice> {
@@ -50,7 +50,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private final Map<ESPHomeBluetoothDevice, ESPHomeHandler> connectionMap = new ConcurrentHashMap<>();
 
-    private final MonitoredScheduledThreadPoolExecutor executor;
+    private final MonitoredCompositeExecutorService executor;
 
     /**
      * Creates a new instance of this class for the {@link Thing}.
@@ -60,7 +60,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
      * @param executor
      */
     public ESPHomeBluetoothProxyHandler(Bridge bridge, ThingRegistry thingRegistry,
-            MonitoredScheduledThreadPoolExecutor executor) {
+            MonitoredCompositeExecutorService executor) {
         super(bridge);
         this.thingRegistry = thingRegistry;
         this.executor = executor;

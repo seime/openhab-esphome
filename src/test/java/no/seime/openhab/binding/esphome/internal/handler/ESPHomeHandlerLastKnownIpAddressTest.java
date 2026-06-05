@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,10 +26,7 @@ import org.osgi.framework.BundleContext;
 import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.DeviceInfoResponse;
-import no.seime.openhab.binding.esphome.internal.BindingConstants;
-import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
-import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
-import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
+import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -51,14 +49,15 @@ class ESPHomeHandlerLastKnownIpAddressTest {
 
     private ESPHomeHandler handler;
     private ThingImpl thing;
-    private MonitoredScheduledThreadPoolExecutor executor;
+    private MonitoredCompositeExecutorService executor;
     private ExecutorService packetProcessorExecutor;
 
     @BeforeEach
     void setUp() throws Exception {
         thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "device");
 
-        executor = new MonitoredScheduledThreadPoolExecutor(1, Executors.defaultThreadFactory(), 1000);
+        executor = new MonitoredCompositeExecutorService(Executors.newScheduledThreadPool(1),
+                (ThreadPoolExecutor) Executors.newCachedThreadPool(), 1000);
         packetProcessorExecutor = Executors.newSingleThreadExecutor();
 
         FirmwareUpgradeService firmwareUpgradeService = Mockito.mock(FirmwareUpgradeService.class);

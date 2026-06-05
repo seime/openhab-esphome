@@ -45,6 +45,10 @@ The binding uses mDNS to automatically discover devices on the network.
 
 ## Binding Configuration
 
+Configuration file to use: `$OH_CONFDIR/services/runtime.cfg` .
+
+### Common encryption key for all devices
+
 It is possible to set a default encryption key for all devices in the binding configuration. This is useful if you
 have a lot of devices using the same encryption key. If you are using file based config, add
 
@@ -52,7 +56,14 @@ have a lot of devices using the same encryption key. If you are using file based
 binding.esphome:defaultEncryptionKey=<BASE64ENCODEDKEY>
 ```
 
-to `$OH_CONFDIR/services/runtime.cfg` .
+### Thread pool size
+
+The internal threadpool defaults to maximum `numProcessors * 2` threads. If you have a lot of devices, you may want to
+increase this. You can do this by setting the `maxPoolSize` parameter in the binding configuration.
+
+```
+binding.esphome:maxPoolSize=20
+```
 
 ## Always connected devices vs. battery-powered / deep sleep devices.
 

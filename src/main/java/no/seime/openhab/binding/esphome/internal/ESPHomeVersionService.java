@@ -5,7 +5,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -37,18 +36,19 @@ public class ESPHomeVersionService {
 
     private @Nullable String latestVersion;
 
-    private final ScheduledExecutorService scheduler;
+    private final MonitoredCompositeExecutorService scheduler;
 
     private @Nullable ScheduledFuture<?> scheduledFuture;
 
     private final List<ESPHomeVersionListener> listeners = new CopyOnWriteArrayList<>();
 
-    public ESPHomeVersionService(ScheduledExecutorService scheduler) {
+    public ESPHomeVersionService(MonitoredCompositeExecutorService scheduler) {
         this.scheduler = scheduler;
     }
 
     public void start() {
-        scheduledFuture = scheduler.scheduleWithFixedDelay(this::fetchVersion, 0, 24, TimeUnit.HOURS);
+        scheduledFuture = scheduler.scheduleWithFixedDelay(this::fetchVersion, 0, 24, TimeUnit.HOURS,
+                "New ESPHome version fetcher", 10000);
     }
 
     public void stop() {

@@ -81,7 +81,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
     private final List<Channel> dynamicChannels = new CopyOnWriteArrayList<>();
     private final ESPHomeEventSubscriber eventSubscriber;
-    private final MonitoredScheduledThreadPoolExecutor executorService;
+    private final MonitoredCompositeExecutorService executorService;
     private final KeySequentialExecutor packetProcessor;
     private final EventPublisher eventPublisher;
     @Nullable
@@ -121,7 +121,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
-            ESPHomeEventSubscriber eventSubscriber, MonitoredScheduledThreadPoolExecutor executorService,
+            ESPHomeEventSubscriber eventSubscriber, MonitoredCompositeExecutorService executorService,
             KeySequentialExecutor packetProcessor, EventPublisher eventPublisher,
             @Nullable String bindingPropertyDefaultEncryptionKey, BundleContext bundleContext,
             ESPHomeVersionService versionService, FirmwareUpgradeService firmwareUpgradeService) {

@@ -14,11 +14,10 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.StringUtils;
-import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
 import org.openhab.core.events.EventPublisher;
@@ -39,6 +38,7 @@ import com.jano7.executor.KeySequentialExecutor;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
+import no.seime.openhab.binding.esphome.internal.MonitoredCompositeExecutorService;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -49,7 +49,6 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHo
  *
  * @author Arne Seime - Initial contribution
  */
-@NonNullByDefault
 @Component(configurationPid = "binding.esphome", service = { ThingHandlerFactory.class, ESPHomeHandlerFactory.class })
 public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
@@ -57,16 +56,10 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE,
             BindingConstants.THING_TYPE_BLE_PROXY);
-    public FirmwareUpgradeService firmwareUpgradeService;
 
     private @Nullable String bindingPropertyDefaultEncryptionKey;
 
     private final AtomicLong threadCounter = new AtomicLong(0);
-
-    @Override
-    public boolean supportsThingType(ThingTypeUID thingTypeUID) {
-        return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
-    }
 
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private final ESPStateDescriptionProvider stateDescriptionProvider;
@@ -74,10 +67,11 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final ThingRegistry thingRegistry;
     private final EventPublisher eventPublisher;
-    private final MonitoredScheduledThreadPoolExecutor scheduler;
-    private final KeySequentialExecutor packetExecutor;
-    private final ConnectionSelector connectionSelector;
-    private final ESPHomeVersionService versionService;
+    private MonitoredCompositeExecutorService scheduler;
+    private KeySequentialExecutor packetExecutor;
+    private ConnectionSelector connectionSelector;
+    private ESPHomeVersionService versionService;
+    public FirmwareUpgradeService firmwareUpgradeService;
 
     private final Map<ThingUID, ESPHomeHandler> esphomeHandlers = new ConcurrentHashMap<>();
 
@@ -85,29 +79,13 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPStateDescriptionProvider stateDescriptionProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry,
-            @Reference EventPublisher eventPublisher) throws IOException {
-        scheduler = new MonitoredScheduledThreadPoolExecutor(4, r -> {
-            long currentCount = threadCounter.incrementAndGet();
-            logger.debug("Creating new worker thread {} for scheduler", currentCount);
-            Thread t = new Thread(r);
-            t.setDaemon(true);
-            t.setName("ESPHome Thing Scheduler " + currentCount);
-            return t;
-        }, 300);
-
-        packetExecutor = new KeySequentialExecutor(scheduler);
+            @Reference EventPublisher eventPublisher) {
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         this.stateDescriptionProvider = stateDescriptionProvider;
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
         this.eventPublisher = eventPublisher;
-
-        connectionSelector = new ConnectionSelector();
-
-        versionService = new ESPHomeVersionService(scheduler);
-
-        firmwareUpgradeService = new FirmwareUpgradeService();
     }
 
     @Override
@@ -131,23 +109,78 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     }
 
     @Override
+    public boolean supportsThingType(ThingTypeUID thingTypeUID) {
+        return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
+    }
+
+    @Override
     protected void activate(ComponentContext componentContext) {
         super.activate(componentContext);
-        connectionSelector.start();
-        versionService.start();
+
         Dictionary<String, Object> properties = componentContext.getProperties();
-        bindingPropertyDefaultEncryptionKey = StringUtils.trimToNull((String) properties.get("defaultEncryptionKey"));
-        if (bindingPropertyDefaultEncryptionKey != null) {
-            logger.info(
-                    "Found binding default encryption key for ESPHome devices, will use if not configured on thing");
+
+        try {
+
+            // Read configuration
+            int maxPoolSize = Runtime.getRuntime().availableProcessors() * 2;
+            if (properties.get("maxPoolSize") != null) {
+                try {
+                    maxPoolSize = Integer.parseInt(properties.get("maxPoolSize").toString());
+                } catch (NumberFormatException e) {
+                    logger.warn("Invalid maxPoolSize property '{}', using default {}", properties.get("maxPoolSize"),
+                            maxPoolSize);
+                }
+            }
+
+            bindingPropertyDefaultEncryptionKey = StringUtils
+                    .trimToNull((String) properties.get("defaultEncryptionKey"));
+            if (bindingPropertyDefaultEncryptionKey != null) {
+                logger.info(
+                        "Found binding default encryption key for ESPHome devices, will use if not configured on thing");
+            }
+
+            String bindingPropertyEspHomeExecutable = StringUtils
+                    .trimToNull((String) properties.get("esphomeExecutable"));
+            String bindingPropertyEspHomeUpgradeExecutable = StringUtils
+                    .trimToNull((String) properties.get("esphomeUpgradeExecutable"));
+
+            // Thread pool setup
+            ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1, r -> {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                t.setName("ESPHome Thing Scheduler");
+                return t;
+            });
+
+            ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(4, maxPoolSize, 60L, TimeUnit.SECONDS,
+                    new SynchronousQueue<>(), r -> {
+                        long currentCount = threadCounter.incrementAndGet();
+                        logger.debug("Creating new worker thread {} for scheduler", currentCount);
+                        Thread t = new Thread(r);
+                        t.setDaemon(true);
+                        t.setName("ESPHome Thing Executor " + currentCount);
+                        return t;
+                    });
+
+            scheduler = new MonitoredCompositeExecutorService(scheduledExecutorService, threadPoolExecutor, 300);
+
+            // Other
+            packetExecutor = new KeySequentialExecutor(scheduler);
+
+            connectionSelector = new ConnectionSelector();
+
+            versionService = new ESPHomeVersionService(scheduler);
+
+            firmwareUpgradeService = new FirmwareUpgradeService();
+
+            connectionSelector.start();
+            versionService.start();
+
+            firmwareUpgradeService.setBindingPropertyEspHomeExecutable(bindingPropertyEspHomeExecutable);
+            firmwareUpgradeService.setBindingPropertyEspHomeUpgradeExecutable(bindingPropertyEspHomeUpgradeExecutable);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to initialize ESPHome binding", e);
         }
-
-        String bindingPropertyEspHomeExecutable = StringUtils.trimToNull((String) properties.get("esphomeExecutable"));
-        String bindingPropertyEspHomeUpgradeExecutable = StringUtils
-                .trimToNull((String) properties.get("esphomeUpgradeExecutable"));
-
-        firmwareUpgradeService.setBindingPropertyEspHomeExecutable(bindingPropertyEspHomeExecutable);
-        firmwareUpgradeService.setBindingPropertyEspHomeUpgradeExecutable(bindingPropertyEspHomeUpgradeExecutable);
     }
 
     @Override
@@ -155,6 +188,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         connectionSelector.stop();
         versionService.stop();
         scheduler.shutdown();
+
         try {
             scheduler.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
         } catch (InterruptedException e) {
