@@ -39,8 +39,8 @@ public class DynamicThingActionsGenerator {
 
         String methodName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, rsp.getName());
         String classNameAsString = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, rsp.getName());
-        String label = rsp.getName();
-        String description = String.format("Executes the '%s' action on the device", rsp.getName());
+        String label = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, rsp.getName().replace("_", " "));
+        String description = String.format("Executes the api.actions.'%s' action on the device", rsp.getName());
 
         // Define ThingAction implementation class
         AnnotationDescription componentAnnotation = AnnotationDescription.Builder.ofType(Component.class)
@@ -48,7 +48,7 @@ public class DynamicThingActionsGenerator {
                 .defineTypeArray("service", TypeDescription.ForLoadedType.of(ThingActions.class)).build();
 
         AnnotationDescription thingScopeAction = AnnotationDescription.Builder.ofType(ThingActionsScope.class)
-                .define("name", "esphome").build();
+                .define("name", "esphome-" + rsp.getName()).build();
 
         String className = String.format("no.seime.openhab.binding.esphome.internal.handler.action.%s",
                 classNameAsString);

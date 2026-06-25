@@ -17,7 +17,7 @@ import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
-@ThingActionsScope(name = "esphome")
+@ThingActionsScope(name = "esphome-firmware-upgrade")
 @NonNullByDefault
 public class FirmwareUpgradeAction implements ThingActions {
 
