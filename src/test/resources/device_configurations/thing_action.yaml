@@ -24,3 +24,9 @@ api:
       then:
         - logger.log:
             format: Performing snake_case_action.
+    - action: simple_action
+      variables:
+        bool_parameter: bool
+      then:
+        - logger.log:
+            format: Performing simple_action.
