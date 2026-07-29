@@ -146,9 +146,8 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
             return new FakeScheduledFuture<>(executor.submit(
                     new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true)));
         }
-        return new CompondScheduledFuture<>(scheduler.schedule(
-                () -> executor.submit(
-                        new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true)),
+        return new CompondScheduledFuture<>(scheduler.schedule(() -> submitOrLog(
+                new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true), null),
                 delay, unit));
     }
 
@@ -157,7 +156,27 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
         if (delay <= 0L) {
             return new FakeScheduledFuture<>(executor.submit(callable));
         }
-        return new CompondScheduledFuture<>(scheduler.schedule(() -> executor.submit(callable), delay, unit));
+        return new CompondScheduledFuture<>(scheduler.schedule(() -> submitOrLog(callable, null), delay, unit));
+    }
+
+    private <V> Future<V> submitOrLog(Callable<V> task, @Nullable String callerSignature) {
+        try {
+            return executor.submit(task);
+        } catch (RejectedExecutionException e) {
+            logger.warn("Task '{}' rejected by executor: {}", callerSignature != null ? callerSignature : "<unnamed>",
+                    e.getMessage());
+            throw e;
+        }
+    }
+
+    private Future<?> submitOrLog(Runnable task, @Nullable String callerSignature) {
+        try {
+            return executor.submit(task);
+        } catch (RejectedExecutionException e) {
+            logger.warn("Task '{}' rejected by executor: {}", callerSignature != null ? callerSignature : "<unnamed>",
+                    e.getMessage());
+            throw e;
+        }
     }
 
     @Override
@@ -207,12 +226,16 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
     public @Nullable ScheduledFuture<?> schedule(Runnable command, int delay, TimeUnit timeUnit, String callerSignature,
             long maxExecutionTimeMs) {
         if (delay <= 0L) {
-            return new FakeScheduledFuture<>(executor.submit(
-                    new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, callerSignature, false)));
+            return new FakeScheduledFuture<>(submitOrLog(
+                    new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, callerSignature, false),
+                    callerSignature));
         }
-        return new CompondScheduledFuture<>(scheduler.schedule(() -> executor.submit(
-                new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, callerSignature, false)), delay,
-                timeUnit));
+        return new CompondScheduledFuture<>(
+                scheduler
+                        .schedule(
+                                () -> submitOrLog(new TimedRunnable(command, getStackTraceElements(),
+                                        maxExecutionTimeMs, callerSignature, false), callerSignature),
+                                delay, timeUnit));
     }
 
     private class FakeScheduledFuture<V> implements ScheduledFuture<V> {
