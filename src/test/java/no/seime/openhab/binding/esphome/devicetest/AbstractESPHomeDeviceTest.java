@@ -5,6 +5,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -13,6 +14,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +45,7 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHo
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+@Execution(ExecutionMode.CONCURRENT)
 public abstract class AbstractESPHomeDeviceTest {
 
     private final MonitoredCompositeExecutorService executor = new MonitoredCompositeExecutorService(
@@ -66,14 +70,15 @@ public abstract class AbstractESPHomeDeviceTest {
     public void setUp() throws Exception {
         registryItems.clear();
 
-        emulator = new ESPHomeDeviceRunner(getEspDeviceConfigurationYamlFileName());
+        int apiPort = pickFreePort();
+        emulator = new ESPHomeDeviceRunner(getEspDeviceConfigurationYamlFileName(), apiPort);
         emulator.compileAndRun();
 
         deviceConfiguration = new ESPHomeConfiguration();
         deviceConfiguration.hostname = "localhost";
-        deviceConfiguration.port = 6053;
+        deviceConfiguration.port = apiPort;
         deviceConfiguration.encryptionKey = "TiFvlzL9tNB29cys/ZR4o+YYHvwawrTF8csI13hZaPw=";
-        deviceConfiguration.deviceId = "virtual";
+        deviceConfiguration.deviceId = emulator.getDeviceName();
         deviceConfiguration.deviceLogLevel = LogLevel.VERY_VERBOSE;
         when(configuration.as(ESPHomeConfiguration.class)).thenReturn(deviceConfiguration);
 
@@ -113,6 +118,12 @@ public abstract class AbstractESPHomeDeviceTest {
     }
 
     protected abstract File getEspDeviceConfigurationYamlFileName();
+
+    private static int pickFreePort() throws Exception {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        }
+    }
 
     @AfterEach
     public void shutdown() throws InterruptedException {
