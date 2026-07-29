@@ -41,6 +41,7 @@ import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
 import no.seime.openhab.binding.esphome.internal.MonitoredCompositeExecutorService;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
+import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 /**
@@ -64,6 +65,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private final ESPStateDescriptionProvider stateDescriptionProvider;
     private final ESPHomeEventSubscriber eventSubscriber;
+    private final ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
 
     private final ThingRegistry thingRegistry;
     private final EventPublisher eventPublisher;
@@ -79,13 +81,14 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
             @Reference ESPStateDescriptionProvider stateDescriptionProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry,
-            @Reference EventPublisher eventPublisher) {
+            @Reference EventPublisher eventPublisher, @Reference ESPHomeMDNSHostnameResolver mdnsHostnameResolver) {
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         this.stateDescriptionProvider = stateDescriptionProvider;
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
         this.eventPublisher = eventPublisher;
+        this.mdnsHostnameResolver = mdnsHostnameResolver;
     }
 
     @Override
@@ -95,7 +98,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
-                    bindingPropertyDefaultEncryptionKey, getBundleContext(), versionService, firmwareUpgradeService);
+                    bindingPropertyDefaultEncryptionKey, getBundleContext(), versionService, firmwareUpgradeService,
+                    mdnsHostnameResolver);
             esphomeHandlers.put(thing.getUID(), handler);
             return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {

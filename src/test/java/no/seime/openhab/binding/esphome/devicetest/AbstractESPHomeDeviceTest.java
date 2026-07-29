@@ -38,6 +38,7 @@ import com.jano7.executor.KeySequentialExecutor;
 import no.seime.openhab.binding.esphome.deviceutil.ESPHomeDeviceRunner;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
+import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 import no.seime.openhab.binding.esphome.internal.handler.ESPStateDescriptionProvider;
@@ -64,6 +65,7 @@ public abstract class AbstractESPHomeDeviceTest {
     protected @Mock ESPChannelTypeProvider channelTypeProvider;
     protected @Mock ESPStateDescriptionProvider stateDescriptionProvider;
     protected @Mock BundleContext bundleContext;
+    protected @Mock ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
     private ESPHomeDeviceRunner emulator;
 
     @BeforeEach
@@ -110,7 +112,7 @@ public abstract class AbstractESPHomeDeviceTest {
 
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, bundleContext,
-                versionService, firmwareUpgradeService);
+                versionService, firmwareUpgradeService, mdnsHostnameResolver);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 
