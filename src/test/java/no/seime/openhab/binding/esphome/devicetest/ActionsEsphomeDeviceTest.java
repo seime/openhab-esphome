@@ -28,8 +28,8 @@ public class ActionsEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_action"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createActionEvent("virtual", "some.action",
-                Map.of("entity_id", "Something"), Map.of(), Map.of()));
+        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createActionEvent(deviceConfiguration.deviceId,
+                "some.action", Map.of("entity_id", "Something"), Map.of(), Map.of()));
 
         thingHandler.dispose();
     }
@@ -42,8 +42,8 @@ public class ActionsEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_event"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000)).post(
-                ESPHomeEventFactory.createEventEvent("virtual", "esphome.something", Map.of(), Map.of(), Map.of()));
+        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createEventEvent(deviceConfiguration.deviceId,
+                "esphome.something", Map.of(), Map.of(), Map.of()));
 
         thingHandler.dispose();
     }
@@ -56,7 +56,8 @@ public class ActionsEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_tag"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createTagScannedEvent("virtual", "mytag"));
+        verify(eventPublisher, timeout(2000))
+                .post(ESPHomeEventFactory.createTagScannedEvent(deviceConfiguration.deviceId, "mytag"));
 
         thingHandler.dispose();
     }

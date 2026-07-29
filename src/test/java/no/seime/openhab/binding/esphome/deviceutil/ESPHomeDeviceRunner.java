@@ -1,10 +1,13 @@
 package no.seime.openhab.binding.esphome.deviceutil;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,19 +16,39 @@ public class ESPHomeDeviceRunner {
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeDeviceRunner.class);
 
+    private static final Pattern NAME_PATTERN = Pattern.compile("^\\s{2}name:\\s*(\\S+)\\s*$", Pattern.MULTILINE);
+
     private final ExecutorService executorService = Executors.newFixedThreadPool(1);
     private final File espDeviceConfigurationYamlFileName;
+    private final int apiPort;
+    private final String deviceName;
     private Process emulatorProcess;
 
-    public ESPHomeDeviceRunner(File espDeviceConfigurationYamlFileName) {
+    public ESPHomeDeviceRunner(File espDeviceConfigurationYamlFileName, int apiPort) throws IOException {
         this.espDeviceConfigurationYamlFileName = espDeviceConfigurationYamlFileName;
+        this.apiPort = apiPort;
+        this.deviceName = extractDeviceName(espDeviceConfigurationYamlFileName);
+    }
+
+    private static String extractDeviceName(File yaml) throws IOException {
+        String content = Files.readString(yaml.toPath());
+        int esphomeIdx = content.indexOf("esphome:");
+        if (esphomeIdx < 0) {
+            throw new IOException("No 'esphome:' section in " + yaml);
+        }
+        Matcher m = NAME_PATTERN.matcher(content.substring(esphomeIdx));
+        if (!m.find()) {
+            throw new IOException("Could not find 'name:' under 'esphome:' in " + yaml);
+        }
+        return m.group(1);
     }
 
     public void compileAndRun() throws IOException {
 
         ProcessBuilder compilationBuilder = new ProcessBuilder();
         compilationBuilder.redirectErrorStream(true);
-        compilationBuilder.command("esphome", "compile", espDeviceConfigurationYamlFileName.getPath());
+        compilationBuilder.command("esphome", "-s", "api_port", String.valueOf(apiPort), "compile",
+                espDeviceConfigurationYamlFileName.getPath());
         Consumer<String> compilationListener = s -> {
             logger.info("{}", s);
         };
@@ -42,10 +65,12 @@ public class ESPHomeDeviceRunner {
             }
 
             // Now launch the compiled binary
-            logger.info("ESPHome compilation completed successfully, now starting emulator");
+            logger.info("ESPHome compilation completed successfully for {} on port {}, now starting emulator",
+                    deviceName, apiPort);
 
             File parentFile = espDeviceConfigurationYamlFileName.getParentFile();
-            File emulatorBinary = new File(parentFile, ".esphome/build/virtual/.pioenvs/virtual/program");
+            File emulatorBinary = new File(parentFile,
+                    ".esphome/build/" + deviceName + "/.pioenvs/" + deviceName + "/program");
             if (!emulatorBinary.exists()) {
                 throw new RuntimeException("Compiled binary not found in " + emulatorBinary);
             }
@@ -54,13 +79,13 @@ public class ESPHomeDeviceRunner {
             emulatorBuilder.redirectErrorStream(true);
             emulatorProcess = emulatorBuilder.start();
             emulatorProcess.onExit().thenRun(() -> {
-                logger.info("ESPHome emulator exited");
+                logger.info("ESPHome emulator {} exited", deviceName);
             });
 
             // For some reason cannot get console output from the emulator, so just wait a second before proceeding.
             // Startup is quick
             Thread.sleep(2000);
-            logger.info("ESPHome emulator started successfully");
+            logger.info("ESPHome emulator {} started successfully on port {}", deviceName, apiPort);
 
         } catch (InterruptedException e) {
             logger.error("Interrupted while waiting for ESPHome to start", e);
@@ -68,6 +93,10 @@ public class ESPHomeDeviceRunner {
             throw new RuntimeException("Interrupted while waiting for ESPHome to start", e);
 
         }
+    }
+
+    public String getDeviceName() {
+        return deviceName;
     }
 
     public void shutdown() throws InterruptedException {

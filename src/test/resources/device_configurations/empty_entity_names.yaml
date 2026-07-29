@@ -1,5 +1,8 @@
+substitutions:
+  api_port: "6053"
+
 esphome:
-  name: virtual
+  name: virtual_empty
   friendly_name: Virtual
 
 host:
@@ -9,6 +12,7 @@ logger:
   level: VERY_VERBOSE
 
 api:
+  port: ${api_port}
   encryption:
     key: !secret emulator_encryption_key
 
