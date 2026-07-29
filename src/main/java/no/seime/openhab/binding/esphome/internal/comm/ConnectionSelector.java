@@ -56,8 +56,8 @@ public class ConnectionSelector {
 
     private void processKey(SelectionKey key) {
         EncryptedFrameHelper frameHelper = (EncryptedFrameHelper) key.attachment();
-        logger.trace("Processing key readable={}, connectable={}", key.isReadable(), key.isConnectable());
         try {
+            logger.trace("Processing key readable={}, connectable={}", key.isReadable(), key.isConnectable());
             SocketChannel channel = (SocketChannel) key.channel();
             if (key.isConnectable() && channel.isConnectionPending()) {
                 boolean connected = channel.finishConnect();
