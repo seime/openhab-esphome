@@ -29,6 +29,7 @@ import io.esphome.api.DeviceInfoResponse;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
+import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,6 +47,8 @@ class ESPHomeHandlerLastKnownIpAddressTest {
     private BundleContext bundleContext;
     @Mock
     private ThingHandlerCallback callback;
+    @Mock
+    private ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
 
     private ESPHomeHandler handler;
     private ThingImpl thing;
@@ -64,7 +67,7 @@ class ESPHomeHandlerLastKnownIpAddressTest {
 
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
-                bundleContext, mock(ESPHomeVersionService.class), firmwareUpgradeService);
+                bundleContext, mock(ESPHomeVersionService.class), firmwareUpgradeService, mdnsHostnameResolver);
 
         setField("config", new ESPHomeConfiguration());
 

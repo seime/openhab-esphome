@@ -49,6 +49,7 @@ import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
+import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.handler.action.AbstractESPHomeThingAction;
 import no.seime.openhab.binding.esphome.internal.handler.action.DynamicThingActionsGenerator;
 import no.seime.openhab.binding.esphome.internal.handler.action.FirmwareUpgradeAction;
@@ -89,6 +90,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final BundleContext bundleContext;
     private final ESPHomeVersionService versionService;
     private final FirmwareUpgradeService firmwareUpgradeService;
+    private final ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -124,7 +126,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             ESPHomeEventSubscriber eventSubscriber, MonitoredCompositeExecutorService executorService,
             KeySequentialExecutor packetProcessor, EventPublisher eventPublisher,
             @Nullable String bindingPropertyDefaultEncryptionKey, BundleContext bundleContext,
-            ESPHomeVersionService versionService, FirmwareUpgradeService firmwareUpgradeService) {
+            ESPHomeVersionService versionService, FirmwareUpgradeService firmwareUpgradeService,
+            ESPHomeMDNSHostnameResolver mdnsHostnameResolver) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -138,6 +141,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.bundleContext = bundleContext;
         this.versionService = versionService;
         this.firmwareUpgradeService = firmwareUpgradeService;
+        this.mdnsHostnameResolver = mdnsHostnameResolver;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -808,6 +812,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             String configuredIpAddress = configuredAddress.getHostAddress();
             return new ResolvedConnectionTarget(configuredIpAddress, configuredIpAddress, configuredHostname,
                     configuredHostname, false);
+        }
+
+        Optional<String> mdnsIp = mdnsHostnameResolver.resolve(configuredHostname);
+        if (mdnsIp.isPresent()) {
+            String ip = mdnsIp.get();
+            logger.debug("[{}] Resolved '{}' via mDNS cache to {}", logPrefix, configuredHostname, ip);
+            return new ResolvedConnectionTarget(ip, ip, configuredHostname + " (mDNS " + ip + ")", configuredHostname,
+                    true);
         }
 
         try {
