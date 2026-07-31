@@ -50,6 +50,6 @@ public class SelectMessageHandler extends AbstractMessageHandler<ListEntitiesSel
     @Override
     public void handleState(SelectStateResponse rsp) {
         findChannelByKey(rsp.getKey()).ifPresent(channel -> handler.updateState(channel.getUID(),
-                rsp.getMissingState() ? UnDefType.UNDEF : new StringType(rsp.getState())));
+                rsp.getMissingState() ? UnDefType.NULL : new StringType(rsp.getState())));
     }
 }

@@ -67,7 +67,7 @@ public class TimeMessageHandler extends AbstractMessageHandler<ListEntitiesTimeR
 
     protected State toTimeState(int hour, int minute, int second, boolean missingState) {
         if (missingState) {
-            return UnDefType.UNDEF;
+            return UnDefType.NULL;
         } else {
             return new QuantityType<>(hour * 3600 + minute * 60 + second, Units.SECOND);
         }
