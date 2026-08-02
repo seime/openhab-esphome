@@ -12,7 +12,6 @@
 		<config-description>
 			<parameter-group name="network">
 				<label>Device address</label>
-				<context>network-address</context>
 			</parameter-group>
 			<parameter-group name="haActions">
 				<label>Actions</label>
@@ -39,12 +38,10 @@
 					ESPHome device configuration yaml</description>
 			</parameter>
 			<parameter name="hostname" type="text" required="true" groupName="network">
-				<context>network-address</context>
 				<label>Hostname</label>
 				<description>Hostname or IP address of the device</description>
 			</parameter>
 			<parameter name="port" type="integer" min="1" max="65500" required="false" groupName="network">
-				<context>network-address</context>
 				<label>Port</label>
 				<default>6053</default>
 				<description>IP Port number of the device</description>
