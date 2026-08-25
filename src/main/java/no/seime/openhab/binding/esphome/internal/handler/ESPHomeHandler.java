@@ -206,7 +206,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         versionService.addListener(this);
 
         if (config.deepSleep) {
-            updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Waiting for device to wake up from deep sleep");
+            if (config.deepSleepAssumeOnline) {
+                logger.debug("[{}] Deep sleep assume online", logPrefix);
+                updateStatus(ThingStatus.ONLINE);
+                scheduleDeepSleepWatchdog();
+            } else {
+                updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
+                        "Waiting for device to wake up from deep sleep");
+            }
         } else {
             exponentialBackoff = new ExponentialBackoff(config.reconnectInterval, config.maxReconnectInterval);
             if (config.hostname != null && !config.hostname.isEmpty()) {
@@ -282,14 +289,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
                 logger.info("[{}] Trying to connect to {}:{}", logPrefix, connectionTarget.logTarget(), port);
                 if (config.deepSleep && getThing().getStatus() != ThingStatus.ONLINE) {
-                    if (config.deepSleepAssumeOnline) {
-                        logger.debug("[{}] Deep sleep assume online", logPrefix);
-                        updateStatus(ThingStatus.ONLINE);
-                        scheduleDeepSleepWatchdog();
-                    } else {
-                        updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
-                                String.format("Connecting to %s:%d", connectionTarget.statusTarget(), port));
-                    }
+                    updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
+                            String.format("Connecting to %s:%d", connectionTarget.statusTarget(), port));
                 }
 
                 // Default to using the default encryption key from the binding if not set in device configuration
