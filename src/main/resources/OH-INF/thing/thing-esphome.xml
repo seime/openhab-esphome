@@ -173,4 +173,22 @@
 
 		</config-description>
 	</thing-type>
+
+	<channel-type id="latestFirmwareVersion" advanced="true">
+		<item-type>String</item-type>
+		<label>Latest Firmware Version</label>
+		<description>Latest version of ESPHome firmware fetched from https://github.com/esphome/esphome/releases/latest</description>
+		<state readOnly="true"/>
+		<autoUpdatePolicy>veto</autoUpdatePolicy>
+	</channel-type>
+
+	<channel-type id="firmwareUpdateAvailable" advanced="true">
+		<item-type>Contact</item-type>
+		<label>Firmware Update Available</label>
+		<description>OPEN if there is a newer version of ESPHome firmware available. This does only check your device version
+			against the latest version published on GitHub, not against the version installed on your computer. Note that even if
+			there is a new version on GitHub, it might not have been released for your favourite package manager.</description>
+		<state readOnly="true"/>
+		<autoUpdatePolicy>veto</autoUpdatePolicy>
+	</channel-type>
 </thing:thing-descriptions>

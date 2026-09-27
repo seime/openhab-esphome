@@ -12,12 +12,15 @@
  */
 package no.seime.openhab.binding.esphome.internal.handler;
 
+import java.util.Set;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.storage.StorageService;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.AbstractStorageBasedTypeProvider;
 import org.openhab.core.thing.type.ChannelType;
 import org.openhab.core.thing.type.ChannelTypeProvider;
+import org.openhab.core.thing.type.ChannelTypeUID;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -40,5 +43,17 @@ public class ESPChannelTypeProvider extends AbstractStorageBasedTypeProvider {
         String thingUid = uid.getBindingId() + ":" + uid.getId() + "_";
         getChannelTypes(null).stream().map(ChannelType::getUID).filter(c -> c.getAsString().startsWith(thingUid))
                 .forEach(this::removeChannelType);
+    }
+
+    /**
+     * Remove dynamic channel types belonging to {@code thingUID} that are not present in {@code keep}. Used to clean up
+     * types left over from a previous interrogation after the thing has been updated with the current channel set — so
+     * no channel ever references a missing type (which would race with
+     * {@code ThingManagerImpl.normalizeConfiguration}).
+     */
+    public void removeOrphanedChannelTypesForThing(ThingUID thingUID, Set<ChannelTypeUID> keep) {
+        String prefix = thingUID.getBindingId() + ":" + thingUID.getId() + "_";
+        getChannelTypes(null).stream().map(ChannelType::getUID).filter(c -> c.getAsString().startsWith(prefix))
+                .filter(c -> !keep.contains(c)).forEach(this::removeChannelType);
     }
 }

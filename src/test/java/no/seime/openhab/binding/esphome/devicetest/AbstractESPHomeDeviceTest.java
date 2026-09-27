@@ -95,18 +95,12 @@ public abstract class AbstractESPHomeDeviceTest {
 
         ESPHomeVersionService versionService = Mockito.mock(ESPHomeVersionService.class);
         when(versionService.getLatestVersion()).thenReturn("2024.3.0");
-        when(versionService.createLatestFirmwareVersionChannelType(Mockito.any()))
+        when(versionService.createLatestFirmwareVersionChannel(Mockito.any()))
                 .thenAnswer(invocation -> new ESPHomeVersionService(executor)
-                        .createLatestFirmwareVersionChannelType(invocation.getArgument(0)));
-        when(versionService.createFirmwareUpdateAvailableChannelType(Mockito.any()))
+                        .createLatestFirmwareVersionChannel(invocation.getArgument(0)));
+        when(versionService.createFirmwareUpdateAvailableChannel(Mockito.any()))
                 .thenAnswer(invocation -> new ESPHomeVersionService(executor)
-                        .createFirmwareUpdateAvailableChannelType(invocation.getArgument(0)));
-        when(versionService.createLatestFirmwareVersionChannel(Mockito.any(), Mockito.any()))
-                .thenAnswer(invocation -> new ESPHomeVersionService(executor)
-                        .createLatestFirmwareVersionChannel(invocation.getArgument(0), invocation.getArgument(1)));
-        when(versionService.createFirmwareUpdateAvailableChannel(Mockito.any(), Mockito.any()))
-                .thenAnswer(invocation -> new ESPHomeVersionService(executor)
-                        .createFirmwareUpdateAvailableChannel(invocation.getArgument(0), invocation.getArgument(1)));
+                        .createFirmwareUpdateAvailableChannel(invocation.getArgument(0)));
 
         FirmwareUpgradeService firmwareUpgradeService = Mockito.mock(FirmwareUpgradeService.class);
 

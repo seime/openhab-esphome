@@ -23,8 +23,10 @@ public class EmptyEntityNamesEsphomeDeviceTest extends AbstractESPHomeDeviceTest
 
         // Only brightness channel should be created
         assertEquals(5, thingHandler.getDynamicChannels().size());
-        assertEquals("Latest Firmware Version", thingHandler.getDynamicChannels().get(0).getLabel());
-        assertEquals("Firmware Update Available", thingHandler.getDynamicChannels().get(1).getLabel());
+        assertEquals(null, thingHandler.getDynamicChannels().get(0).getLabel()); // Latest firmware version, static
+                                                                                 // channel type
+        assertEquals(null, thingHandler.getDynamicChannels().get(1).getLabel()); // Firmware update available, static
+                                                                                 // channel type
         assertEquals("None", thingHandler.getDynamicChannels().get(2).getLabel());
         assertEquals("None", thingHandler.getDynamicChannels().get(3).getLabel());
         assertEquals("Temperature", thingHandler.getDynamicChannels().get(4).getLabel());
