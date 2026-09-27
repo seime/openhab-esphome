@@ -34,6 +34,7 @@ import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.binding.ThingActions;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.type.ChannelType;
+import org.openhab.core.thing.type.ChannelTypeUID;
 import org.openhab.core.types.*;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
@@ -551,6 +552,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     new FirmwareUpgradeAction(this), new Hashtable<>()));
 
             updateThing(editThing().withChannels(dynamicChannels).build());
+            sweepOrphanedChannelTypes();
             logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
             interrogated = true;
             frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
@@ -644,18 +646,19 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void addFirmwareChannels() {
-        ChannelType latestFirmwareVersionChannelType = versionService
-                .createLatestFirmwareVersionChannelType(thing.getUID());
-        ChannelType firmwareUpdateAvailableChannelType = versionService
-                .createFirmwareUpdateAvailableChannelType(thing.getUID());
+        dynamicChannels.add(0, versionService.createFirmwareUpdateAvailableChannel(thing.getUID()));
+        dynamicChannels.add(0, versionService.createLatestFirmwareVersionChannel(thing.getUID()));
+    }
 
-        addChannelType(latestFirmwareVersionChannelType);
-        addChannelType(firmwareUpdateAvailableChannelType);
-
-        dynamicChannels.add(0, versionService.createFirmwareUpdateAvailableChannel(thing.getUID(),
-                firmwareUpdateAvailableChannelType.getUID()));
-        dynamicChannels.add(0, versionService.createLatestFirmwareVersionChannel(thing.getUID(),
-                latestFirmwareVersionChannelType.getUID()));
+    private void sweepOrphanedChannelTypes() {
+        Set<ChannelTypeUID> stillReferenced = new HashSet<>();
+        for (Channel channel : thing.getChannels()) {
+            ChannelTypeUID typeUID = channel.getChannelTypeUID();
+            if (typeUID != null) {
+                stillReferenced.add(typeUID);
+            }
+        }
+        dynamicChannelTypeProvider.removeOrphanedChannelTypesForThing(thing.getUID(), stillReferenced);
     }
 
     public void sendBluetoothCommand(GeneratedMessage message) {
@@ -783,9 +786,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 } else {
                     scheduleDeepSleepWatchdog();
                 }
-                // Clean up old channels and channel types
+                // Clear the local list of channels; the previous set stays on the Thing (and its channel-type
+                // references stay resolvable in the type provider) until updateThing() below replaces them. Orphaned
+                // types are swept later, after updateThing() has propagated, to avoid racing with
+                // ThingManagerImpl.normalizeConfiguration.
                 dynamicChannels.clear();
-                dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
 
                 // Clean up old actions
                 clearThingActions();

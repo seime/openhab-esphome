@@ -15,9 +15,6 @@ import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
-import org.openhab.core.thing.type.AutoUpdatePolicy;
-import org.openhab.core.thing.type.ChannelType;
-import org.openhab.core.thing.type.ChannelTypeBuilder;
 import org.openhab.core.thing.type.ChannelTypeUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,39 +127,21 @@ public class ESPHomeVersionService {
         return false;
     }
 
-    public ChannelType createLatestFirmwareVersionChannelType(ThingUID thingUID) {
-        return ChannelTypeBuilder
-                .state(new ChannelTypeUID(BindingConstants.BINDING_ID,
-                        thingUID.getId() + "_" + BindingConstants.CHANNEL_LATEST_FIRMWARE_VERSION),
-                        "Latest Firmware Version", CoreItemFactory.STRING)
-                .isAdvanced(true).withAutoUpdatePolicy(AutoUpdatePolicy.VETO).build();
-    }
-
-    public ChannelType createFirmwareUpdateAvailableChannelType(ThingUID thingUID) {
-        return ChannelTypeBuilder
-                .state(new ChannelTypeUID(BindingConstants.BINDING_ID,
-                        thingUID.getId() + "_" + BindingConstants.CHANNEL_FIRMWARE_UPDATE_AVAILABLE),
-                        "Firmware Update Available", CoreItemFactory.CONTACT)
-                .isAdvanced(true).withAutoUpdatePolicy(AutoUpdatePolicy.VETO).build();
-    }
-
-    public Channel createLatestFirmwareVersionChannel(ThingUID thingUID, ChannelTypeUID channelTypeUID) {
+    public Channel createLatestFirmwareVersionChannel(ThingUID thingUID) {
         return ChannelBuilder
                 .create(new ChannelUID(thingUID, BindingConstants.CHANNEL_LATEST_FIRMWARE_VERSION),
                         CoreItemFactory.STRING)
-                .withLabel("Latest Firmware Version")
-                .withDescription(
-                        "Latest version of ESPHome firmware fetched from https://github.com/esphome/esphome/releases/latest")
-                .withType(channelTypeUID).build();
+                .withType(new ChannelTypeUID(BindingConstants.BINDING_ID,
+                        BindingConstants.CHANNEL_LATEST_FIRMWARE_VERSION))
+                .build();
     }
 
-    public Channel createFirmwareUpdateAvailableChannel(ThingUID thingUID, ChannelTypeUID channelTypeUID) {
+    public Channel createFirmwareUpdateAvailableChannel(ThingUID thingUID) {
         return ChannelBuilder
                 .create(new ChannelUID(thingUID, BindingConstants.CHANNEL_FIRMWARE_UPDATE_AVAILABLE),
                         CoreItemFactory.CONTACT)
-                .withLabel("Firmware Update Available")
-                .withDescription(
-                        "OPEN if there is a newer version of ESPHome firmware available. This does only check your device version against the latest version published on GitHub, not against the version installed on your computer. Note that even if there is a new version on GitHub, it might not have been released for your favourite package manager.")
-                .withType(channelTypeUID).build();
+                .withType(new ChannelTypeUID(BindingConstants.BINDING_ID,
+                        BindingConstants.CHANNEL_FIRMWARE_UPDATE_AVAILABLE))
+                .build();
     }
 }
