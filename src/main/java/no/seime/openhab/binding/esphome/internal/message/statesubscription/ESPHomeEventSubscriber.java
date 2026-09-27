@@ -1,6 +1,8 @@
 package no.seime.openhab.binding.esphome.internal.message.statesubscription;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -50,7 +52,7 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
             THING_STATUS_INFO_CHANGED_EVENT);
     private final Logger logger = LoggerFactory.getLogger(ESPHomeEventSubscriber.class);
     private final Set<String> subscribedEventTypes = new HashSet<>();
-    private final Map<ESPHomeHandler, List<EventSubscription>> eventSubscriptions = new HashMap<>();
+    private final Map<ESPHomeHandler, List<EventSubscription>> eventSubscriptions = new ConcurrentHashMap<>();
     private final ItemRegistry itemRegistry;
     private final ThingRegistry thingRegistry;
 
@@ -169,7 +171,7 @@ public class ESPHomeEventSubscriber implements EventSubscriber {
     }
 
     public void addEventSubscription(ESPHomeHandler handler, EventSubscription subscription) {
-        eventSubscriptions.computeIfAbsent(handler, espHomeHandler -> new ArrayList<>()).add(subscription);
+        eventSubscriptions.computeIfAbsent(handler, espHomeHandler -> new CopyOnWriteArrayList<>()).add(subscription);
     }
 
     public void removeEventSubscriptions(ESPHomeHandler handler) {
