@@ -48,7 +48,12 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
 
     private final Map<Long, SortedSet<DeviceAndRSSI>> knownDevices = new ConcurrentHashMap<>();
 
-    private final Map<ESPHomeBluetoothDevice, ESPHomeHandler> connectionMap = new ConcurrentHashMap<>();
+    /**
+     * Devices currently locked to a specific ESPHome proxy handler. Keyed by BLE address (as long) for
+     * O(1) routing of incoming GATT responses.
+     */
+    private final Map<Long, ESPHomeBluetoothDevice> connectedDevices = new ConcurrentHashMap<>();
+    private final Map<Long, ESPHomeHandler> deviceToHandler = new ConcurrentHashMap<>();
 
     private final MonitoredCompositeExecutorService executor;
 
@@ -118,12 +123,13 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                 .toList();
         logger.debug("Found {} inactive handlers to remove", inactiveHandlers.size());
         espHomeHandlers.removeAll(inactiveHandlers);
-        inactiveHandlers.stream().forEach(handler -> {
+        inactiveHandlers.forEach(handler -> {
             try {
                 handler.stopListeningForBLEAdvertisements();
             } catch (Exception e) {
                 // Swallow
             }
+            notifyDevicesOfLostHandler(handler);
         });
 
         List<Thing> esphomeThings = thingRegistry.stream()
@@ -158,6 +164,18 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
                 espHomeHandlers.stream().map(e -> e.getThing().getUID()).toList());
     }
 
+    private void notifyDevicesOfLostHandler(ESPHomeHandler handler) {
+        List<Long> lostAddresses = deviceToHandler.entrySet().stream().filter(entry -> entry.getValue() == handler)
+                .map(Map.Entry::getKey).toList();
+        for (Long address : lostAddresses) {
+            ESPHomeBluetoothDevice device = connectedDevices.remove(address);
+            deviceToHandler.remove(address);
+            if (device != null) {
+                device.handleESPHomeHandlerLost();
+            }
+        }
+    }
+
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
     }
@@ -180,32 +198,49 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
             });
             handleRawAdvertisement(rawAdvertisementsResponse, handler);
         } else if (message instanceof BluetoothDeviceConnectionResponse rsp) {
-            Optional<Map.Entry<ESPHomeBluetoothDevice, ESPHomeHandler>> deviceEntry = connectionMap.entrySet().stream()
-                    .filter(device -> device.getKey().getAddress()
-                            .equals(BluetoothAddressUtil.createAddress(rsp.getAddress())))
-                    .findFirst();
-
-            deviceEntry.ifPresent(device -> device.getKey().handleConnectionsMessage(rsp));
+            routeToDevice(rsp.getAddress(), "connection", device -> device.handleConnectionsMessage(rsp));
         } else if (message instanceof BluetoothGATTGetServicesResponse rsp) {
-            Optional<Map.Entry<ESPHomeBluetoothDevice, ESPHomeHandler>> deviceEntry = connectionMap.entrySet().stream()
-                    .filter(device -> device.getKey().getAddress()
-                            .equals(BluetoothAddressUtil.createAddress(rsp.getAddress())))
-                    .findFirst();
-
-            deviceEntry.ifPresent(device -> device.getKey().handleGattServicesMessage(rsp));
+            routeToDevice(rsp.getAddress(), "gatt services", device -> device.handleGattServicesMessage(rsp));
         } else if (message instanceof BluetoothGATTGetServicesDoneResponse rsp) {
-            Optional<Map.Entry<ESPHomeBluetoothDevice, ESPHomeHandler>> deviceEntry = connectionMap.entrySet().stream()
-                    .filter(device -> device.getKey().getAddress()
-                            .equals(BluetoothAddressUtil.createAddress(rsp.getAddress())))
-                    .findFirst();
-
-            deviceEntry.ifPresent(device -> device.getKey().handleGattServicesDoneMessage(rsp));
+            routeToDevice(rsp.getAddress(), "gatt services done", device -> device.handleGattServicesDoneMessage(rsp));
+        } else if (message instanceof BluetoothGATTReadResponse rsp) {
+            routeToDevice(rsp.getAddress(), "gatt read", device -> device.handleReadResponse(rsp));
+        } else if (message instanceof BluetoothGATTWriteResponse rsp) {
+            routeToDevice(rsp.getAddress(), "gatt write", device -> device.handleWriteResponse(rsp));
+        } else if (message instanceof BluetoothGATTNotifyResponse rsp) {
+            routeToDevice(rsp.getAddress(), "gatt notify", device -> device.handleNotifyResponse(rsp));
+        } else if (message instanceof BluetoothGATTNotifyDataResponse rsp) {
+            routeToDevice(rsp.getAddress(), "gatt notify data", device -> device.handleNotifyDataResponse(rsp));
+        } else if (message instanceof BluetoothGATTErrorResponse rsp) {
+            routeToDevice(rsp.getAddress(), "gatt error", device -> device.handleErrorResponse(rsp));
+        } else if (message instanceof BluetoothConnectionsFreeResponse rsp) {
+            logger.debug("[{}] {} of {} BLE connections free on ESP", handler.getThing().getUID(), rsp.getFree(),
+                    rsp.getLimit());
         } else if (message instanceof BluetoothScannerStateResponse rsp) {
             logger.debug("Received BluetoothScannerStateResponse from {} with status {}, currently ignored",
                     handler.getThing().getUID(), rsp.getState());
+        } else if (message instanceof BluetoothDevicePairingResponse rsp) {
+            logger.debug("[{}] Pairing response for {}: error={}", handler.getThing().getUID(), rsp.getAddress(),
+                    rsp.getError());
+        } else if (message instanceof BluetoothDeviceUnpairingResponse rsp) {
+            logger.debug("[{}] Unpairing response for {}: error={}", handler.getThing().getUID(), rsp.getAddress(),
+                    rsp.getError());
+        } else if (message instanceof BluetoothDeviceClearCacheResponse rsp) {
+            logger.debug("[{}] Clear cache response for {}: error={}", handler.getThing().getUID(), rsp.getAddress(),
+                    rsp.getError());
         } else {
             logger.warn("Received unhandled Bluetooth packet type: {} from {}", message.getClass().getSimpleName(),
                     handler.getThing().getUID());
+        }
+    }
+
+    private void routeToDevice(long address, String description,
+            java.util.function.Consumer<ESPHomeBluetoothDevice> action) {
+        ESPHomeBluetoothDevice device = connectedDevices.get(address);
+        if (device != null) {
+            action.accept(device);
+        } else {
+            logger.debug("Received {} response for unknown/not-connected address {}", description, address);
         }
     }
 
@@ -346,12 +381,16 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         return null;
     }
 
-    public void linkDevice(ESPHomeBluetoothDevice espHomeBluetoothDevice, ESPHomeHandler lockToHandler) {
-        connectionMap.put(espHomeBluetoothDevice, lockToHandler);
+    public void linkDevice(ESPHomeBluetoothDevice device, ESPHomeHandler lockToHandler) {
+        long address = device.getAddressAsLong();
+        connectedDevices.put(address, device);
+        deviceToHandler.put(address, lockToHandler);
     }
 
-    public void unlinkDevice(ESPHomeBluetoothDevice espHomeBluetoothDevice) {
-        connectionMap.remove(espHomeBluetoothDevice);
+    public void unlinkDevice(ESPHomeBluetoothDevice device) {
+        long address = device.getAddressAsLong();
+        connectedDevices.remove(address);
+        deviceToHandler.remove(address);
     }
 
     private record DeviceAndRSSI(ThingUID device, int rssi, Instant lastSeen) implements Comparable<DeviceAndRSSI> {

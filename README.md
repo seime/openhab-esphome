@@ -226,10 +226,13 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 It is now possible to use the built-in Bluetooth proxy in ESPHome. This allows you to use ESPHome devices as proxies
 for other Bluetooth devices such as BTHome sensors or a range of other Bluetooth devices.
 
-> NOTE: Only beacons / devices broadcasting data are supported at the moment. Connectable devices will be supported in a
-> future release.
+Both advertisement-only devices (beacons, BTHome sensors, ...) and connectable GATT devices are supported. For
+connectable devices the binding will pick the ESPHome proxy currently reporting the strongest RSSI for the target
+device and lock the connection to that proxy for its whole lifetime, so RSSI fluctuations on other proxies will
+not cause the connection to hop between ESPs mid-session. If the chosen proxy goes offline, the BLE device is
+notified so the child handler can attempt to reconnect via another proxy.
 
-> NOTE: The proxy bridge *CANNOT* be created in the UI, you *must* file based configuration!
+> NOTE: The proxy bridge *CANNOT* be created in the UI, you *must* use file based configuration!
 
 The feature is still experimental and may not work as expected.
 
@@ -460,6 +463,4 @@ The following entity types are **not** yet supported (please submit a PR of file
 - `water_heater`
 
 - `light` - not all modes are supported. Please create a PR if you need a specific mode.
-
-In addition, the Bluetooth proxy isn't fully ready yet.
 
