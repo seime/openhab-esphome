@@ -423,11 +423,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     case UNINITIALIZED -> logger.debug(
                             "[{}] Received packet {} while uninitialized, this can happen when the socket is closed while unprocessed packets exists. Ignoring",
                             logPrefix, message.getClass().getSimpleName());
-                    case CONNECTING -> {
-                        // We are still connecting, so we ignore any packets
+                    case CONNECTING -> // We are still connecting, so we ignore any packets
                         logger.debug("[{}] Received packet {} while connecting, ignoring", logPrefix,
                                 message.getClass().getSimpleName());
-                    }
                     case HELLO_SENT -> handleHelloResponse(message);
                     case CONNECTED -> handleConnected(message);
                 }
@@ -721,6 +719,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         super.updateState(channelUID, state);
     }
 
+    @Override
     public void triggerChannel(ChannelUID channelUID, String event) {
         ThingHandlerCallback callback = getCallback();
         if (callback != null) {
@@ -810,11 +809,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private void scheduleDeepSleepWatchdog() {
         cancelDeepSleepWatchdog();
         if (config.deepSleepTimeoutSeconds > 0) {
-            deepSleepWatchdogFuture = executorService.schedule(() -> {
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
-                        String.format("Device in deep sleep mode was not made connectable within timeout of %ds",
-                                config.deepSleepTimeoutSeconds));
-            }, config.deepSleepTimeoutSeconds, TimeUnit.SECONDS);
+            deepSleepWatchdogFuture = executorService
+                    .schedule(
+                            () -> updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
+                                    String.format(
+                                            "Device in deep sleep mode was not made connectable within timeout of %ds",
+                                            config.deepSleepTimeoutSeconds)),
+                            config.deepSleepTimeoutSeconds, TimeUnit.SECONDS);
         }
     }
 
@@ -943,7 +944,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 try {
                     frameHelper.send(cmd);
                 } catch (ProtocolAPIError e) {
-                    logger.warn("[{}] Error sending API action {}", logPrefix, e);
+                    logger.warn("[{}] Error sending API action {}", logPrefix, e.getMessage(), e);
                 }
             }
         }
