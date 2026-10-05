@@ -492,6 +492,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
         handleDisconnection(ThingStatusDetail.CONFIGURATION_PENDING, "Configuration updated");
+        super.handleConfigurationUpdate(configurationParameters);
+        scheduleConnect(0);
     }
 
     private void handleConnected(GeneratedMessage message) throws ProtocolAPIError {
