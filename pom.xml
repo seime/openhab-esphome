@@ -157,24 +157,24 @@
       </plugin>
 
       <plugin>
-        <groupId>dev.cookiecode</groupId>
+        <groupId>io.github.ascopes</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
+        <version>5.1.10</version>
+
+        <configuration>
+          <protoc>${proto.version}</protoc>
+        </configuration>
+
         <executions>
           <execution>
-            <id>compile-proto</id>
+            <id>generate-protobuf-stubs</id>
             <goals>
-              <goal>compile</goal>
+              <goal>generate</goal>
             </goals>
-            <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${proto.version}:exe:${os.detected.classifier}</protocArtifact>
-              <attachProtoSources>false</attachProtoSources>
-              <useArgumentFile>true</useArgumentFile>
-              <checkStaleness>true</checkStaleness>
-            </configuration>
           </execution>
         </executions>
       </plugin>
+
     </plugins>
   </build>
 
