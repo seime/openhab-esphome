@@ -156,8 +156,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
                 return t;
             });
 
-            ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(maxPoolSize, maxPoolSize, 60L,
-                    TimeUnit.SECONDS, new LinkedBlockingQueue<>(1000), r -> {
+            ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(2, maxPoolSize, 120L, TimeUnit.SECONDS,
+                    new LinkedBlockingQueue<>(1000), r -> {
                         long currentCount = threadCounter.incrementAndGet();
                         logger.debug("Creating new worker thread {} for scheduler", currentCount);
                         Thread t = new Thread(r);

@@ -1,4 +1,5 @@
 package no.seime.openhab.binding.esphome.internal;
+
 /*
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
@@ -12,11 +13,9 @@ package no.seime.openhab.binding.esphome.internal;
  * SPDX-License-Identifier: EPL-2.0
  */
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
@@ -40,6 +39,7 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
     private final ScheduledExecutorService scheduler;
 
     private final long defaultMaxExecutionTimeMs;
+    private final ScheduledFuture<?> statsFuture;
 
     public MonitoredCompositeExecutorService(@NonNull ScheduledExecutorService scheduler,
             @NonNull ThreadPoolExecutor executor, long defaultMaxExecutionTimeMs) {
@@ -47,7 +47,7 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
         this.executor = executor;
         this.defaultMaxExecutionTimeMs = defaultMaxExecutionTimeMs;
 
-        scheduler.scheduleAtFixedRate(() -> {
+        statsFuture = scheduler.scheduleAtFixedRate(() -> {
             logger.debug("Executor stats poolSize={}, activeCount={}, queueSize={}", executor.getPoolSize(),
                     executor.getActiveCount(), executor.getQueue().size());
         }, 2, 5, TimeUnit.SECONDS);
@@ -55,13 +55,15 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
     @Override
     public void shutdown() {
+        statsFuture.cancel(false);
         scheduler.shutdown();
         executor.shutdown();
     }
 
     @Override
     public List<Runnable> shutdownNow() {
-        List<Runnable> result = scheduler.shutdownNow();
+        statsFuture.cancel(false);
+        List<Runnable> result = new ArrayList<>(scheduler.shutdownNow());
         result.addAll(executor.shutdownNow());
         return result;
     }
@@ -80,17 +82,15 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
     public boolean awaitTermination(long timeout, @Nullable TimeUnit unit) throws InterruptedException {
         TimeUnit timeUnit = unit == null ? TimeUnit.MILLISECONDS : unit;
         long starttime = System.nanoTime();
+        long timeoutNanos = timeUnit.toNanos(timeout);
 
-        boolean didTerminate = scheduler.awaitTermination(timeout, timeUnit);
+        boolean didTerminate = scheduler.awaitTermination(timeoutNanos, TimeUnit.NANOSECONDS);
         if (didTerminate) {
-            long remaining = timeUnit.toNanos(timeout) - System.nanoTime() + starttime;
+            long remaining = timeoutNanos - (System.nanoTime() - starttime);
             if (remaining <= 0L) {
-                return false;
+                return executor.isTerminated();
             }
             didTerminate = executor.awaitTermination(remaining, TimeUnit.NANOSECONDS);
-        } else {
-            executor.shutdownNow();
-            didTerminate = false;
         }
 
         return didTerminate;
@@ -98,7 +98,8 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
     @Override
     public <T> Future<T> submit(Callable<T> task) {
-        return executor.submit(task);
+        return executor
+                .submit(new TimedCallable<>(task, getStackTraceElements(), defaultMaxExecutionTimeMs, null, false));
     }
 
     @Override
@@ -115,24 +116,33 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
     @Override
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-        return executor.invokeAll(tasks);
+        return executor.invokeAll(wrapCallables(tasks, null, defaultMaxExecutionTimeMs));
     }
 
     @Override
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
             throws InterruptedException {
-        return executor.invokeAll(tasks, timeout, unit);
+        return executor.invokeAll(wrapCallables(tasks, null, defaultMaxExecutionTimeMs), timeout, unit);
     }
 
     @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-        return executor.invokeAny(tasks);
+        return executor.invokeAny(wrapCallables(tasks, null, defaultMaxExecutionTimeMs));
     }
 
     @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
-        return executor.invokeAny(tasks, timeout, unit);
+        return executor.invokeAny(wrapCallables(tasks, null, defaultMaxExecutionTimeMs), timeout, unit);
+    }
+
+    private <T> Collection<Callable<T>> wrapCallables(Collection<? extends Callable<T>> tasks,
+            @Nullable String callerSignature, long maxExecutionTimeMs) {
+        StackTraceElement[] stackTrace = getStackTraceElements();
+        return tasks.stream()
+                .<Callable<T>> map(
+                        task -> new TimedCallable<>(task, stackTrace, maxExecutionTimeMs, callerSignature, false))
+                .toList();
     }
 
     @Override
@@ -142,21 +152,28 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
     @Override
     public @NonNull ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+        Objects.requireNonNull(command);
+        Objects.requireNonNull(unit);
         if (delay <= 0L) {
-            return new FakeScheduledFuture<>(executor.submit(
+            return new ImmediateScheduledFuture<>(executor.submit(
                     new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true)));
         }
-        return new CompondScheduledFuture<>(scheduler.schedule(() -> submitOrLog(
+        return new CompoundScheduledFuture<>(scheduler.schedule(() -> submitOrLog(
                 new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true), null),
                 delay, unit));
     }
 
     @Override
-    public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
+    public <V> @NonNull ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
+        Objects.requireNonNull(callable);
+        Objects.requireNonNull(unit);
         if (delay <= 0L) {
-            return new FakeScheduledFuture<>(executor.submit(callable));
+            return new ImmediateScheduledFuture<>(executor.submit(
+                    new TimedCallable<>(callable, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true)));
         }
-        return new CompondScheduledFuture<>(scheduler.schedule(() -> submitOrLog(callable, null), delay, unit));
+        return new CompoundScheduledFuture<>(scheduler.schedule(() -> submitOrLog(
+                new TimedCallable<>(callable, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true), null),
+                delay, unit));
     }
 
     private <V> Future<V> submitOrLog(Callable<V> task, @Nullable String callerSignature) {
@@ -180,72 +197,63 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
     }
 
     @Override
-    public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
+    public @NonNull ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period,
+            TimeUnit unit) {
         Objects.requireNonNull(command);
         Objects.requireNonNull(unit);
-        TaskLauncher launcher = new TaskLauncher(
-                new TimedRunnable(command, getStackTraceElements(), defaultMaxExecutionTimeMs, null, true), executor);
-        return new TaskLauncherScheduledFuture(scheduler.scheduleAtFixedRate(launcher, initialDelay, period, unit),
-                launcher);
+        PeriodicScheduledFuture future = new PeriodicScheduledFuture(command, initialDelay, period, unit, true,
+                getStackTraceElements(), defaultMaxExecutionTimeMs, null);
+        future.start();
+        return future;
     }
 
-    public @Nullable ScheduledFuture<?> scheduleAtFixedRate(Runnable runnable, long initialDelay, long period,
+    public @NonNull ScheduledFuture<?> scheduleAtFixedRate(Runnable runnable, long initialDelay, long period,
             TimeUnit timeUnit, String callerSignature) {
         Objects.requireNonNull(runnable);
         Objects.requireNonNull(timeUnit);
         Objects.requireNonNull(callerSignature);
-        TaskLauncher launcher = new TaskLauncher(
-                new TimedRunnable(runnable, getStackTraceElements(), defaultMaxExecutionTimeMs, callerSignature, true),
-                executor);
-        return new TaskLauncherScheduledFuture(scheduler.scheduleAtFixedRate(launcher, initialDelay, period, timeUnit),
-                launcher);
+        PeriodicScheduledFuture future = new PeriodicScheduledFuture(runnable, initialDelay, period, timeUnit, true,
+                getStackTraceElements(), defaultMaxExecutionTimeMs, callerSignature);
+        future.start();
+        return future;
     }
 
     @Override
-    public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
+    public @NonNull ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
+            TimeUnit unit) {
         return scheduleWithFixedDelay(command, initialDelay, delay, unit, null, defaultMaxExecutionTimeMs);
     }
 
-    public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit,
-            String callerSignature, long maxExecutionTimeMs) {
-
+    public @NonNull ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
+            TimeUnit unit, @Nullable String callerSignature, long maxExecutionTimeMs) {
         Objects.requireNonNull(command);
         Objects.requireNonNull(unit);
-        TaskLauncher launcher = new TaskLauncher(
-                new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, callerSignature, true),
-                executor);
-        return new TaskLauncherScheduledFuture(scheduler.scheduleWithFixedDelay(launcher, initialDelay, delay, unit),
-                launcher);
+        PeriodicScheduledFuture future = new PeriodicScheduledFuture(command, initialDelay, delay, unit, false,
+                getStackTraceElements(), maxExecutionTimeMs, callerSignature);
+        future.start();
+        return future;
     }
 
-    public @Nullable ScheduledFuture<?> schedule(Runnable command, int delay, TimeUnit timeUnit,
+    public @NonNull ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit timeUnit,
             String callerSignature) {
         return schedule(command, delay, timeUnit, callerSignature, defaultMaxExecutionTimeMs);
     }
 
-    public @Nullable ScheduledFuture<?> schedule(Runnable command, int delay, TimeUnit timeUnit, String callerSignature,
+    public @NonNull ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit timeUnit, String callerSignature,
             long maxExecutionTimeMs) {
+        Objects.requireNonNull(command);
+        Objects.requireNonNull(timeUnit);
         if (delay <= 0L) {
-            return new FakeScheduledFuture<>(submitOrLog(
-                    new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, callerSignature, false),
+            return new ImmediateScheduledFuture<>(submitOrLog(
+                    new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, callerSignature, true),
                     callerSignature));
         }
-        return new CompondScheduledFuture<>(
-                scheduler
-                        .schedule(
-                                () -> submitOrLog(new TimedRunnable(command, getStackTraceElements(),
-                                        maxExecutionTimeMs, callerSignature, false), callerSignature),
-                                delay, timeUnit));
+        return new CompoundScheduledFuture<>(scheduler.schedule(() -> submitOrLog(
+                new TimedRunnable(command, getStackTraceElements(), maxExecutionTimeMs, callerSignature, true),
+                callerSignature), delay, timeUnit));
     }
 
-    private class FakeScheduledFuture<V> implements ScheduledFuture<V> {
-
-        @NonNull
-        private final Future<V> delegate;
-
-        public FakeScheduledFuture(@NonNull Future<V> future) {
-            delegate = future;
-        }
+    private record ImmediateScheduledFuture<V>(@NonNull Future<V> delegate) implements ScheduledFuture<V> {
 
         @Override
         public long getDelay(TimeUnit unit) {
@@ -254,7 +262,7 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
         @Override
         public int compareTo(Delayed other) {
-            if (other == this || other instanceof FakeScheduledFuture) {
+            if (other == this || other instanceof ImmediateScheduledFuture) {
                 return 0;
             }
             long diff = getDelay(TimeUnit.NANOSECONDS) - other.getDelay(TimeUnit.NANOSECONDS);
@@ -287,12 +295,13 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
         }
     }
 
-    private class CompondScheduledFuture<V> implements ScheduledFuture<V> {
+    private class CompoundScheduledFuture<V> implements ScheduledFuture<V> {
 
         @NonNull
         private final ScheduledFuture<Future<V>> scheduledTask;
+        private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
-        public CompondScheduledFuture(@NonNull ScheduledFuture<Future<V>> scheduledFuture) {
+        public CompoundScheduledFuture(@NonNull ScheduledFuture<Future<V>> scheduledFuture) {
             scheduledTask = scheduledFuture;
         }
 
@@ -306,11 +315,11 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
             if (other == this) {
                 return 0;
             }
-            if (other instanceof CompondScheduledFuture o) {
+            if (other instanceof CompoundScheduledFuture o) {
                 return scheduledTask.compareTo(o.scheduledTask);
             }
-            if (other instanceof TaskLauncherScheduledFuture o) {
-                return scheduledTask.compareTo(o.scheduledTask);
+            if (other instanceof PeriodicScheduledFuture o) {
+                return Long.compare(getDelay(TimeUnit.NANOSECONDS), o.getDelay(TimeUnit.NANOSECONDS));
             }
             long diff = getDelay(TimeUnit.NANOSECONDS) - other.getDelay(TimeUnit.NANOSECONDS);
             return (diff < 0) ? -1 : (diff > 0) ? 1 : 0;
@@ -318,40 +327,38 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean result = scheduledTask.cancel(false);
-            if (scheduledTask.isCancelled()) {
-                return result;
+            cancelled.set(true);
+            boolean result = scheduledTask.cancel(mayInterruptIfRunning);
+            if (scheduledTask.isDone() && !scheduledTask.isCancelled()) {
+                try {
+                    Future<V> task = scheduledTask.get();
+                    if (task != null) {
+                        result = task.cancel(mayInterruptIfRunning) || result;
+                    }
+                } catch (CancellationException ignored) {
+                    return true;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                } catch (ExecutionException ignored) {
+                    return result;
+                }
             }
-            Future<V> task;
-            try {
-                task = scheduledTask.get();
-            } catch (CancellationException e) {
-                return result;
-            } catch (InterruptedException e) {
-                return false;
-            } catch (ExecutionException e) {
-                // Should be impossible
-                logger.warn("Unexpected exception in CompondScheduledFuture.cancel(): {}", e.getCause());
-                return false;
-            }
-            return task.cancel(mayInterruptIfRunning);
+            return result;
         }
 
         @Override
         public boolean isCancelled() {
-            if (!scheduledTask.isCancelled()) {
-                return false;
+            if (cancelled.get() || scheduledTask.isCancelled()) {
+                return true;
             }
             if (scheduledTask.isDone()) {
                 try {
-                    return scheduledTask.get().isCancelled();
+                    Future<V> inner = scheduledTask.get();
+                    return inner != null && inner.isCancelled();
                 } catch (CancellationException e) {
                     return true;
-                } catch (InterruptedException e) {
-                    return false;
-                } catch (ExecutionException e) {
-                    // Should be impossible
-                    logger.warn("Unexpected exception in CompondScheduledFuture.isCancelled(): {}", e.getCause());
+                } catch (Exception e) {
                     return false;
                 }
             }
@@ -360,58 +367,158 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
         @Override
         public boolean isDone() {
+            if (cancelled.get() || scheduledTask.isCancelled()) {
+                return true;
+            }
             if (!scheduledTask.isDone()) {
                 return false;
             }
             try {
-                return scheduledTask.get().isDone();
+                Future<V> inner = scheduledTask.get();
+                return inner != null && inner.isDone();
             } catch (CancellationException e) {
                 return true;
-            } catch (InterruptedException e) {
-                return false;
-            } catch (ExecutionException e) {
-                // Should be impossible
-                logger.warn("Unexpected exception in CompondScheduledFuture.isDone(): {}", e.getCause());
-                return false;
+            } catch (Exception e) {
+                return true;
             }
         }
 
         @Override
         public V get() throws InterruptedException, ExecutionException {
-            return scheduledTask.get().get();
+            if (cancelled.get()) {
+                throw new CancellationException();
+            }
+            Future<V> inner = scheduledTask.get();
+            return inner.get();
         }
 
         @Override
         public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            if (cancelled.get()) {
+                throw new CancellationException();
+            }
             TimeUnit timeUnit = unit == null ? TimeUnit.MILLISECONDS : unit;
-            long starttime = System.nanoTime();
+            long startNanos = System.nanoTime();
+            long timeoutNanos = timeUnit.toNanos(timeout);
 
-            Future<V> task = scheduledTask.get(timeout, timeUnit);
-            long remaining = timeUnit.toNanos(timeout) - System.nanoTime() + starttime;
-            if (remaining <= 0L) {
+            Future<V> task = scheduledTask.get(timeoutNanos, TimeUnit.NANOSECONDS);
+            long elapsedNanos = System.nanoTime() - startNanos;
+            long remainingNanos = timeoutNanos - elapsedNanos;
+            if (remainingNanos <= 0L) {
+                if (task.isDone()) {
+                    return task.get();
+                }
                 throw new TimeoutException();
             }
-            return task.get(remaining, TimeUnit.NANOSECONDS);
+            return task.get(remainingNanos, TimeUnit.NANOSECONDS);
         }
     }
 
-    private class TaskLauncherScheduledFuture implements ScheduledFuture<Void> {
+    private class PeriodicScheduledFuture implements ScheduledFuture<Void>, Runnable {
 
-        @NonNull
-        private final ScheduledFuture<?> scheduledTask;
+        private final Runnable command;
+        private final long initialDelay;
+        private final long periodOrDelay;
+        private final TimeUnit unit;
+        private final boolean isFixedRate;
+        private final StackTraceElement[] stackTrace;
+        private final long maxExecutionTimeMs;
+        private final @Nullable String callerSignature;
 
-        @NonNull
-        private final TaskLauncher taskLauncher;
+        private final Object lock = new Object();
+        private ScheduledFuture<?> scheduledFuture;
+        private Future<?> runningFuture;
+        private boolean cancelled = false;
+        private Throwable failureException = null;
+        private long nextRunTimeNanos;
 
-        public TaskLauncherScheduledFuture(@NonNull ScheduledFuture<?> scheduledTask,
-                @NonNull TaskLauncher taskLauncher) {
-            this.scheduledTask = scheduledTask;
-            this.taskLauncher = taskLauncher;
+        public PeriodicScheduledFuture(Runnable command, long initialDelay, long periodOrDelay, TimeUnit unit,
+                boolean isFixedRate, StackTraceElement[] stackTrace, long maxExecutionTimeMs,
+                @Nullable String callerSignature) {
+            this.command = command;
+            this.initialDelay = initialDelay;
+            this.periodOrDelay = periodOrDelay;
+            this.unit = unit;
+            this.isFixedRate = isFixedRate;
+            this.stackTrace = stackTrace;
+            this.maxExecutionTimeMs = maxExecutionTimeMs;
+            this.callerSignature = callerSignature;
+            nextRunTimeNanos = System.nanoTime() + unit.toNanos(initialDelay);
+        }
+
+        public void start() {
+            synchronized (lock) {
+                if (cancelled || isShutdown()) {
+                    return;
+                }
+                scheduledFuture = scheduler.schedule(this, initialDelay, unit);
+            }
         }
 
         @Override
-        public long getDelay(TimeUnit unit) {
-            return scheduledTask.getDelay(unit);
+        public void run() {
+            synchronized (lock) {
+                if (cancelled || failureException != null || executor.isShutdown()) {
+                    return;
+                }
+                try {
+                    runningFuture = executor.submit(new TimedRunnable(() -> {
+                        try {
+                            command.run();
+                            onExecutionSuccess();
+                        } catch (Throwable t) {
+                            onExecutionFailure(t);
+                            throw t;
+                        }
+                    }, stackTrace, maxExecutionTimeMs, callerSignature, true));
+                } catch (RejectedExecutionException e) {
+                    logger.warn("Periodic task '{}' rejected by executor: {}",
+                            callerSignature != null ? callerSignature : "<unnamed>", e.getMessage());
+                    onExecutionFailure(e);
+                }
+            }
+        }
+
+        private void onExecutionSuccess() {
+            synchronized (lock) {
+                if (cancelled || failureException != null || scheduler.isShutdown()) {
+                    lock.notifyAll();
+                    return;
+                }
+                long delayNanos;
+                if (isFixedRate) {
+                    nextRunTimeNanos += unit.toNanos(periodOrDelay);
+                    delayNanos = nextRunTimeNanos - System.nanoTime();
+                    if (delayNanos < 0) {
+                        delayNanos = 0;
+                    }
+                } else {
+                    delayNanos = unit.toNanos(periodOrDelay);
+                    nextRunTimeNanos = System.nanoTime() + delayNanos;
+                }
+                try {
+                    scheduledFuture = scheduler.schedule(this, delayNanos, TimeUnit.NANOSECONDS);
+                } catch (RejectedExecutionException e) {
+                    logger.warn("Periodic task '{}' reschedule rejected by scheduler: {}",
+                            callerSignature != null ? callerSignature : "<unnamed>", e.getMessage());
+                    onExecutionFailure(e);
+                }
+            }
+        }
+
+        private void onExecutionFailure(Throwable t) {
+            synchronized (lock) {
+                failureException = t;
+                lock.notifyAll();
+            }
+        }
+
+        @Override
+        public long getDelay(TimeUnit targetUnit) {
+            synchronized (lock) {
+                long remainingNanos = nextRunTimeNanos - System.nanoTime();
+                return targetUnit.convert(remainingNanos, TimeUnit.NANOSECONDS);
+            }
         }
 
         @Override
@@ -419,11 +526,8 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
             if (other == this) {
                 return 0;
             }
-            if (other instanceof CompondScheduledFuture o) {
-                return scheduledTask.compareTo(o.scheduledTask);
-            }
-            if (other instanceof TaskLauncherScheduledFuture o) {
-                return scheduledTask.compareTo(o.scheduledTask);
+            if (other instanceof PeriodicScheduledFuture o) {
+                return Long.compare(nextRunTimeNanos, o.nextRunTimeNanos);
             }
             long diff = getDelay(TimeUnit.NANOSECONDS) - other.getDelay(TimeUnit.NANOSECONDS);
             return (diff < 0) ? -1 : (diff > 0) ? 1 : 0;
@@ -431,70 +535,88 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean result = scheduledTask.cancel(false);
-            Future<?> task = taskLauncher.getTaskFuture();
-            if (task != null) {
-                result &= task.cancel(mayInterruptIfRunning);
+            synchronized (lock) {
+                if (cancelled) {
+                    return false;
+                }
+                if (failureException != null) {
+                    return false;
+                }
+                cancelled = true;
+                if (scheduledFuture != null) {
+                    scheduledFuture.cancel(mayInterruptIfRunning);
+                }
+                if (runningFuture != null) {
+                    runningFuture.cancel(mayInterruptIfRunning);
+                }
+                lock.notifyAll();
+                return true;
             }
-            return result;
         }
 
         @Override
         public boolean isCancelled() {
-            return scheduledTask.isCancelled();
+            synchronized (lock) {
+                return cancelled;
+            }
         }
 
         @Override
         public boolean isDone() {
-            return scheduledTask.isDone();
+            synchronized (lock) {
+                return cancelled || failureException != null;
+            }
         }
 
         @Override
         public Void get() throws InterruptedException, ExecutionException {
-            return (Void) scheduledTask.get();
+            synchronized (lock) {
+                while (!isDone()) {
+                    lock.wait();
+                }
+                if (cancelled) {
+                    throw new CancellationException();
+                }
+                if (failureException != null) {
+                    throw new ExecutionException(failureException);
+                }
+                return null;
+            }
         }
 
         @Override
         public Void get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-            return (Void) scheduledTask.get(timeout, unit);
-        }
-    }
-
-    private static class TaskLauncher implements Runnable {
-
-        @NonNull
-        private final Runnable task;
-        @NonNull
-        private final ExecutorService executor;
-
-        private volatile Future<?> taskFuture;
-
-        public TaskLauncher(@NonNull Runnable task, @NonNull ExecutorService executor) {
-            this.task = task;
-            this.executor = executor;
-        }
-
-        @Override
-        public void run() {
-            taskFuture = executor.submit(task);
-        }
-
-        public Future<?> getTaskFuture() {
-            return taskFuture;
+            long remainingNanos = unit.toNanos(timeout);
+            long deadline = System.nanoTime() + remainingNanos;
+            synchronized (lock) {
+                while (!isDone()) {
+                    if (remainingNanos <= 0L) {
+                        throw new TimeoutException();
+                    }
+                    TimeUnit.NANOSECONDS.timedWait(lock, remainingNanos);
+                    remainingNanos = deadline - System.nanoTime();
+                }
+                if (cancelled) {
+                    throw new CancellationException();
+                }
+                if (failureException != null) {
+                    throw new ExecutionException(failureException);
+                }
+                return null;
+            }
         }
     }
 
     private static class TimedRunnable implements Runnable {
         private final Runnable delegate;
         private final StackTraceElement[] stackTrace;
-        private long startTime;
         private final long submitTime;
         private final long maxExecutionTime;
-        private final String taskDescription;
+        private final @Nullable String taskDescription;
         private final boolean isScheduled;
 
         public TimedRunnable(Runnable delegate, StackTraceElement[] stackTrace, long maxExecutionTime,
-                String taskDescription, boolean isScheduled) {
+                @Nullable String taskDescription, boolean isScheduled) {
             this.delegate = delegate;
             this.stackTrace = stackTrace;
             this.maxExecutionTime = maxExecutionTime;
@@ -505,22 +627,68 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
         @Override
         public void run() {
-            startTime = System.currentTimeMillis();
-            delegate.run();
-            long waitTime = System.currentTimeMillis() - submitTime;
-            long duration = System.currentTimeMillis() - startTime;
-            if (duration > maxExecutionTime) {
-                logger.warn(
-                        "Task '{}' took longer than expected to execute: {}ms, expected < {}ms. Task was submitted here: {}",
-                        taskDescription != null ? taskDescription : "<unnamed>", duration, maxExecutionTime,
-                        formatStacktrace(stackTrace));
-            }
+            long startTime = System.currentTimeMillis();
+            try {
+                delegate.run();
+            } finally {
+                long duration = System.currentTimeMillis() - startTime;
+                if (duration > maxExecutionTime) {
+                    logger.warn(
+                            "Task '{}' took longer than expected to execute: {}ms, expected < {}ms. Task was submitted here: {}",
+                            taskDescription != null ? taskDescription : "<unnamed>", duration, maxExecutionTime,
+                            formatStacktrace(stackTrace));
+                }
 
-            if (!isScheduled && waitTime > MAX_WAIT_TIME_MS) {
-                logger.warn(
-                        "Task '{}' stayed longer than {}ms in queue before being processed: {}ms. This may indicate a too small threadpool or inadequate hardware for openHAB to run on. Task was submitted here: {}",
-                        taskDescription != null ? taskDescription : "<unnamed>", MAX_WAIT_TIME_MS, waitTime,
-                        formatStacktrace(stackTrace));
+                long waitTime = startTime - submitTime;
+                if (!isScheduled && waitTime > MAX_WAIT_TIME_MS) {
+                    logger.warn(
+                            "Task '{}' stayed longer than {}ms in queue before being processed: {}ms. This may indicate a too small threadpool or inadequate hardware for openHAB to run on. Task was submitted here: {}",
+                            taskDescription != null ? taskDescription : "<unnamed>", MAX_WAIT_TIME_MS, waitTime,
+                            formatStacktrace(stackTrace));
+                }
+            }
+        }
+    }
+
+    private static class TimedCallable<V> implements Callable<V> {
+        private final Callable<V> delegate;
+        private final StackTraceElement[] stackTrace;
+        private final long submitTime;
+        private final long maxExecutionTime;
+        private final @Nullable String taskDescription;
+        private final boolean isScheduled;
+
+        public TimedCallable(Callable<V> delegate, StackTraceElement[] stackTrace, long maxExecutionTime,
+                @Nullable String taskDescription, boolean isScheduled) {
+            this.delegate = delegate;
+            this.stackTrace = stackTrace;
+            this.maxExecutionTime = maxExecutionTime;
+            this.taskDescription = taskDescription;
+            this.isScheduled = isScheduled;
+            submitTime = System.currentTimeMillis();
+        }
+
+        @Override
+        public V call() throws Exception {
+            long startTime = System.currentTimeMillis();
+            try {
+                return delegate.call();
+            } finally {
+                long duration = System.currentTimeMillis() - startTime;
+                if (duration > maxExecutionTime) {
+                    logger.warn(
+                            "Task '{}' took longer than expected to execute: {}ms, expected < {}ms. Task was submitted here: {}",
+                            taskDescription != null ? taskDescription : "<unnamed>", duration, maxExecutionTime,
+                            formatStacktrace(stackTrace));
+                }
+
+                long waitTime = startTime - submitTime;
+                if (!isScheduled && waitTime > MAX_WAIT_TIME_MS) {
+                    logger.warn(
+                            "Task '{}' stayed longer than {}ms in queue before being processed: {}ms. This may indicate a too small threadpool or inadequate hardware for openHAB to run on. Task was submitted here: {}",
+                            taskDescription != null ? taskDescription : "<unnamed>", MAX_WAIT_TIME_MS, waitTime,
+                            formatStacktrace(stackTrace));
+                }
             }
         }
     }
@@ -537,8 +705,9 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
 
     private static StackTraceElement[] getStackTraceElements() {
         StackTraceElement[] callerStacktrace = Thread.currentThread().getStackTrace();
-        // Trim 3 first entries
-        callerStacktrace = Arrays.copyOfRange(callerStacktrace, 3, callerStacktrace.length);
-        return callerStacktrace;
+        if (callerStacktrace.length <= 3) {
+            return new StackTraceElement[0];
+        }
+        return Arrays.copyOfRange(callerStacktrace, 3, callerStacktrace.length);
     }
 }
