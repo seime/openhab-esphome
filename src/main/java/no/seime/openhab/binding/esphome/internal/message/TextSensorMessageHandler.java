@@ -63,7 +63,7 @@ public class TextSensorMessageHandler
 
     protected State toTextState(String state, boolean missingState) {
         if (missingState) {
-            return UnDefType.UNDEF;
+            return UnDefType.NULL;
         } else {
             return new StringType(state);
         }
