@@ -26,14 +26,14 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 ## Getting started for non ESPHome users
 
 1. [Install ESPHome](https://esphome.io/guides/installing_esphome)
-2. Create an ESPHome configuration for your device
-3. Flash the device with the ESPHome firmware
-4. Install the openHAB ESPHome binding by copying the jar file
+2. Create an ESPHome configuration for your device and flash it to your ESP8266 or ESP32
+3. Install the openHAB ESPHome binding by copying the jar file
    here https://github.com/seime/openhab-esphome/releases/tag/latest_oh4 into your `addons` folder, or by installing
    from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849
-5. Wait for discovery to find your device - or add manually in a thing file.
+4. Wait for discovery to find your device - or add manually in a thing file.
 
-> **Note:** Remember to edit your things and add the `encryptionKey` .
+> **Note:** Remember to edit your things and add the `encryptionKey` - or provide a default encryption key in the
+> binding configuration.
 
 ## Discovery
 
@@ -46,7 +46,7 @@ Configuration file to use: `$OH_CONFDIR/services/runtime.cfg` .
 ### Common encryption key for all devices
 
 It is possible to set a default encryption key for all devices in the binding configuration. This is useful if you
-have a lot of devices using the same encryption key. If you are using file based config, add
+have a lot of devices using the same encryption key. If you are using file-based config, add
 
 ```
 binding.esphome:defaultEncryptionKey=<BASE64ENCODEDKEY>
@@ -68,13 +68,13 @@ that are offline. This is the recommended mode for devices that are always conne
 running on mains power.
 
 To enable deep sleep mode, set `deepSleep = true` in the device configuration. In this mode, the binding will not
-attempt to reconnect to devices that are offline, and will instead wait for them to come back online. This is the
+attempt to reconnect to devices that are offline and will instead wait for them to come back online. This is the
 recommended mode for battery-powered devices that use deep sleep to save power. Also set `deepSleepTimeoutSeconds` to
 a reasonable value to detect if the device isn't reachable.
 
 It is also possible to set `deepSleepAssumeOnline = true` to assume the `thing`/device is online without any
 verification. This
-is useful for devices that are known to be online, but be just sleeping when the `thing` is initiated.
+is useful for devices that are known to be online, but be just sleeping when the `thing` is initialized.
 
 ## Thing Configuration
 
