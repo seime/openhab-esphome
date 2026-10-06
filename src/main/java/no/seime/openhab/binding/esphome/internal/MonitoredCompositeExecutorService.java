@@ -253,7 +253,7 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
                 callerSignature), delay, timeUnit));
     }
 
-    private record ImmediateScheduledFuture<V>(@NonNull Future<V> delegate) implements ScheduledFuture<V> {
+    private record ImmediateScheduledFuture<V> (@NonNull Future<V> delegate) implements ScheduledFuture<V> {
 
         @Override
         public long getDelay(TimeUnit unit) {
