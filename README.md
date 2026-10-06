@@ -458,9 +458,13 @@ Most entity types and functions are now supported. However, there are some limit
 The following entity types are **not** yet supported (please submit a PR of file a feature request!)
 
 - `camera`
-- `voice`
+- `voice` - See PR
 - `siren`
 - `water_heater`
 
 - `light` - not all modes are supported. Please create a PR if you need a specific mode.
 
+Other functions are not yet supported:
+
+- Serial proxy
+- Infrared
