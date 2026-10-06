@@ -1,26 +1,22 @@
 # ESPHome Binding for openHAB
 
-### Docs updated 2026-05-10.
-
-<img src="logo.png" width="200"/>
+<img src="logo.png" width="200" alt="ESPHome binding for openHAB"/>
 
 [<img src="https://github.com/seime/support-me/blob/main/openHAB_workswith.png" width=300>](https://www.openhab.org)
 
 [<img src="https://github.com/seime/support-me/blob/main/beer_me.png" width=150>](https://buymeacoffee.com/arnes)
 
 This binding makes [ESPHome](https://esphome.io) devices available in openHAB through the ESPHome Home Assistant Native
-API. This is an
-alternative to using MQTT and/or running Home Assistant in addition to openHAB.
+API.
 
-It does _NOT_ provide any webpage for managing the ESP themselves. Use
-the [ESPHome dashboard](https://esphome.io/guides/installing_esphome.html) for that.
+ESPHome installation instructions: https://esphome.io/install/
 
 <img src="esphomedashboard.png" alt="ESPHome dashboard" width="30%"/>
 
 Benefits of using the native API over MQTT:
 
 - Very tight integration with openHAB, state patterns, options, icons etc fully integrated
-- Robust and reliable communication - 2 way keep-alive pings at fairly short intervals lets you know if the device has
+- Robust and reliable communication - 2 way keep-alive pings at fairly short intervals let you know if the device has
   gone offline
 - No need for an MQTT broker (but that is nice to have anyway for other things :))
 - Slightly faster than messaging over MQTT (according to the ESPHome documentation)
@@ -119,22 +115,17 @@ be linked to an Item. Instead, they fire an event on the openHAB event bus when 
 
 You can use these in rules like this:
 
-```js
+```
 configuration: {
 }
-triggers:
-    -id
-:
-"1"
-label: My
-Event
-Channel
-triggered
-pluginId: core.ChannelEventTrigger
-type: core.ChannelEventTrigger
-configuration:
-    event: dag
-channelUID: esphome:device:mydevice:scene_dag
+triggers: 
+    - id: "1"
+      label: My Event Channel triggered
+      pluginId: core.ChannelEventTrigger
+      type: core.ChannelEventTrigger
+      configuration:
+        event: dag
+        channelUID: esphome: device: mydevice: scene_dag
 ```
 
 Or in Rules DSL:
@@ -167,7 +158,7 @@ Switch Garage_Switch "Relay"                        <switch>        {channel="es
 
 ## FAQ
 
-### My hostname field suddenly changed to xxxx.local?
+### My hostname field suddenly changed to xxxx.local.?
 
 > Openhab updates thing configuration based on mDNS messages. There is currently no way to avoid this, but there are 2
 > workarounds:
@@ -179,9 +170,9 @@ Switch Garage_Switch "Relay"                        <switch>        {channel="es
 
 I get errors like
 ```[WARN ] [phome.internal.handler.ESPHomeHandler] - [mydevice] Error initial connection no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError: Failed to connect to 'XXXX.local.' port 6053```
-> See previous question
+> See the previous question
 
-### openHAB loose connection to my device
+### openHAB loses connection to my device
 
 with log messages like
 `[WARN ] [home.internal.handler.ESPHomeHandler] - [esphome-deviceId] Ping responses lacking. Waited 4 times 10 seconds, total of 40. Assuming connection lost and disconnecting`
@@ -224,7 +215,8 @@ Also see https://community.openhab.org/t/esphome-binding-for-the-native-api/1468
 ## Bluetooth proxy support
 
 It is now possible to use the built-in Bluetooth proxy in ESPHome. This allows you to use ESPHome devices as proxies
-for other Bluetooth devices such as BTHome sensors or a range of other Bluetooth devices.
+for other Bluetooth devices such as BTHome sensors, Shelly BLU, Airthings etc.
+See https://www.openhab.org/addons/bindings/bluetooth/ for a list of OH supported devices.
 
 Both advertisement-only devices (beacons, BTHome sensors, ...) and connectable GATT devices are supported. For
 connectable devices the binding will pick the ESPHome proxy currently reporting the strongest RSSI for the target
@@ -232,9 +224,7 @@ device and lock the connection to that proxy for its whole lifetime, so RSSI flu
 not cause the connection to hop between ESPs mid-session. If the chosen proxy goes offline, the BLE device is
 notified so the child handler can attempt to reconnect via another proxy.
 
-> NOTE: The proxy bridge *CANNOT* be created in the UI, you *must* use file based configuration!
-
-The feature is still experimental and may not work as expected.
+The Bluetooth proxy bridge is configured via the Bluetooth binding in MainUI (or via `.things` file configuration).
 
 1. Configure the ESPHome device with the `bluetooth_proxy` component. See https://esphome.io/components/bluetooth_proxy
 
