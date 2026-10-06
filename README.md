@@ -1,6 +1,6 @@
 # ESPHome Binding for openHAB
 
-<img src="logo.png" width="200" alt="ESPHome binding for openHAB"/>
+[<img src="logo.png" width="200" alt="ESPHome binding for openHAB"/>](https://esphome.io)
 
 [<img src="https://github.com/seime/support-me/blob/main/openHAB_workswith.png" width=300>](https://www.openhab.org)
 
