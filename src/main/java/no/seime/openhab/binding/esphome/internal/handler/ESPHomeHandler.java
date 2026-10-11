@@ -200,6 +200,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         config = getConfigAs(ESPHomeConfiguration.class);
 
         // Use configured logprefix instead of default thingId
+        logPrefix = thing.getUID().getId();
         if (config.logPrefix != null && !config.logPrefix.isEmpty()) {
             logPrefix = String.format("%s", config.logPrefix); // To avoid nullness warning
         }
@@ -236,6 +237,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             cancelConnectFuture();
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
+            cancelDeepSleepWatchdog();
             if (frameHelper != null) {
                 if (connectionState == ConnectionState.CONNECTED) {
                     try {
@@ -487,13 +489,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 scheduleConnect(nextDelay);
             }
         }
-    }
-
-    @Override
-    public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
-        handleDisconnection(ThingStatusDetail.CONFIGURATION_PENDING, "Configuration updated");
-        super.handleConfigurationUpdate(configurationParameters);
-        scheduleConnect(0);
     }
 
     private void handleConnected(GeneratedMessage message) throws ProtocolAPIError {
