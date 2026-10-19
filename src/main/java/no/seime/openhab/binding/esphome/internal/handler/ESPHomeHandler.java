@@ -107,6 +107,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private ConnectionState connectionState = ConnectionState.UNINITIALIZED;
     private boolean disposed = false;
     private boolean interrogated;
+    // Compilation time of the firmware the current channels, channel types and thing actions were created from
+    @Nullable
+    private String interrogatedCompilationTime;
+    @Nullable
+    private String pendingCompilationTime;
     private boolean bluetoothProxyStarted = false;
     // default is not used initialized in initialize()
     private ExponentialBackoff exponentialBackoff = new ExponentialBackoff(10, 500);
@@ -258,6 +263,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             connectionState = ConnectionState.UNINITIALIZED;
 
             thingActionClassLoader = null;
+            interrogatedCompilationTime = null;
+            pendingCompilationTime = null;
         }
         super.dispose();
     }
@@ -494,9 +501,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private void handleConnected(GeneratedMessage message) throws ProtocolAPIError {
         cancelDeepSleepWatchdog();
 
-        if (logger.isDebugEnabled()) {
+        if (logger.isTraceEnabled()) {
             // ToString method costs a bit
-            logger.debug("[{}] Received message type {} with content '{}'", logPrefix,
+            logger.trace("[{}] Received message type {} with content '{}'", logPrefix,
                     message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
         }
         if (disposed) {
@@ -505,7 +512,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         if (message instanceof AuthenticationResponse connectResponse) {
             if (connectResponse.getInvalidPassword()) {
-                logger.debug("[{}] Received login response {}", logPrefix, connectResponse);
+                logger.trace("[{}] Received login response {}", logPrefix, connectResponse);
 
                 handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
             }
@@ -539,6 +546,21 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
 
             updateThing(editThing().withProperties(props).build());
+
+            String compilationTime = rsp.getCompilationTime();
+            if (!compilationTime.isEmpty() && compilationTime.equals(interrogatedCompilationTime)) {
+                logger.debug(
+                        "[{}] Firmware compilation time '{}' unchanged since last interrogation, reusing existing channels and actions",
+                        logPrefix, compilationTime);
+                frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
+                frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
+                updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
+                        versionService.getLatestVersion());
+            } else {
+                logger.debug("[{}] Firmware compilation time changed from '{}' to '{}', starting device interrogation",
+                        logPrefix, interrogatedCompilationTime, compilationTime);
+                startInterrogation(compilationTime);
+            }
         } else if (message instanceof ListEntitiesDoneResponse) {
 
             addFirmwareChannels();
@@ -550,6 +572,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             sweepOrphanedChannelTypes();
             logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
             interrogated = true;
+            interrogatedCompilationTime = pendingCompilationTime;
             frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
 
             updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
@@ -727,7 +750,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
             synchronized (connectionStateLock) {
-                logger.debug("[{}] Received hello response {}", logPrefix, helloResponse);
+                logger.trace("[{}] Received hello response {}", logPrefix, helloResponse);
                 logger.info("[{}] Connected successfully. Device '{}' is running '{}' on protocol version '{}.{}'",
                         logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
                         helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
@@ -747,7 +770,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }
 
                 updateStatus(ThingStatus.ONLINE);
-                logger.debug("[{}] Device login complete, starting device interrogation", logPrefix);
+                logger.debug("[{}] Device login complete, requesting device info", logPrefix);
 
                 if (!config.deepSleep) {
                     // Reset last pong
@@ -782,25 +805,30 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 } else {
                     scheduleDeepSleepWatchdog();
                 }
-                // Clear the local list of channels; the previous set stays on the Thing (and its channel-type
-                // references stay resolvable in the type provider) until updateThing() below replaces them. Orphaned
-                // types are swept later, after updateThing() has propagated, to avoid racing with
-                // ThingManagerImpl.normalizeConfiguration.
-                dynamicChannels.clear();
 
-                // Clean up old actions
-                clearThingActions();
-                // Create a new classloader for the ThingActions generated from this device, to allow for proper
-                // unloading of old classes when the device reappears with different actions after a reconnect
-                thingActionClassLoader = new ClassLoader(getClass().getClassLoader()) {
-                };
-
-                // Start interrogation
+                // Entity interrogation is decided upon receiving DeviceInfoResponse
                 frameHelper.send(DeviceInfoRequest.getDefaultInstance());
-                frameHelper.send(ListEntitiesRequest.getDefaultInstance());
-                frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
             }
         }
+    }
+
+    private void startInterrogation(String compilationTime) throws ProtocolAPIError {
+        pendingCompilationTime = compilationTime;
+        // Clear the local list of channels; the previous set stays on the Thing (and its channel-type
+        // references stay resolvable in the type provider) until updateThing() in ListEntitiesDoneResponse replaces
+        // them. Orphaned types are swept later, after updateThing() has propagated, to avoid racing with
+        // ThingManagerImpl.normalizeConfiguration.
+        dynamicChannels.clear();
+
+        // Clean up old actions
+        clearThingActions();
+        // Create a new classloader for the ThingActions generated from this device, to allow for proper
+        // unloading of old classes when the device reappears with different actions after a reconnect
+        thingActionClassLoader = new ClassLoader(getClass().getClassLoader()) {
+        };
+
+        frameHelper.send(ListEntitiesRequest.getDefaultInstance());
+        frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
     }
 
     private void scheduleDeepSleepWatchdog() {

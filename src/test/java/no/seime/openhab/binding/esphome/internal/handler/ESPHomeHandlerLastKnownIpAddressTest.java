@@ -19,15 +19,21 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openhab.core.events.EventPublisher;
+import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
+import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.internal.ThingImpl;
 import org.osgi.framework.BundleContext;
 
 import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.DeviceInfoResponse;
+import io.esphome.api.ListEntitiesDoneResponse;
+import io.esphome.api.ListEntitiesRequest;
+import io.esphome.api.SubscribeStatesRequest;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
+import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
@@ -49,6 +55,10 @@ class ESPHomeHandlerLastKnownIpAddressTest {
     private ThingHandlerCallback callback;
     @Mock
     private ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
+    @Mock
+    private EncryptedFrameHelper frameHelper;
+    @Mock
+    private ESPHomeVersionService versionService;
 
     private ESPHomeHandler handler;
     private ThingImpl thing;
@@ -67,9 +77,10 @@ class ESPHomeHandlerLastKnownIpAddressTest {
 
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
-                bundleContext, mock(ESPHomeVersionService.class), firmwareUpgradeService, mdnsHostnameResolver);
+                bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver);
 
         setField("config", new ESPHomeConfiguration());
+        setField("frameHelper", frameHelper);
 
         handler.setCallback(callback);
     }
@@ -173,6 +184,52 @@ class ESPHomeHandlerLastKnownIpAddressTest {
         verify(callback).thingUpdated(argThat(updatedThing -> "127.0.0.1"
                 .equals(updatedThing.getProperties().get(ESPHomeHandler.PROPERTY_LAST_KNOWN_IP_ADDRESS))
                 && "virtual".equals(updatedThing.getProperties().get("name"))));
+    }
+
+    @Test
+    void skipsInterrogationWhenCompilationTimeUnchanged() throws Exception {
+        stubFirmwareChannels();
+        handleDeviceInfo("2026-04-14T00:00:00Z");
+        invokeMethod("handleConnected", new Class<?>[] { com.google.protobuf.GeneratedMessage.class },
+                ListEntitiesDoneResponse.getDefaultInstance());
+        verify(frameHelper, times(1)).send(ListEntitiesRequest.getDefaultInstance());
+
+        handleDeviceInfo("2026-04-14T00:00:00Z");
+
+        verify(frameHelper, times(1)).send(ListEntitiesRequest.getDefaultInstance());
+        verify(frameHelper, times(2)).send(SubscribeStatesRequest.getDefaultInstance());
+    }
+
+    @Test
+    void interrogatesWhenCompilationTimeChanged() throws Exception {
+        stubFirmwareChannels();
+        handleDeviceInfo("2026-04-14T00:00:00Z");
+        invokeMethod("handleConnected", new Class<?>[] { com.google.protobuf.GeneratedMessage.class },
+                ListEntitiesDoneResponse.getDefaultInstance());
+
+        handleDeviceInfo("2026-04-15T00:00:00Z");
+
+        verify(frameHelper, times(2)).send(ListEntitiesRequest.getDefaultInstance());
+    }
+
+    @Test
+    void interrogatesAgainWhenPreviousInterrogationDidNotComplete() throws Exception {
+        handleDeviceInfo("2026-04-14T00:00:00Z");
+        handleDeviceInfo("2026-04-14T00:00:00Z");
+
+        verify(frameHelper, times(2)).send(ListEntitiesRequest.getDefaultInstance());
+    }
+
+    private void stubFirmwareChannels() {
+        when(versionService.createFirmwareUpdateAvailableChannel(thing.getUID())).thenAnswer(
+                i -> ChannelBuilder.create(new ChannelUID(thing.getUID(), "firmwareUpdateAvailable")).build());
+        when(versionService.createLatestFirmwareVersionChannel(thing.getUID())).thenAnswer(
+                i -> ChannelBuilder.create(new ChannelUID(thing.getUID(), "latestFirmwareVersion")).build());
+    }
+
+    private void handleDeviceInfo(String compilationTime) throws Exception {
+        invokeMethod("handleConnected", new Class<?>[] { com.google.protobuf.GeneratedMessage.class },
+                DeviceInfoResponse.newBuilder().setCompilationTime(compilationTime).build());
     }
 
     private Object invokeMethod(String name, Class<?>[] parameterTypes, Object... args) throws Exception {
