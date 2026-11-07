@@ -8,12 +8,15 @@ import java.io.File;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openhab.core.items.ItemNotFoundException;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.thing.*;
 
 import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 
+@Execution(ExecutionMode.SAME_THREAD)
 public class ActionsEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
     protected File getEspDeviceConfigurationYamlFileName() {

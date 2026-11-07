@@ -2,7 +2,7 @@ substitutions:
   api_port: "6053"
 
 esphome:
-  name: virtual
+  name: virtual_media_player
 
 host:
   mac_address: "06:35:69:ab:f6:79"
