@@ -25,10 +25,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.audio.AudioFormat;
+import org.openhab.core.audio.AudioHTTPServer;
+import org.openhab.core.audio.AudioSink;
+import org.openhab.core.audio.AudioSource;
 import org.openhab.core.events.AbstractEvent;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.library.types.OpenClosedType;
 import org.openhab.core.library.types.StringType;
+import org.openhab.core.net.HttpServiceUtil;
+import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.binding.ThingActions;
@@ -48,6 +54,10 @@ import com.jano7.executor.KeySequentialExecutor;
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 import no.seime.openhab.binding.esphome.internal.*;
+import no.seime.openhab.binding.esphome.internal.audio.AudioUtil;
+import no.seime.openhab.binding.esphome.internal.audio.ESPHomeAudioSink;
+import no.seime.openhab.binding.esphome.internal.audio.ESPHomeVoiceAssistantAudioSource;
+import no.seime.openhab.binding.esphome.internal.audio.VoiceAssistantFeature;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
@@ -92,6 +102,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ESPHomeVersionService versionService;
     private final FirmwareUpgradeService firmwareUpgradeService;
     private final ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
+    private final AudioHTTPServer audioHTTPServer;
+    private final NetworkAddressService networkAddressService;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -119,6 +131,13 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private String resolvedIpAddressForCurrentConnection;
 
     private final Set<ServiceRegistration<?>> thingActionServiceRegistrations = new HashSet<>();
+    private final Map<Integer, ListEntitiesMediaPlayerResponse> mediaPlayers = new HashMap<>();
+    private final Map<Integer, MediaPlayerStateResponse> mediaPlayerStates = new HashMap<>();
+    private final Map<Integer, ESPHomeAudioSink> audioSinks = new HashMap<>();
+    private final Map<Integer, ServiceRegistration<AudioSink>> audioSinkRegistrations = new HashMap<>();
+    private @Nullable ESPHomeVoiceAssistantAudioSource audioSource;
+    private @Nullable ServiceRegistration<AudioSource> audioSourceRegistration;
+    private int voiceAssistantFeatureFlags;
 
     private String logPrefix;
     @Nullable
@@ -133,7 +152,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             KeySequentialExecutor packetProcessor, EventPublisher eventPublisher,
             @Nullable String bindingPropertyDefaultEncryptionKey, BundleContext bundleContext,
             ESPHomeVersionService versionService, FirmwareUpgradeService firmwareUpgradeService,
-            ESPHomeMDNSHostnameResolver mdnsHostnameResolver) {
+            ESPHomeMDNSHostnameResolver mdnsHostnameResolver, AudioHTTPServer audioHTTPServer,
+            NetworkAddressService networkAddressService) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -148,6 +168,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.versionService = versionService;
         this.firmwareUpgradeService = firmwareUpgradeService;
         this.mdnsHostnameResolver = mdnsHostnameResolver;
+        this.audioHTTPServer = audioHTTPServer;
+        this.networkAddressService = networkAddressService;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -186,6 +208,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 ValveStateResponse.class);
         registerMessageHandler(EntityTypes.EVENT, new EventMessageHandler(this), ListEntitiesEventResponse.class,
                 EventResponse.class);
+        registerMessageHandler(EntityTypes.MEDIA_PLAYER, new MediaPlayerMessageHandler(this),
+                ListEntitiesMediaPlayerResponse.class, MediaPlayerStateResponse.class);
     }
 
     private void registerMessageHandler(String entityType,
@@ -243,6 +267,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
             cancelDeepSleepWatchdog();
+            // ThingActions
+            clearThingActions();
+            // AudioSinks
+            unregisterAudioSinks();
+            mediaPlayers.clear();
+            mediaPlayerStates.clear();
+            // AudioSource
+            unregisterAudioSource();
+
             if (frameHelper != null) {
                 if (connectionState == ConnectionState.CONNECTED) {
                     try {
@@ -256,9 +289,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.close();
                 frameHelper = null;
             }
-
-            // ThingActions
-            clearThingActions();
 
             connectionState = ConnectionState.UNINITIALIZED;
 
@@ -279,6 +309,130 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         dynamicChannelTypeProvider.removeChannelTypesForThing(thing.getUID());
 
         super.handleRemoval();
+    }
+
+    private void refreshAudioServices() {
+        if (!interrogated || disposed || connectionState != ConnectionState.CONNECTED) {
+            unregisterAudioSinks();
+            unregisterAudioSource();
+            return;
+        }
+
+        refreshAudioSink();
+        refreshAudioSource();
+    }
+
+    private void refreshAudioSink() {
+        String baseUrl = resolveAudioSinkBaseUrl();
+        if (baseUrl == null) {
+            logger.debug("[{}] Cannot register ESPHome audio sinks because the primary openHAB IPv4 address is unknown",
+                    logPrefix);
+            unregisterAudioSinks();
+            return;
+        }
+
+        Set<Integer> staleKeys = new HashSet<>(audioSinkRegistrations.keySet());
+        for (ListEntitiesMediaPlayerResponse mediaPlayer : mediaPlayers.values()) {
+            Set<AudioFormat> supportedFormats = AudioUtil
+                    .mapSupportedAudioFormats(mediaPlayer.getSupportedFormatsList());
+            if (supportedFormats.isEmpty()) {
+                continue;
+            }
+            staleKeys.remove(mediaPlayer.getKey());
+            ESPHomeAudioSink sink = audioSinks.get(mediaPlayer.getKey());
+            if (sink == null) {
+                ESPHomeAudioSink newAudioSink = new ESPHomeAudioSink(this, audioHTTPServer, mediaPlayer, baseUrl);
+                newAudioSink.updateState(mediaPlayerStates.get(mediaPlayer.getKey()));
+                audioSinkRegistrations.put(mediaPlayer.getKey(),
+                        bundleContext.registerService(AudioSink.class, newAudioSink, new Hashtable<>()));
+                audioSinks.put(mediaPlayer.getKey(), newAudioSink);
+            } else {
+                sink.updateState(mediaPlayerStates.get(mediaPlayer.getKey()));
+            }
+        }
+
+        for (Integer staleKey : staleKeys) {
+            ServiceRegistration<AudioSink> registration = audioSinkRegistrations.remove(staleKey);
+            if (registration != null) {
+                registration.unregister();
+            }
+            audioSinks.remove(staleKey);
+        }
+    }
+
+    private void refreshAudioSource() {
+        if (!supportsVoiceAssistantApiAudio()) {
+            ESPHomeVoiceAssistantAudioSource source = audioSource;
+            audioSource = null;
+            if (source != null) {
+                source.close();
+            }
+            ServiceRegistration<AudioSource> registration = audioSourceRegistration;
+            audioSourceRegistration = null;
+            if (registration != null) {
+                registration.unregister();
+            }
+            return;
+        }
+
+        if (audioSource == null) {
+            ESPHomeVoiceAssistantAudioSource newAudioSource = new ESPHomeVoiceAssistantAudioSource(this);
+            audioSourceRegistration = bundleContext.registerService(AudioSource.class, newAudioSource,
+                    new Hashtable<>());
+            audioSource = newAudioSource;
+        }
+    }
+
+    private @Nullable String resolveAudioSinkBaseUrl() {
+        @Nullable
+        String primaryAddress = networkAddressService.getPrimaryIpv4HostAddress();
+        return primaryAddress != null
+                ? "http://" + primaryAddress + ":" + HttpServiceUtil.getHttpServicePort(bundleContext)
+                : null;
+    }
+
+    private void unregisterAudioSinks() {
+        for (ServiceRegistration<AudioSink> registration : audioSinkRegistrations.values()) {
+            registration.unregister();
+        }
+        audioSinkRegistrations.clear();
+        for (ESPHomeAudioSink sink : audioSinks.values()) {
+            sink.dispose();
+        }
+        audioSinks.clear();
+    }
+
+    private void unregisterAudioSource() {
+        ESPHomeVoiceAssistantAudioSource source = audioSource;
+        if (source != null) {
+            source.close();
+            audioSource = null;
+        }
+        ServiceRegistration<AudioSource> sourceRegistration = audioSourceRegistration;
+        if (sourceRegistration != null) {
+            sourceRegistration.unregister();
+            audioSourceRegistration = null;
+        }
+    }
+
+    private boolean supportsVoiceAssistantApiAudio() {
+        return (voiceAssistantFeatureFlags & VoiceAssistantFeature.API_AUDIO.getFlag()) != 0;
+    }
+
+    private void handleMediaPlayerEntity(ListEntitiesMediaPlayerResponse message) {
+        mediaPlayers.put(message.getKey(), message);
+    }
+
+    private void handleMediaPlayerState(MediaPlayerStateResponse message) {
+        if (!mediaPlayers.containsKey(message.getKey())) {
+            return;
+        }
+
+        mediaPlayerStates.put(message.getKey(), message);
+        ESPHomeAudioSink sink = audioSinks.get(message.getKey());
+        if (sink != null) {
+            sink.updateState(message);
+        }
     }
 
     private void connect() {
@@ -347,7 +501,16 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     public void sendMessage(GeneratedMessage message) throws ProtocolAPIError {
-        frameHelper.send(message);
+        EncryptedFrameHelper helper = frameHelper;
+        if (helper != null) {
+            helper.send(message);
+        } else {
+            throw new ProtocolAPIError(String.format("[%s] Device is not connected", logPrefix));
+        }
+    }
+
+    public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+        return executorService.schedule(command, delay, unit);
     }
 
     private void setUndefToAllChannels() {
@@ -475,6 +638,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             eventSubscriber.removeEventSubscriptions(this);
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
+            unregisterAudioSinks();
+            unregisterAudioSource();
+            voiceAssistantFeatureFlags = 0;
 
             if (frameHelper != null) {
                 frameHelper.close();
@@ -537,7 +703,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             } else {
                 props.remove("projectVersion");
             }
-
             if (!rsp.getHasDeepSleep() && config.deepSleep) {
                 logger.warn(
                         "[{}] Thing is configured with deep sleep, but the ESPHome device does not support it. Disabling deep sleep mode",
@@ -545,8 +710,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 config.deepSleep = false;
             }
 
+            voiceAssistantFeatureFlags = rsp.getVoiceAssistantFeatureFlags();
             updateThing(editThing().withProperties(props).build());
-
             String compilationTime = rsp.getCompilationTime();
             if (!compilationTime.isEmpty() && compilationTime.equals(interrogatedCompilationTime)) {
                 logger.debug(
@@ -556,11 +721,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
                 updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
                         versionService.getLatestVersion());
+                refreshAudioServices();
             } else {
                 logger.debug("[{}] Firmware compilation time changed from '{}' to '{}', starting device interrogation",
                         logPrefix, interrogatedCompilationTime, compilationTime);
                 startInterrogation(compilationTime);
             }
+        } else if (message instanceof ListEntitiesMediaPlayerResponse mediaPlayerResponse) {
+            handleMediaPlayerEntity(mediaPlayerResponse);
+            classToHandlerMap.get(message.getClass()).handleMessage(message);
         } else if (message instanceof ListEntitiesDoneResponse) {
 
             addFirmwareChannels();
@@ -573,6 +742,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
             interrogated = true;
             interrogatedCompilationTime = pendingCompilationTime;
+            refreshAudioServices();
             frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
 
             updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
@@ -594,6 +764,16 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
+        } else if (message instanceof VoiceAssistantRequest voiceAssistantRequest) {
+            ESPHomeVoiceAssistantAudioSource source = audioSource;
+            if (source != null) {
+                source.handleVoiceAssistantRequest(voiceAssistantRequest);
+            }
+        } else if (message instanceof VoiceAssistantAudio voiceAssistantAudio) {
+            ESPHomeVoiceAssistantAudioSource source = audioSource;
+            if (source != null) {
+                source.handleVoiceAssistantAudio(voiceAssistantAudio);
+            }
         } else if (message instanceof HomeassistantActionRequest serviceResponse) {
             Map<String, String> data = convertPbListToMap(serviceResponse.getDataList());
             Map<String, String> dataTemplate = convertPbListToMap(serviceResponse.getDataTemplateList());
@@ -651,6 +831,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
 
         } else {
+            if (message instanceof MediaPlayerStateResponse mediaPlayerStateResponse) {
+                handleMediaPlayerState(mediaPlayerStateResponse);
+            }
             // Regular messages handled by message handlers
             AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = classToHandlerMap
                     .get(message.getClass());
@@ -822,6 +1005,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         // Clean up old actions
         clearThingActions();
+        unregisterAudioSinks();
+        unregisterAudioSource();
+        mediaPlayers.clear();
+        mediaPlayerStates.clear();
         // Create a new classloader for the ThingActions generated from this device, to allow for proper
         // unloading of old classes when the device reappears with different actions after a reconnect
         thingActionClassLoader = new ClassLoader(getClass().getClassLoader()) {

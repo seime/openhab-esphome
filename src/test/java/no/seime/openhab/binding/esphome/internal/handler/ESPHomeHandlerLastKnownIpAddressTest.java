@@ -18,7 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.events.EventPublisher;
+import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
@@ -59,6 +61,10 @@ class ESPHomeHandlerLastKnownIpAddressTest {
     private EncryptedFrameHelper frameHelper;
     @Mock
     private ESPHomeVersionService versionService;
+    @Mock
+    private AudioHTTPServer audioHTTPServer;
+    @Mock
+    private NetworkAddressService networkAddressService;
 
     private ESPHomeHandler handler;
     private ThingImpl thing;
@@ -77,11 +83,11 @@ class ESPHomeHandlerLastKnownIpAddressTest {
 
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
-                bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver);
+                bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
+                networkAddressService);
 
         setField("config", new ESPHomeConfiguration());
         setField("frameHelper", frameHelper);
-
         handler.setCallback(callback);
     }
 

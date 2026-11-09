@@ -57,6 +57,7 @@ public class EncryptedFrameHelper {
     private CipherStatePair cipherStatePair;
     private NoiseProtocolState state;
     private final String connectionId = UUID.randomUUID().toString();
+    private final Object sendLock = new Object();
 
     public EncryptedFrameHelper(ConnectionSelector connectionSelector, CommunicationListener listener,
             String encryptionKeyBase64, @Nullable String expectedDeviceId, String logPrefix,
@@ -91,8 +92,10 @@ public class EncryptedFrameHelper {
 
             client.start();
 
-            state = NoiseProtocolState.HELLO;
-            connection.send(createFrame(new byte[0]));
+            synchronized (sendLock) {
+                state = NoiseProtocolState.HELLO;
+                connection.send(createFrame(new byte[0]));
+            }
 
         } catch (NoSuchAlgorithmException e) {
             throw new ProtocolAPIError("Error initializing encryption", e);
@@ -175,8 +178,10 @@ public class EncryptedFrameHelper {
             System.arraycopy(noiseHandshakeBuffer, 0, payload, 1, noiseHandshakeLength);
 
             ByteBuffer frame = createFrame(payload);
-            state = NoiseProtocolState.HANDSHAKE;
-            connection.send(frame);
+            synchronized (sendLock) {
+                state = NoiseProtocolState.HANDSHAKE;
+                connection.send(frame);
+            }
         }
     }
 
@@ -232,18 +237,23 @@ public class EncryptedFrameHelper {
     }
 
     public ByteBuffer encodeFrame(GeneratedMessage message) throws ProtocolAPIError {
-        try {
-            byte[] protoBytes = message.toByteArray();
-            int type = message.getDescriptorForType().getOptions().getExtension(ApiOptions.id);
-            byte[] typeAndLength = new byte[] { (byte) (type >> 8 & 0xFF), (byte) (type & 0xFF),
-                    (byte) (protoBytes.length >> 8 & 0xFF), (byte) (protoBytes.length & 0xFF) };
-            byte[] frameUnencrypted = concatArrays(typeAndLength, protoBytes);
-            byte[] frameEncrypted = encryptPacket(frameUnencrypted);
+        synchronized (sendLock) {
+            if (state != NoiseProtocolState.READY || cipherStatePair == null) {
+                throw new ProtocolAPIError("Transport encryption is not ready (state=" + state + ")");
+            }
+            try {
+                byte[] protoBytes = message.toByteArray();
+                int type = message.getDescriptorForType().getOptions().getExtension(ApiOptions.id);
+                byte[] typeAndLength = new byte[] { (byte) (type >> 8 & 0xFF), (byte) (type & 0xFF),
+                        (byte) (protoBytes.length >> 8 & 0xFF), (byte) (protoBytes.length & 0xFF) };
+                byte[] frameUnencrypted = concatArrays(typeAndLength, protoBytes);
+                byte[] frameEncrypted = encryptPacket(frameUnencrypted);
 
-            return createFrame(frameEncrypted);
+                return createFrame(frameEncrypted);
 
-        } catch (Exception e) {
-            throw new ProtocolAPIError(e.getMessage());
+            } catch (Exception e) {
+                throw new ProtocolAPIError(e.getMessage(), e);
+            }
         }
     }
 
@@ -271,7 +281,9 @@ public class EncryptedFrameHelper {
     }
 
     public void close() {
-        connection.close();
+        synchronized (sendLock) {
+            connection.close();
+        }
     }
 
     protected void processBuffer() throws ProtocolException {
@@ -387,14 +399,13 @@ public class EncryptedFrameHelper {
             logger.debug("[{}] Sending message type {} with content '{}'", logPrefix,
                     message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
         }
-        try {
+        synchronized (sendLock) {
             if (connection != null) {
                 connection.send(encodeFrame(message));
             } else {
-                logger.debug("Connection is null, cannot send message");
+                logger.debug("[{}] Connection is null, cannot send message", logPrefix);
+                throw new ProtocolAPIError("Connection is null, cannot send message");
             }
-        } catch (ProtocolAPIError e) {
-            logger.warn("Error sending message", e);
         }
     }
 

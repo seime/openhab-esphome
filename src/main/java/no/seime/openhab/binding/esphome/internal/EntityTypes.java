@@ -19,4 +19,5 @@ public class EntityTypes {
     public static final String LOCK = "Lock";
     public static final String VALVE = "Valve";
     public static final String EVENT = "Event";
+    public static final String MEDIA_PLAYER = "MediaPlayer";
 }

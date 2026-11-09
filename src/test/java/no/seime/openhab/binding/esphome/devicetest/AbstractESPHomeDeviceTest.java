@@ -21,12 +21,14 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.items.GenericItem;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemNotFoundException;
 import org.openhab.core.items.ItemRegistry;
+import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
@@ -66,6 +68,8 @@ public abstract class AbstractESPHomeDeviceTest {
     protected @Mock ESPStateDescriptionProvider stateDescriptionProvider;
     protected @Mock BundleContext bundleContext;
     protected @Mock ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
+    protected @Mock AudioHTTPServer audioHTTPServer;
+    protected @Mock NetworkAddressService networkAddressService;
     private ESPHomeDeviceRunner emulator;
 
     @BeforeEach
@@ -92,6 +96,7 @@ public abstract class AbstractESPHomeDeviceTest {
 
         when(itemRegistry.getItems()).thenReturn(registryItems);
         eventSubscriber = new ESPHomeEventSubscriber(thingRegistry, itemRegistry);
+        when(networkAddressService.getPrimaryIpv4HostAddress()).thenReturn("127.0.0.1");
 
         ESPHomeVersionService versionService = Mockito.mock(ESPHomeVersionService.class);
         when(versionService.getLatestVersion()).thenReturn("2024.3.0");
@@ -106,7 +111,7 @@ public abstract class AbstractESPHomeDeviceTest {
 
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, bundleContext,
-                versionService, firmwareUpgradeService, mdnsHostnameResolver);
+                versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer, networkAddressService);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 
