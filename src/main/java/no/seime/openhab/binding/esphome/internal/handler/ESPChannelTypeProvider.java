@@ -12,10 +12,14 @@
  */
 package no.seime.openhab.binding.esphome.internal.handler;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.storage.StorageService;
+import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.AbstractStorageBasedTypeProvider;
 import org.openhab.core.thing.type.ChannelType;
@@ -33,27 +37,49 @@ import org.osgi.service.component.annotations.Reference;
 @Component(service = { ESPChannelTypeProvider.class, ChannelTypeProvider.class })
 @NonNullByDefault
 public class ESPChannelTypeProvider extends AbstractStorageBasedTypeProvider {
+    private final ThingRegistry thingRegistry;
+
+    // Protect types registered before an interrogation publishes its channels to the ThingRegistry.
+    private final Map<ThingUID, Set<ChannelTypeUID>> pendingTypes = new HashMap<>();
+
     @Activate
-    public ESPChannelTypeProvider(@Reference StorageService storageService) {
+    public ESPChannelTypeProvider(@Reference StorageService storageService, @Reference ThingRegistry thingRegistry) {
         super(storageService);
+        this.thingRegistry = thingRegistry;
     }
 
-    public void removeChannelTypesForThing(ThingUID uid) {
+    public synchronized void addChannelType(ThingUID thingUID, ChannelType channelType) {
+        pendingTypes.computeIfAbsent(thingUID, uid -> new HashSet<>()).add(channelType.getUID());
+        if (getChannelType(channelType.getUID(), null) == null) {
+            putChannelType(channelType);
+        }
+    }
 
-        String thingUid = uid.getBindingId() + ":" + uid.getId() + "_";
-        getChannelTypes(null).stream().map(ChannelType::getUID).filter(c -> c.getAsString().startsWith(thingUid))
-                .forEach(this::removeChannelType);
+    public synchronized void discardPendingTypes(ThingUID uid) {
+        pendingTypes.remove(uid);
+    }
+
+    public synchronized void removeChannelTypesForThing(ThingUID uid) {
+        pendingTypes.remove(uid);
+        removeOrphanedChannelTypesForThing(uid, Set.of());
     }
 
     /**
-     * Remove dynamic channel types belonging to {@code thingUID} that are not present in {@code keep}. Used to clean up
-     * types left over from a previous interrogation after the thing has been updated with the current channel set — so
-     * no channel ever references a missing type (which would race with
-     * {@code ThingManagerImpl.normalizeConfiguration}).
+     * Sweep stored types after publishing a thing's channels. Include all other registered things (even offline
+     * things) and in-flight interrogations. This also cleans up legacy, thing-scoped types after migration.
      */
-    public void removeOrphanedChannelTypesForThing(ThingUID thingUID, Set<ChannelTypeUID> keep) {
-        String prefix = thingUID.getBindingId() + ":" + thingUID.getId() + "_";
-        getChannelTypes(null).stream().map(ChannelType::getUID).filter(c -> c.getAsString().startsWith(prefix))
-                .filter(c -> !keep.contains(c)).forEach(this::removeChannelType);
+    public synchronized void removeOrphanedChannelTypesForThing(ThingUID thingUID, Set<ChannelTypeUID> keep) {
+        pendingTypes.remove(thingUID);
+        Set<ChannelTypeUID> referenced = new HashSet<>(keep);
+        thingRegistry.getAll().stream().filter(thing -> !thing.getUID().equals(thingUID))
+                .flatMap(thing -> thing.getChannels().stream()).forEach(channel -> {
+                    ChannelTypeUID uid = channel.getChannelTypeUID();
+                    if (uid != null) {
+                        referenced.add(uid);
+                    }
+                });
+        pendingTypes.values().forEach(referenced::addAll);
+        getChannelTypes(null).stream().map(ChannelType::getUID).filter(uid -> !referenced.contains(uid))
+                .forEach(this::removeChannelType);
     }
 }
