@@ -98,6 +98,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final EventPublisher eventPublisher;
     @Nullable
     private final String bindingPropertyDefaultEncryptionKey;
+    @Nullable
+    private final String bindingPropertyAudioBaseUrl;
     private final BundleContext bundleContext;
     private final ESPHomeVersionService versionService;
     private final FirmwareUpgradeService firmwareUpgradeService;
@@ -150,10 +152,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
             ESPHomeEventSubscriber eventSubscriber, MonitoredCompositeExecutorService executorService,
             KeySequentialExecutor packetProcessor, EventPublisher eventPublisher,
-            @Nullable String bindingPropertyDefaultEncryptionKey, BundleContext bundleContext,
-            ESPHomeVersionService versionService, FirmwareUpgradeService firmwareUpgradeService,
-            ESPHomeMDNSHostnameResolver mdnsHostnameResolver, AudioHTTPServer audioHTTPServer,
-            NetworkAddressService networkAddressService) {
+            @Nullable String bindingPropertyDefaultEncryptionKey, @Nullable String bindingPropertyAudioBaseUrl,
+            BundleContext bundleContext, ESPHomeVersionService versionService,
+            FirmwareUpgradeService firmwareUpgradeService, ESPHomeMDNSHostnameResolver mdnsHostnameResolver,
+            AudioHTTPServer audioHTTPServer, NetworkAddressService networkAddressService) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -164,6 +166,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.packetProcessor = packetProcessor;
         this.eventPublisher = eventPublisher;
         this.bindingPropertyDefaultEncryptionKey = bindingPropertyDefaultEncryptionKey;
+        this.bindingPropertyAudioBaseUrl = bindingPropertyAudioBaseUrl;
         this.bundleContext = bundleContext;
         this.versionService = versionService;
         this.firmwareUpgradeService = firmwareUpgradeService;
@@ -325,7 +328,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private void refreshAudioSink() {
         String baseUrl = resolveAudioSinkBaseUrl();
         if (baseUrl == null) {
-            logger.debug("[{}] Cannot register ESPHome audio sinks because the primary openHAB IPv4 address is unknown",
+            logger.debug(
+                    "[{}] Cannot register ESPHome audio sinks because no base URL is configured and the primary openHAB IPv4 address is unknown",
                     logPrefix);
             unregisterAudioSinks();
             return;
@@ -347,6 +351,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         bundleContext.registerService(AudioSink.class, newAudioSink, new Hashtable<>()));
                 audioSinks.put(mediaPlayer.getKey(), newAudioSink);
             } else {
+                sink.setBaseUrl(baseUrl);
                 sink.updateState(mediaPlayerStates.get(mediaPlayer.getKey()));
             }
         }
@@ -384,6 +389,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private @Nullable String resolveAudioSinkBaseUrl() {
+        if (StringUtils.isNotBlank(bindingPropertyAudioBaseUrl)) {
+            return bindingPropertyAudioBaseUrl.trim();
+        }
         @Nullable
         String primaryAddress = networkAddressService.getPrimaryIpv4HostAddress();
         return primaryAddress != null
@@ -393,7 +401,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private void unregisterAudioSinks() {
         for (ServiceRegistration<AudioSink> registration : audioSinkRegistrations.values()) {
-            registration.unregister();
+            if (registration != null) {
+                registration.unregister();
+            }
         }
         audioSinkRegistrations.clear();
         for (ESPHomeAudioSink sink : audioSinks.values()) {

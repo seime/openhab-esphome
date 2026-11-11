@@ -52,6 +52,16 @@ have a lot of devices using the same encryption key. If you are using file-based
 binding.esphome:defaultEncryptionKey=<BASE64ENCODEDKEY>
 ```
 
+### Audio streaming with reverse proxy / custom base URL
+
+When streaming audio to ESPHome Media Player entities, openHAB serves audio over HTTP and provides a URL for the device to stream from. 
+By default, openHAB's primary IPv4 address and HTTP port are used. 
+If openHAB is behind a reverse proxy (or in a container/VLAN setup), you can override the base URL in the binding configuration:
+
+```
+binding.esphome:audioBaseUrl=https://openhab.internal
+```
+
 ### Thread pool size
 
 The internal threadpool defaults to maximum `numProcessors * 2` threads. If you have a lot of devices, you may want to

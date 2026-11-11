@@ -110,8 +110,9 @@ public abstract class AbstractESPHomeDeviceTest {
         FirmwareUpgradeService firmwareUpgradeService = Mockito.mock(FirmwareUpgradeService.class);
 
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
-                eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, bundleContext,
-                versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer, networkAddressService);
+                eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, null,
+                bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
+                networkAddressService);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 

@@ -61,6 +61,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
             BindingConstants.THING_TYPE_BLE_PROXY);
 
     private @Nullable String bindingPropertyDefaultEncryptionKey;
+    private @Nullable String bindingPropertyAudioBaseUrl;
 
     private final AtomicLong threadCounter = new AtomicLong(0);
 
@@ -105,8 +106,9 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
-                    bindingPropertyDefaultEncryptionKey, getBundleContext(), versionService, firmwareUpgradeService,
-                    mdnsHostnameResolver, audioHTTPServer, networkAddressService);
+                    bindingPropertyDefaultEncryptionKey, bindingPropertyAudioBaseUrl, getBundleContext(),
+                    versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
+                    networkAddressService);
             esphomeHandlers.put(thing.getUID(), handler);
             return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
@@ -148,6 +150,14 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
             if (bindingPropertyDefaultEncryptionKey != null) {
                 logger.info(
                         "Found binding default encryption key for ESPHome devices, will use if not configured on thing");
+            }
+
+            bindingPropertyAudioBaseUrl = StringUtils.trimToNull((String) properties.get("audioBaseUrl"));
+            if (bindingPropertyAudioBaseUrl == null) {
+                bindingPropertyAudioBaseUrl = StringUtils.trimToNull((String) properties.get("defaultAudioBaseUrl"));
+            }
+            if (bindingPropertyAudioBaseUrl != null) {
+                logger.debug("Found binding audio base URL for ESPHome devices: {}", bindingPropertyAudioBaseUrl);
             }
 
             String bindingPropertyEspHomeExecutable = StringUtils

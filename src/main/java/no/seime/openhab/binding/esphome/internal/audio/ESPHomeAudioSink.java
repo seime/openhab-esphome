@@ -64,7 +64,7 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
 
     private final String id;
     private final String label;
-    private final String baseUrl;
+    private volatile String baseUrl;
     private final int mediaPlayerKey;
     private final String mediaPlayerObjectId;
     private final Set<AudioFormat> supportedFormats;
@@ -310,7 +310,19 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
         return !announcementFormats.isEmpty() && matches(announcementFormats, actualFormat);
     }
 
-    private static String normalizeBaseUrl(String baseUrl) {
-        return baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = normalizeBaseUrl(baseUrl);
+    }
+
+    public static String normalizeBaseUrl(String baseUrl) {
+        String trimmed = baseUrl.trim();
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 }
