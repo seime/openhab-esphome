@@ -73,6 +73,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
 
     private final ThingRegistry thingRegistry;
     private final Inbox inbox;
+    private final ManagedThingProvider managedThingProvider;
     private final EventPublisher eventPublisher;
     private final AudioHTTPServer audioHTTPServer;
     private final NetworkAddressService networkAddressService;
@@ -90,7 +91,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry,
             @Reference EventPublisher eventPublisher, @Reference ESPHomeMDNSHostnameResolver mdnsHostnameResolver,
             @Reference AudioHTTPServer audioHTTPServer, @Reference NetworkAddressService networkAddressService,
-            @Reference Inbox inbox) {
+            @Reference Inbox inbox, @Reference ManagedThingProvider managedThingProvider) {
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         this.stateDescriptionProvider = stateDescriptionProvider;
@@ -101,6 +102,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         this.mdnsHostnameResolver = mdnsHostnameResolver;
         this.audioHTTPServer = audioHTTPServer;
         this.networkAddressService = networkAddressService;
+        this.managedThingProvider = managedThingProvider;
     }
 
     @Override
@@ -115,7 +117,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
                     bindingPropertyDefaultEncryptionKey, bindingPropertyAudioBaseUrl, getBundleContext(),
                     versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                    networkAddressService);
+                    networkAddressService, managedThingProvider);
             esphomeHandlers.put(thing.getUID(), handler);
             return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {

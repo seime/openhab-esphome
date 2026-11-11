@@ -1,11 +1,13 @@
 package no.seime.openhab.binding.esphome.internal.handler;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,6 +24,7 @@ import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.ChannelUID;
+import org.openhab.core.thing.ManagedThingProvider;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.internal.ThingImpl;
@@ -32,6 +35,8 @@ import com.jano7.executor.KeySequentialExecutor;
 import io.esphome.api.DeviceInfoResponse;
 import io.esphome.api.ListEntitiesDoneResponse;
 import io.esphome.api.ListEntitiesRequest;
+import io.esphome.api.NoiseEncryptionSetKeyRequest;
+import io.esphome.api.NoiseEncryptionSetKeyResponse;
 import io.esphome.api.SubscribeStatesRequest;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
@@ -66,6 +71,9 @@ class ESPHomeHandlerLastKnownIpAddressTest {
     @Mock
     private NetworkAddressService networkAddressService;
 
+    @Mock
+    private ManagedThingProvider managedThingProvider;
+
     private ESPHomeHandler handler;
     private ThingImpl thing;
     private MonitoredCompositeExecutorService executor;
@@ -84,7 +92,7 @@ class ESPHomeHandlerLastKnownIpAddressTest {
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
                 null, bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                networkAddressService);
+                networkAddressService, managedThingProvider);
 
         setField("config", new ESPHomeConfiguration());
         setField("frameHelper", frameHelper);
@@ -236,6 +244,106 @@ class ESPHomeHandlerLastKnownIpAddressTest {
     private void handleDeviceInfo(String compilationTime) throws Exception {
         invokeMethod("handleConnected", new Class<?>[] { com.google.protobuf.GeneratedMessage.class },
                 DeviceInfoResponse.newBuilder().setCompilationTime(compilationTime).build());
+    }
+
+    @Test
+    void adoptionPersistsKeyBeforeSendingItToDevice() throws Exception {
+        when(managedThingProvider.get(thing.getUID())).thenReturn(thing);
+        thing.getConfiguration().put("hostname", "device.local");
+        doAnswer(invocation -> {
+            NoiseEncryptionSetKeyRequest request = invocation.getArgument(0);
+            String key = request.getKey().toStringUtf8();
+            assertEquals(32, Base64.getDecoder().decode(key).length);
+            assertEquals(key, thing.getConfiguration().get("encryptionKey"));
+            assertEquals("device.local", thing.getConfiguration().get("hostname"));
+            verify(callback).thingUpdated(thing);
+            return null;
+        }).when(frameHelper).send(any(NoiseEncryptionSetKeyRequest.class));
+
+        invokeMethod("provisionEncryptionKey", new Class<?>[] { DeviceInfoResponse.class }, DeviceInfoResponse
+                .newBuilder().setApiEncryptionSupported(true).setApiEncryptionProvisionable(true).build());
+
+        verify(frameHelper).send(any(NoiseEncryptionSetKeyRequest.class));
+    }
+
+    @Test
+    void adoptionDoesNotReplaceExistingKey() throws Exception {
+        when(managedThingProvider.get(thing.getUID())).thenReturn(thing);
+        thing.getConfiguration().put("encryptionKey", "existing-key");
+        invokeMethod("provisionEncryptionKey", new Class<?>[] { DeviceInfoResponse.class }, DeviceInfoResponse
+                .newBuilder().setApiEncryptionSupported(true).setApiEncryptionProvisionable(true).build());
+        verify(frameHelper, never()).send(any(NoiseEncryptionSetKeyRequest.class));
+        assertEquals("existing-key", thing.getConfiguration().get("encryptionKey"));
+    }
+
+    @Test
+    void adoptionRequiresEditableThing() throws Exception {
+        invokeMethod("provisionEncryptionKey", new Class<?>[] { DeviceInfoResponse.class }, DeviceInfoResponse
+                .newBuilder().setApiEncryptionSupported(true).setApiEncryptionProvisionable(true).build());
+        verify(frameHelper, never()).send(any(NoiseEncryptionSetKeyRequest.class));
+        assertNull(thing.getConfiguration().get("encryptionKey"));
+    }
+
+    @Test
+    void adoptionRequiresProvisionableDevice() throws Exception {
+        invokeMethod("provisionEncryptionKey", new Class<?>[] { DeviceInfoResponse.class },
+                DeviceInfoResponse.newBuilder().setApiEncryptionSupported(true).build());
+        verify(frameHelper, never()).send(any(NoiseEncryptionSetKeyRequest.class));
+        assertNull(thing.getConfiguration().get("encryptionKey"));
+    }
+
+    @Test
+    void adoptionDoesNotSendKeyWhenSavingFails() throws Exception {
+        when(managedThingProvider.get(thing.getUID())).thenReturn(thing);
+        doThrow(new IllegalStateException("Storage unavailable")).when(callback).thingUpdated(thing);
+        invokeMethod("provisionEncryptionKey", new Class<?>[] { DeviceInfoResponse.class }, DeviceInfoResponse
+                .newBuilder().setApiEncryptionSupported(true).setApiEncryptionProvisionable(true).build());
+        verify(frameHelper, never()).send(any(NoiseEncryptionSetKeyRequest.class));
+        assertNull(thing.getConfiguration().get("encryptionKey"));
+    }
+
+    @Test
+    void adoptionReconnectsAfterDeviceAcknowledgesKey() throws Exception {
+        when(managedThingProvider.get(thing.getUID())).thenReturn(thing);
+        setConnected();
+        setField("provisioningConnection", true);
+        invokeMethod("handleConnected", new Class<?>[] { com.google.protobuf.GeneratedMessage.class },
+                DeviceInfoResponse.newBuilder().setApiEncryptionSupported(true).setApiEncryptionProvisionable(true)
+                        .build());
+        String savedKey = (String) thing.getConfiguration().get("encryptionKey");
+
+        handler.onPacket(NoiseEncryptionSetKeyResponse.newBuilder().setSuccess(true).build());
+
+        verify(frameHelper).close();
+        verify(frameHelper, never()).send(any(ListEntitiesRequest.class));
+        assertEquals(savedKey, thing.getConfiguration().get("encryptionKey"));
+    }
+
+    @Test
+    void adoptionRetainsKeyWhenDeviceRejectsIt() throws Exception {
+        when(managedThingProvider.get(thing.getUID())).thenReturn(thing);
+        setConnected();
+        setField("provisioningConnection", true);
+        invokeMethod("handleConnected", new Class<?>[] { com.google.protobuf.GeneratedMessage.class },
+                DeviceInfoResponse.newBuilder().setApiEncryptionSupported(true).setApiEncryptionProvisionable(true)
+                        .build());
+        String savedKey = (String) thing.getConfiguration().get("encryptionKey");
+
+        handler.onPacket(NoiseEncryptionSetKeyResponse.newBuilder().setSuccess(false).build());
+
+        verify(frameHelper).close();
+        assertEquals(savedKey, thing.getConfiguration().get("encryptionKey"));
+    }
+
+    private void setConnected() throws Exception {
+        Field field = ESPHomeHandler.class.getDeclaredField("connectionState");
+        for (Object state : field.getType().getEnumConstants()) {
+            if ("CONNECTED".equals(state.toString())) {
+                setField("connectionState", state);
+                return;
+            }
+        }
+        fail("CONNECTED state missing");
     }
 
     private Object invokeMethod(String name, Class<?>[] parameterTypes, Object... args) throws Exception {
