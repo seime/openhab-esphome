@@ -83,7 +83,7 @@ class ESPHomeHandlerLastKnownIpAddressTest {
 
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
-                bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
+                null, bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
                 networkAddressService);
 
         setField("config", new ESPHomeConfiguration());

@@ -2,9 +2,12 @@ package no.seime.openhab.binding.esphome.internal.handler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -35,6 +38,7 @@ import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.audio.AudioSink;
 import org.openhab.core.audio.AudioSource;
 import org.openhab.core.audio.AudioStream;
+import org.openhab.core.audio.StreamServed;
 import org.openhab.core.audio.URLAudioStream;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.library.CoreItemFactory;
@@ -70,6 +74,7 @@ import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
 import no.seime.openhab.binding.esphome.internal.MonitoredCompositeExecutorService;
+import no.seime.openhab.binding.esphome.internal.audio.ESPHomeAudioSink;
 import no.seime.openhab.binding.esphome.internal.audio.MediaPlayerFeature;
 import no.seime.openhab.binding.esphome.internal.audio.VoiceAssistantFeature;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
@@ -129,8 +134,8 @@ class ESPHomeHandlerAudioServicesTest {
 
         handler = new ESPHomeHandler(new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "device"),
                 new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider, eventSubscriber, executor,
-                new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null, bundleContext, versionService,
-                firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer, networkAddressService);
+                new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null, null, bundleContext,
+                versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer, networkAddressService);
         handler.setCallback(callback);
         setField("config", new ESPHomeConfiguration());
         setField("connectionState", enumValue(getFieldType("connectionState"), "CONNECTED"));
@@ -564,6 +569,105 @@ class ESPHomeHandlerAudioServicesTest {
                 .filter(c -> !c.getUID().getId().equals("speaker_one")).count());
         assertTrue(handler.getDynamicChannels().stream()
                 .anyMatch(c -> "state".equals(c.getConfiguration().get("entity_field"))));
+    }
+
+    @Test
+    void resolvesAudioSinkBaseUrlFromBindingConfiguration() throws Exception {
+        setField("bindingPropertyAudioBaseUrl", "https://custom-openhab.example.com/");
+
+        ArgumentCaptor<AudioSink> sinkCaptor = ArgumentCaptor.forClass(AudioSink.class);
+        when(bundleContext.registerService(eq(AudioSink.class), sinkCaptor.capture(), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").build()).build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        AudioSink sink = sinkCaptor.getValue();
+        assertNotNull(sink);
+        assertInstanceOf(ESPHomeAudioSink.class, sink);
+        assertEquals("https://custom-openhab.example.com", ((ESPHomeAudioSink) sink).getBaseUrl());
+
+        AudioStream audioStream = Mockito.mock(AudioStream.class);
+        when(audioStream.getFormat()).thenReturn(AudioFormat.MP3);
+
+        StreamServed servedStream = new StreamServed("/audio/stream123.mp3", audioStream,
+                new java.util.concurrent.atomic.AtomicInteger(1), new java.util.concurrent.atomic.AtomicLong(0), false,
+                new CompletableFuture<>());
+        when(audioHTTPServer.serve(any(), anyInt(), anyBoolean())).thenReturn(servedStream);
+
+        sink.processAndComplete(audioStream);
+
+        verify(frameHelper).send(MediaPlayerCommandRequest.newBuilder().setKey(11).setHasMediaUrl(true)
+                .setMediaUrl("https://custom-openhab.example.com/audio/stream123.mp3").setHasAnnouncement(true)
+                .setAnnouncement(false).build());
+    }
+
+    @Test
+    void fallsBackToPrimaryIpv4WhenNoBindingAudioBaseUrlConfigured() throws Exception {
+        setField("bindingPropertyAudioBaseUrl", null);
+
+        ArgumentCaptor<AudioSink> sinkCaptor = ArgumentCaptor.forClass(AudioSink.class);
+        when(bundleContext.registerService(eq(AudioSink.class), sinkCaptor.capture(), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").build()).build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        AudioSink sink = sinkCaptor.getValue();
+        assertNotNull(sink);
+        assertEquals("http://127.0.0.1:" + org.openhab.core.net.HttpServiceUtil.getHttpServicePort(bundleContext),
+                ((ESPHomeAudioSink) sink).getBaseUrl());
+    }
+
+    @Test
+    void registersAudioSinkEvenIfPrimaryIpv4IsNullWhenBindingAudioBaseUrlIsConfigured() throws Exception {
+        when(networkAddressService.getPrimaryIpv4HostAddress()).thenReturn(null);
+        when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        setField("bindingPropertyAudioBaseUrl", "https://proxy.example.com");
+
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").build()).build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        verify(bundleContext).registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class));
+    }
+
+    @Test
+    void updatesBaseUrlOnExistingAudioSinkWhenRefreshed() throws Exception {
+        setField("bindingPropertyAudioBaseUrl", "https://initial-url.com");
+
+        ArgumentCaptor<AudioSink> sinkCaptor = ArgumentCaptor.forClass(AudioSink.class);
+        when(bundleContext.registerService(eq(AudioSink.class), sinkCaptor.capture(), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").build()).build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        AudioSink sink = sinkCaptor.getValue();
+        assertEquals("https://initial-url.com", ((ESPHomeAudioSink) sink).getBaseUrl());
+
+        // Update binding property and refresh
+        setField("bindingPropertyAudioBaseUrl", "https://updated-url.com///");
+        invokeMethod("refreshAudioSink", new Class<?>[0]);
+
+        assertEquals("https://updated-url.com", ((ESPHomeAudioSink) sink).getBaseUrl());
+    }
+
+    @Test
+    void normalizesBaseUrlCorrectly() {
+        assertEquals("http://example.com:8080", ESPHomeAudioSink.normalizeBaseUrl("http://example.com:8080"));
+        assertEquals("http://example.com:8080", ESPHomeAudioSink.normalizeBaseUrl("http://example.com:8080/"));
+        assertEquals("http://example.com:8080", ESPHomeAudioSink.normalizeBaseUrl("  http://example.com:8080///  "));
+        assertEquals("https://proxy.com/openhab", ESPHomeAudioSink.normalizeBaseUrl("https://proxy.com/openhab/"));
     }
 
     private void invokeHandleConnected(com.google.protobuf.GeneratedMessage message) throws Exception {
