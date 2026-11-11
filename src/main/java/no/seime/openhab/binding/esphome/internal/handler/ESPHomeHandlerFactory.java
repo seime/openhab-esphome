@@ -58,7 +58,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandlerFactory.class);
 
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE,
-            BindingConstants.THING_TYPE_BLE_PROXY);
+            BindingConstants.THING_TYPE_BLE_PROXY, BindingConstants.THING_TYPE_DEVICE_BUILDER);
 
     private @Nullable String bindingPropertyDefaultEncryptionKey;
 
@@ -102,6 +102,9 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
+        if (BindingConstants.THING_TYPE_DEVICE_BUILDER.equals(thingTypeUID)) {
+            return new DeviceBuilderHandler(thing);
+        }
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
