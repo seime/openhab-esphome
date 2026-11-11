@@ -42,6 +42,8 @@ class DeviceBuilderHandlerTest {
         assertEquals(0, handler.getScanIntervalSeconds());
         thing.setConfiguration(new Configuration(Map.of("scanInterval", 60)));
         assertEquals(60, handler.getScanIntervalSeconds());
+        thing.setConfiguration(new Configuration(Map.of("scanInterval", 0)));
+        assertEquals(0, handler.getScanIntervalSeconds());
     }
 
     @Test

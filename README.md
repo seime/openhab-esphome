@@ -471,7 +471,7 @@ The URL must provide direct access to the dashboard API; a Home Assistant ingres
 page requiring a browser session is not suitable.
 
 The binding scans on startup and every five minutes by default. Set `scanInterval`
-in seconds on the Device Builder thing to change the interval, or clear it to
+in seconds on the Device Builder thing to change the interval, or set it to `0` to
 disable automatic scans. You can also start discovery from the inbox. For each
 configured device with a native `api`, it reads the resolved configuration,
 including substitutions, packages and secrets, and fills in the device address,

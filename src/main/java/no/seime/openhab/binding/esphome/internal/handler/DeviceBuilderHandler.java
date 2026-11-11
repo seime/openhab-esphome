@@ -61,7 +61,7 @@ public class DeviceBuilderHandler extends BaseThingHandler {
             updateStatus(ThingStatus.UNKNOWN);
         } catch (IllegalArgumentException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Configure a valid dashboard URL and a positive scan interval, or leave the interval empty");
+                    "Configure a valid dashboard URL and a scan interval of 0 or greater");
         }
     }
 

@@ -13,10 +13,10 @@
 				<description>Dashboard base URL, including any path prefix, for example http://localhost:6052/</description>
 				<default>http://localhost:6052/</default>
 			</parameter>
-			<parameter name="scanInterval" type="integer" min="1" required="false" unit="s">
+			<parameter name="scanInterval" type="integer" min="0" required="false" unit="s">
 				<label>Scan Interval</label>
-				<description>Seconds between background discovery scans. The first scan runs immediately. Leave empty to disable
-					automatic scans.</description>
+				<description>Seconds between background discovery scans. The first scan runs immediately. Set to 0 to disable
+					automatic scans. Manual discovery remains available.</description>
 				<default>300</default>
 			</parameter>
 			<parameter name="username" type="text">
