@@ -45,11 +45,12 @@ public final class DeviceBuilderDevice {
         properties.put(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID, name);
         properties.put(ESPHomeDiscoveryParticipant.PROPERTY_HOSTNAME, address);
         properties.put(ESPHomeDiscoveryParticipant.PROPERTY_PORT, api.has("port") ? api.get("port").getAsInt() : 6053);
-        if (api.has("encryption") && api.get("encryption").isJsonObject()) {
-            String key = text(api.getAsJsonObject("encryption"), "key", "");
-            if (!key.isBlank()) {
-                properties.put("encryptionKey", key);
-            }
+        if (!api.has("encryption") || !api.get("encryption").isJsonObject()) {
+            return null;
+        }
+        String key = text(api.getAsJsonObject("encryption"), "key", "");
+        if (!key.isBlank()) {
+            properties.put("encryptionKey", key);
         }
         properties.put("allowActions", hasActions(config) || hasControlEntities(config));
         properties.put("enableBluetoothProxy", config.has("bluetooth_proxy"));

@@ -65,13 +65,13 @@ class DeviceBuilderDiscoveryTest {
     }
 
     @Test
-    void discoversUnencryptedDevicesAndHomeAssistantControlEntities() {
+    void discoversEncryptedDevicesAndHomeAssistantControlEntities() {
         DiscoveryResult result = DeviceBuilderDevice.createResult(json("{}"), json("""
-                {"esphome":{"name":"test"}, "api":{},
+                {"esphome":{"name":"test"}, "api":{"encryption":{"key":"resolved-secret"}},
                  "switch":[{"platform":"homeassistant","entity_id":"switch.test"}]}
                 """));
         assertNotNull(result);
-        assertFalse(result.getProperties().containsKey("encryptionKey"));
+        assertEquals("resolved-secret", result.getProperties().get("encryptionKey"));
         assertEquals("test.local", result.getProperties().get("hostname"));
         assertEquals(6053, result.getProperties().get("port"));
         assertEquals(true, result.getProperties().get("allowActions"));
@@ -80,7 +80,7 @@ class DeviceBuilderDiscoveryTest {
     @Test
     void enablesBluetoothProxyWhenComponentIsPresent() {
         DiscoveryResult result = DeviceBuilderDevice.createResult(json("{}"), json("""
-                {"esphome":{"name":"test"}, "api":{}, "bluetooth_proxy":{}}
+                {"esphome":{"name":"test"}, "api":{"encryption":{"key":"resolved-secret"}}, "bluetooth_proxy":{}}
                 """));
         assertNotNull(result);
         assertEquals(true, result.getProperties().get("enableBluetoothProxy"));
@@ -93,6 +93,15 @@ class DeviceBuilderDiscoveryTest {
         DiscoveryResult mdns = new ESPHomeDiscoveryParticipant(inbox).createResult(service);
         assertNotNull(mdns);
         assertEquals(true, mdns.getProperties().get("enableBluetoothProxy"));
+    }
+
+    @Test
+    void skipsDevicesWithoutApiEncryptionObject() {
+        for (String api : new String[] { "{}", "{\"encryption\":null}", "{\"encryption\":\"invalid\"}",
+                "{\"encryption\":[]}", "{\"encryption\":false}" }) {
+            JsonObject config = json("{\"esphome\":{\"name\":\"test\"},\"api\":" + api + "}");
+            assertNull(DeviceBuilderDevice.createResult(json("{}"), config), api);
+        }
     }
 
     @Test

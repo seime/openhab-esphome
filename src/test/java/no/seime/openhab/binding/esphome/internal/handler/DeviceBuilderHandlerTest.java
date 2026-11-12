@@ -197,7 +197,9 @@ class DeviceBuilderHandlerTest {
                     status = 422;
                     response = "Invalid configuration";
                 } else {
-                    response = "{\"esphome\":{\"name\":\"test\"},\"api\":{}}";
+                    response = """
+                            {"esphome":{"name":"test"},"api":{"encryption":{"key":"resolved-key"}}}
+                            """;
                 }
             }
             byte[] body = response.getBytes(StandardCharsets.UTF_8);
