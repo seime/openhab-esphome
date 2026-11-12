@@ -162,6 +162,10 @@ public class DeviceBuilderHandler extends BaseThingHandler {
         }
         List<JsonElement> ordered = new ArrayList<>();
         devices.forEach(ordered::add);
+        ordered.removeIf(element -> {
+            JsonElement name = element.isJsonObject() ? element.getAsJsonObject().get("name") : null;
+            return name != null && name.isJsonPrimitive() && configuredIds.contains(name.getAsString());
+        });
         // Stable sorting preserves dashboard order within each priority group.
         ordered.sort(Comparator.comparingInt(element -> {
             JsonElement name = element.isJsonObject() ? element.getAsJsonObject().get("name") : null;
@@ -169,7 +173,7 @@ public class DeviceBuilderHandler extends BaseThingHandler {
                 return 0;
             }
             String deviceId = name.getAsString();
-            return configuredIds.contains(deviceId) ? 2 : inboxIds.contains(deviceId) ? 1 : 0;
+            return inboxIds.contains(deviceId) ? 1 : 0;
         }));
         return ordered;
     }

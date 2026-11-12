@@ -59,7 +59,7 @@ class DeviceBuilderHandlerTest {
             authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
             String response;
             if (exchange.getRequestURI().getPath().endsWith("/devices")) {
-                response = "{\"configured\":[{\"configuration\":\"my device.yaml\",\"address\":\"192.0.2.1\"}]}";
+                response = "{\"configured\":[{\"name\":\"test\",\"configuration\":\"my device.yaml\",\"address\":\"192.0.2.1\"}]}";
             } else {
                 query.set(exchange.getRequestURI().getRawQuery());
                 response = "{\"esphome\":{\"name\":\"test\"},\"api\":{\"encryption\":{\"key\":\"resolved-key\"}}}";
@@ -76,8 +76,8 @@ class DeviceBuilderHandlerTest {
             thing.setConfiguration(
                     new Configuration(Map.of("url", "http://127.0.0.1:" + server.getAddress().getPort() + "/dashboard",
                             "username", "user", "password", "pass")));
-            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, mock(ThingRegistry.class),
-                    mock(Inbox.class));
+            ThingRegistry registry = mock(ThingRegistry.class);
+            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, registry, mock(Inbox.class));
             ThingHandlerCallback callback = mock(ThingHandlerCallback.class);
             handler.setCallback(callback);
             handler.initialize();
@@ -88,6 +88,17 @@ class DeviceBuilderHandlerTest {
             assertEquals("configuration=my+device.yaml", query.get());
             assertEquals("Basic dXNlcjpwYXNz", authorization.get());
             verify(callback).statusUpdated(eq(thing), argThat(status -> status.getStatus() == ThingStatus.ONLINE));
+
+            // A thing added between scans must not receive subsequent discovery updates.
+            ThingImpl configured = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "test");
+            when(registry.getAll()).thenReturn(List.of(configured));
+            query.set(null);
+            results.clear();
+            handler.discover(results::add);
+            assertTrue(results.isEmpty(), "Already-configured devices must not be published");
+            assertNull(query.get(), "Already-configured devices must not have their configuration fetched");
+            verify(callback, times(2)).statusUpdated(eq(thing),
+                    argThat(status -> status.getStatus() == ThingStatus.ONLINE));
         } finally {
             server.stop(0);
         }
@@ -109,7 +120,7 @@ class DeviceBuilderHandlerTest {
     }
 
     @Test
-    void prioritizesNewDevicesThenInboxOnlyDevicesThenExistingThings() throws Exception {
+    void prioritizesNewDevicesThenInboxOnlyDevicesAndSkipsExistingThings() throws Exception {
         ThingRegistry registry = mock(ThingRegistry.class);
         Inbox inbox = mock(Inbox.class);
         ThingImpl existing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "custom-thing-id");
@@ -156,8 +167,7 @@ class DeviceBuilderHandlerTest {
             handler.discover(result -> {
             });
             assertEquals(List.of("configuration=new1.yaml", "configuration=new2.yaml", "configuration=inbox.yaml",
-                    "configuration=inbox2.yaml", "configuration=existing.yaml",
-                    "configuration=existing-with-inbox.yaml"), requests);
+                    "configuration=inbox2.yaml"), requests);
         } finally {
             server.stop(0);
         }
