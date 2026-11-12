@@ -523,11 +523,16 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     public void sendMessage(GeneratedMessage message) throws ProtocolAPIError {
-        EncryptedFrameHelper helper = frameHelper;
-        if (helper != null) {
-            helper.send(message);
-        } else {
-            throw new ProtocolAPIError(String.format("[%s] Device is not connected", logPrefix));
+        synchronized (connectionStateLock) {
+            if (provisioningConnection) {
+                throw new ProtocolAPIError("Device adoption is in progress; commands require the saved encryption key");
+            }
+            EncryptedFrameHelper helper = frameHelper;
+            if (helper != null) {
+                helper.send(message);
+            } else {
+                throw new ProtocolAPIError(String.format("[%s] Device is not connected", logPrefix));
+            }
         }
     }
 
@@ -543,7 +548,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
         synchronized (connectionStateLock) {
-            if (connectionState != ConnectionState.CONNECTED) {
+            if (connectionState != ConnectionState.CONNECTED || provisioningConnection) {
                 logger.warn("[{}] Not connected, ignoring command {}", logPrefix, command);
                 return;
             }
@@ -597,7 +602,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void onConnect() throws ProtocolAPIError {
         synchronized (connectionStateLock) {
-            cancelConnectionTimeoutWatchdog();
+            if (!provisioningConnection) {
+                cancelConnectionTimeoutWatchdog();
+            }
             exponentialBackoff.reset();
             logger.debug("[{}] Encrypted connection established. Starting API handshake.", logPrefix);
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
@@ -642,7 +649,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void remoteDisconnect() {
-        if (config.deepSleep) {
+        if (config.deepSleep && !provisioningConnection) {
             logger.info("[{}] Disconnecting from device in deep sleep mode", logPrefix);
             updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, "Deep sleep");
             scheduleDeepSleepWatchdog();
@@ -672,7 +679,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             connectionState = ConnectionState.UNINITIALIZED;
             resolvedIpAddressForCurrentConnection = null;
 
-            if (!config.deepSleep) {
+            if (!config.deepSleep || (provisioningConnection && StringUtils.isNotBlank(config.encryptionKey))) {
                 setUndefToAllChannels();
 
                 int nextDelay = exponentialBackoff.getNextDelay();
@@ -695,6 +702,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
         }
         if (disposed) {
+            return;
+        }
+
+        // The bootstrap PSK is public. Do not trust this session with actions, state updates,
+        // proxy data, or other normal traffic until it reconnects using the saved private key.
+        if (provisioningConnection && !(message instanceof AuthenticationResponse
+                || message instanceof DeviceInfoResponse || message instanceof NoiseEncryptionSetKeyResponse
+                || message instanceof PingRequest || message instanceof PingResponse
+                || message instanceof DisconnectRequest || message instanceof DisconnectResponse)) {
             return;
         }
 
@@ -1012,7 +1028,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         config.encryptionKey = encodedKey;
         provisioningKeyPending = true;
         // The API's bytes field carries the base64 text, not the decoded 32-byte key.
-        sendMessage(NoiseEncryptionSetKeyRequest.newBuilder().setKey(ByteString.copyFromUtf8(encodedKey)).build());
+        frameHelper.send(NoiseEncryptionSetKeyRequest.newBuilder().setKey(ByteString.copyFromUtf8(encodedKey)).build());
         cancelConnectionTimeoutWatchdog();
         connectionTimeoutFuture = executorService.schedule(() -> {
             synchronized (connectionStateLock) {
@@ -1032,6 +1048,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
                         helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
                 connectionState = ConnectionState.CONNECTED;
+                if (provisioningConnection) {
+                    updateStatus(ThingStatus.UNKNOWN);
+                    frameHelper.send(DeviceInfoRequest.getDefaultInstance());
+                    return;
+                }
                 persistLastKnownIpAddress();
 
                 if (config.allowActions) {

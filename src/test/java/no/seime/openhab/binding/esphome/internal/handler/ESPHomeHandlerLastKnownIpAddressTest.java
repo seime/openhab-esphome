@@ -11,12 +11,15 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,15 +31,24 @@ import org.openhab.core.thing.ManagedThingProvider;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.internal.ThingImpl;
+import org.openhab.core.types.RefreshType;
 import org.osgi.framework.BundleContext;
 
 import com.jano7.executor.KeySequentialExecutor;
 
+import io.esphome.api.DeviceInfoRequest;
 import io.esphome.api.DeviceInfoResponse;
+import io.esphome.api.HelloResponse;
+import io.esphome.api.HomeassistantActionRequest;
 import io.esphome.api.ListEntitiesDoneResponse;
 import io.esphome.api.ListEntitiesRequest;
 import io.esphome.api.NoiseEncryptionSetKeyRequest;
 import io.esphome.api.NoiseEncryptionSetKeyResponse;
+import io.esphome.api.PingRequest;
+import io.esphome.api.PingResponse;
+import io.esphome.api.SubscribeHomeAssistantStateResponse;
+import io.esphome.api.SubscribeHomeassistantServicesRequest;
+import io.esphome.api.SubscribeLogsRequest;
 import io.esphome.api.SubscribeStatesRequest;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
@@ -333,6 +345,113 @@ class ESPHomeHandlerLastKnownIpAddressTest {
 
         verify(frameHelper).close();
         assertEquals(savedKey, thing.getConfiguration().get("encryptionKey"));
+    }
+
+    @Test
+    void bootstrapRejectsActionsStateSubscriptionsAndEntityMessages() throws Exception {
+        setConnected();
+        setField("provisioningConnection", true);
+        handler.onPacket(HomeassistantActionRequest.newBuilder().setService("test.action").build());
+        handler.onPacket(HomeassistantActionRequest.newBuilder().setService("test.event").setIsEvent(true).build());
+        handler.onPacket(SubscribeHomeAssistantStateResponse.getDefaultInstance());
+        handler.onPacket(ListEntitiesDoneResponse.getDefaultInstance());
+        verifyNoInteractions(eventPublisher, eventSubscriber, bundleContext, frameHelper);
+    }
+
+    @Test
+    void bootstrapRejectsChannelCommandsAndDirectMessages() throws Exception {
+        setConnected();
+        setField("provisioningConnection", true);
+        handler.handleCommand(new ChannelUID(thing.getUID(), "test"), RefreshType.REFRESH);
+        assertThrows(ProtocolAPIError.class, () -> handler.sendMessage(SubscribeStatesRequest.getDefaultInstance()));
+        verifyNoInteractions(frameHelper);
+    }
+
+    @Test
+    void bootstrapAllowsControlMessages() throws Exception {
+        setConnected();
+        setField("provisioningConnection", true);
+        handler.onPacket(PingRequest.getDefaultInstance());
+        verify(frameHelper).send(PingResponse.getDefaultInstance());
+    }
+
+    @Test
+    void bootstrapKeepsTimeoutThroughHelloAndRequestsOnlyDeviceInfo() throws Exception {
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.allowActions = true;
+        configuration.deviceLogLevel = LogLevel.DEBUG;
+        setField("config", configuration);
+        setField("provisioningConnection", true);
+        ScheduledFuture<?> timeout = executor.schedule(() -> {
+        }, 60, TimeUnit.SECONDS);
+        setField("connectionTimeoutFuture", timeout);
+
+        handler.onConnect();
+        assertSame(timeout, getField("connectionTimeoutFuture"));
+        assertFalse(timeout.isCancelled());
+        handler.onPacket(HelloResponse.getDefaultInstance());
+        // A peer answering pings without sending device info cannot extend this deadline.
+        handler.onPacket(PingResponse.getDefaultInstance());
+        assertSame(timeout, getField("connectionTimeoutFuture"));
+        assertFalse(timeout.isCancelled());
+        verify(frameHelper).send(DeviceInfoRequest.getDefaultInstance());
+        verify(frameHelper, never()).send(any(SubscribeHomeassistantServicesRequest.class));
+        verify(frameHelper, never()).send(any(SubscribeLogsRequest.class));
+        assertNull(getField("pingWatchdogFuture"));
+        assertNull(getField("deepSleepWatchdogFuture"));
+    }
+
+    @Test
+    void authenticatedSessionCancelsConnectionTimeoutAndSubscribesToActions() throws Exception {
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.allowActions = true;
+        setField("config", configuration);
+        ScheduledFuture<?> timeout = executor.schedule(() -> {
+        }, 60, TimeUnit.SECONDS);
+        setField("connectionTimeoutFuture", timeout);
+        handler.onConnect();
+        assertTrue(timeout.isCancelled());
+        handler.onPacket(HelloResponse.getDefaultInstance());
+        verify(frameHelper).send(SubscribeHomeassistantServicesRequest.getDefaultInstance());
+    }
+
+    @Test
+    void deepSleepAdoptionSchedulesReconnectAfterConfirmation() throws Exception {
+        prepareDeepSleepAdoption();
+        handler.onPacket(NoiseEncryptionSetKeyResponse.newBuilder().setSuccess(true).build());
+        verify(frameHelper).close();
+        assertNotNull(getField("connectFuture"));
+    }
+
+    @Test
+    void deepSleepAdoptionSchedulesReconnectAfterConfirmationTimeout() throws Exception {
+        MonitoredCompositeExecutorService monitoredExecutor = spy(executor);
+        setField("executorService", monitoredExecutor);
+        prepareDeepSleepAdoption();
+        ArgumentCaptor<Runnable> watchdog = ArgumentCaptor.forClass(Runnable.class);
+        verify(monitoredExecutor).schedule(watchdog.capture(), eq(60L), eq(TimeUnit.SECONDS),
+                contains("Adoption watchdog"));
+        watchdog.getValue().run();
+        verify(frameHelper).close();
+        assertNotNull(getField("connectFuture"));
+    }
+
+    private void prepareDeepSleepAdoption() throws Exception {
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.deepSleep = true;
+        setField("config", configuration);
+        when(managedThingProvider.get(thing.getUID())).thenReturn(thing);
+        setConnected();
+        setField("provisioningConnection", true);
+        handler.onPacket(DeviceInfoResponse.newBuilder().setApiEncryptionSupported(true)
+                .setApiEncryptionProvisionable(true).build());
+        assertNotNull(thing.getConfiguration().get("encryptionKey"));
+    }
+
+    private Object getField(String name) throws Exception {
+        Field field = ESPHomeHandler.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(handler);
     }
 
     private void setConnected() throws Exception {
