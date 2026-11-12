@@ -36,6 +36,9 @@ public final class DeviceBuilderDevice {
         }
         JsonObject esphome = config.getAsJsonObject("esphome");
         JsonObject api = config.getAsJsonObject("api");
+        if (esphome.has("name_add_mac_suffix") && esphome.get("name_add_mac_suffix").getAsBoolean()) {
+            return null;
+        }
         String name = esphome.get("name").getAsString();
         String address = text(entry, "address", name + ".local");
         Map<String, Object> properties = new HashMap<>();
