@@ -28,6 +28,8 @@ import org.openhab.core.events.EventPublisher;
 import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.ManagedThingProvider;
+import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.internal.ThingImpl;
@@ -36,8 +38,10 @@ import org.osgi.framework.BundleContext;
 
 import com.jano7.executor.KeySequentialExecutor;
 
+import io.esphome.api.BluetoothDeviceRequest;
 import io.esphome.api.DeviceInfoRequest;
 import io.esphome.api.DeviceInfoResponse;
+import io.esphome.api.ExecuteServiceRequest;
 import io.esphome.api.HelloResponse;
 import io.esphome.api.HomeassistantActionRequest;
 import io.esphome.api.ListEntitiesDoneResponse;
@@ -51,11 +55,13 @@ import io.esphome.api.SubscribeHomeassistantServicesRequest;
 import io.esphome.api.SubscribeLogsRequest;
 import io.esphome.api.SubscribeStatesRequest;
 import no.seime.openhab.binding.esphome.internal.*;
+import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
+import no.seime.openhab.binding.esphome.internal.message.statesubscription.EventSubscription;
 
 @ExtendWith(MockitoExtension.class)
 class ESPHomeHandlerLastKnownIpAddressTest {
@@ -434,6 +440,65 @@ class ESPHomeHandlerLastKnownIpAddressTest {
         watchdog.getValue().run();
         verify(frameHelper).close();
         assertNotNull(getField("connectFuture"));
+    }
+
+    @Test
+    void bootstrapBlocksEveryNormalOutboundEntryPoint() throws Exception {
+        setConnected();
+        setField("provisioningConnection", true);
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.enableBluetoothProxy = true;
+        setField("config", configuration);
+        EventSubscription subscription = mock(EventSubscription.class);
+        when(subscription.getEntityId()).thenReturn("item.test");
+
+        handler.executeAPIAction(ExecuteServiceRequest.getDefaultInstance());
+        handler.sendBluetoothCommand(BluetoothDeviceRequest.getDefaultInstance());
+        handler.listenForBLEAdvertisements(mock(ESPHomeBluetoothProxyHandler.class));
+        handler.stopListeningForBLEAdvertisements();
+        handler.handleOpenHABEvent(subscription, "private-state");
+
+        verifyNoInteractions(frameHelper);
+    }
+
+    @Test
+    void authenticatedSessionAllowsNormalOutboundEntryPoints() throws Exception {
+        setConnected();
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.enableBluetoothProxy = true;
+        setField("config", configuration);
+        EventSubscription subscription = mock(EventSubscription.class);
+        when(subscription.getEntityId()).thenReturn("item.test");
+        when(subscription.getAttribute()).thenReturn("");
+
+        handler.executeAPIAction(ExecuteServiceRequest.getDefaultInstance());
+        handler.sendBluetoothCommand(BluetoothDeviceRequest.getDefaultInstance());
+        handler.listenForBLEAdvertisements(mock(ESPHomeBluetoothProxyHandler.class));
+        handler.stopListeningForBLEAdvertisements();
+        handler.handleOpenHABEvent(subscription, "private-state");
+
+        verify(frameHelper).send(ExecuteServiceRequest.getDefaultInstance());
+        verify(frameHelper).send(BluetoothDeviceRequest.getDefaultInstance());
+        verify(frameHelper).send(io.esphome.api.SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+        verify(frameHelper).send(io.esphome.api.UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+        verify(frameHelper).send(io.esphome.api.HomeAssistantStateResponse.newBuilder().setEntityId("item.test")
+                .setAttribute("").setState("private-state").build());
+    }
+
+    @Test
+    void deepSleepAdoptionFailurePublishesConfigurationErrorWithoutReconnect() throws Exception {
+        setConnected();
+        setField("provisioningConnection", true);
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.deepSleep = true;
+        setField("config", configuration);
+
+        handler.onPacket(DeviceInfoResponse.getDefaultInstance());
+
+        verify(frameHelper).close();
+        verify(callback).statusUpdated(eq(thing), argThat(status -> status.getStatus() == ThingStatus.OFFLINE
+                && status.getStatusDetail() == ThingStatusDetail.CONFIGURATION_ERROR));
+        assertNull(getField("connectFuture"));
     }
 
     private void prepareDeepSleepAdoption() throws Exception {
