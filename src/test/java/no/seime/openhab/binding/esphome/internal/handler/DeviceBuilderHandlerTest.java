@@ -26,7 +26,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.config.discovery.DiscoveryResult;
+import org.openhab.core.config.discovery.DiscoveryResultBuilder;
+import org.openhab.core.config.discovery.inbox.Inbox;
+import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
 
@@ -38,7 +42,7 @@ class DeviceBuilderHandlerTest {
     @Test
     void emptyScanIntervalDisablesBackgroundDiscoveryAndCanBeConfigured() {
         ThingImpl thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE_BUILDER, "builder");
-        DeviceBuilderHandler handler = new DeviceBuilderHandler(thing);
+        DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, mock(ThingRegistry.class), mock(Inbox.class));
         assertEquals(0, handler.getScanIntervalSeconds());
         thing.setConfiguration(new Configuration(Map.of("scanInterval", 60)));
         assertEquals(60, handler.getScanIntervalSeconds());
@@ -72,7 +76,8 @@ class DeviceBuilderHandlerTest {
             thing.setConfiguration(
                     new Configuration(Map.of("url", "http://127.0.0.1:" + server.getAddress().getPort() + "/dashboard",
                             "username", "user", "password", "pass")));
-            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing);
+            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, mock(ThingRegistry.class),
+                    mock(Inbox.class));
             ThingHandlerCallback callback = mock(ThingHandlerCallback.class);
             handler.setCallback(callback);
             handler.initialize();
@@ -101,6 +106,61 @@ class DeviceBuilderHandlerTest {
     @Test
     void staysOnlineForEmptyDeviceList() throws Exception {
         checkConfigurationFailures(false, true);
+    }
+
+    @Test
+    void prioritizesNewDevicesThenInboxOnlyDevicesThenExistingThings() throws Exception {
+        ThingRegistry registry = mock(ThingRegistry.class);
+        Inbox inbox = mock(Inbox.class);
+        ThingImpl existing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "custom-thing-id");
+        existing.setConfiguration(new Configuration(Map.of("deviceId", "existing")));
+        ThingImpl existingWithInbox = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "existing-with-inbox");
+        when(registry.getAll()).thenReturn(List.of(existing, existingWithInbox));
+        when(inbox.getAll()).thenReturn(List.of(
+                DiscoveryResultBuilder.create(new ThingUID(BindingConstants.THING_TYPE_DEVICE, "inbox"))
+                        .withProperty("deviceId", "inbox").build(),
+                DiscoveryResultBuilder.create(new ThingUID(BindingConstants.THING_TYPE_DEVICE, "inbox2")).build(),
+                DiscoveryResultBuilder.create(existingWithInbox.getUID()).build()));
+        List<String> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            String response;
+            if (exchange.getRequestURI().getPath().equals("/devices")) {
+                response = """
+                        {"configured":[
+                          {"name":"existing","configuration":"existing.yaml"},
+                          {"name":"inbox","configuration":"inbox.yaml"},
+                          {"name":"new1","configuration":"new1.yaml"},
+                          {"name":"existing-with-inbox","configuration":"existing-with-inbox.yaml"},
+                          {"name":"new2","configuration":"new2.yaml"},
+                          {"name":"inbox2","configuration":"inbox2.yaml"}]}
+                        """;
+            } else {
+                requests.add(exchange.getRequestURI().getQuery());
+                response = "{}";
+            }
+            byte[] body = response.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (var output = exchange.getResponseBody()) {
+                output.write(body);
+            }
+        });
+        server.start();
+        try {
+            ThingImpl thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE_BUILDER, "builder");
+            thing.setConfiguration(
+                    new Configuration(Map.of("url", "http://127.0.0.1:" + server.getAddress().getPort())));
+            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, registry, inbox);
+            handler.setCallback(mock(ThingHandlerCallback.class));
+            handler.initialize();
+            handler.discover(result -> {
+            });
+            assertEquals(List.of("configuration=new1.yaml", "configuration=new2.yaml", "configuration=inbox.yaml",
+                    "configuration=inbox2.yaml", "configuration=existing.yaml",
+                    "configuration=existing-with-inbox.yaml"), requests);
+        } finally {
+            server.stop(0);
+        }
     }
 
     private void checkConfigurationFailures(boolean allFail, boolean empty) throws Exception {
@@ -140,7 +200,8 @@ class DeviceBuilderHandlerTest {
         try {
             thing.setConfiguration(
                     new Configuration(Map.of("url", "http://127.0.0.1:" + server.getAddress().getPort())));
-            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing);
+            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, mock(ThingRegistry.class),
+                    mock(Inbox.class));
             handler.setCallback(callback);
             handler.initialize();
             List<DiscoveryResult> results = new ArrayList<>();

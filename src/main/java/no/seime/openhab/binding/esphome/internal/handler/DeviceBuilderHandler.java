@@ -17,13 +17,18 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.config.discovery.DiscoveryResult;
+import org.openhab.core.config.discovery.inbox.Inbox;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerService;
@@ -31,20 +36,29 @@ import org.openhab.core.types.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 
+import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.discovery.DeviceBuilderDevice;
 import no.seime.openhab.binding.esphome.internal.discovery.DeviceBuilderDiscoveryService;
+import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeDiscoveryParticipant;
 
 /** Contacts the Device Builder for resolved device configurations. */
 @NonNullByDefault
 public class DeviceBuilderHandler extends BaseThingHandler {
     private final Logger logger = LoggerFactory.getLogger(DeviceBuilderHandler.class);
 
-    public DeviceBuilderHandler(Thing thing) {
+    private final ThingRegistry thingRegistry;
+    private final Inbox inbox;
+
+    public DeviceBuilderHandler(Thing thing, ThingRegistry thingRegistry, Inbox inbox) {
         super(thing);
+        this.thingRegistry = thingRegistry;
+        this.inbox = inbox;
     }
 
     @Override
@@ -93,7 +107,7 @@ public class DeviceBuilderHandler extends BaseThingHandler {
             updateStatus(ThingStatus.ONLINE);
             int attempted = 0;
             int succeeded = 0;
-            for (var element : devices.getAsJsonArray("configured")) {
+            for (var element : prioritizeDevices(devices.getAsJsonArray("configured"))) {
                 attempted++;
                 String filename = "<unknown configuration>";
                 try {
@@ -126,6 +140,38 @@ public class DeviceBuilderHandler extends BaseThingHandler {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                     "Could not read Device Builder dashboard; check URL and credentials");
         }
+    }
+
+    private List<JsonElement> prioritizeDevices(JsonArray devices) {
+        Set<String> configuredIds = new HashSet<>();
+        for (Thing thing : thingRegistry.getAll()) {
+            if (BindingConstants.THING_TYPE_DEVICE.equals(thing.getThingTypeUID())) {
+                Object deviceId = thing.getConfiguration().get(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID);
+                if (deviceId == null) {
+                    deviceId = thing.getProperties().get(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID);
+                }
+                configuredIds.add(deviceId == null ? thing.getUID().getId() : deviceId.toString());
+            }
+        }
+        Set<String> inboxIds = new HashSet<>();
+        for (DiscoveryResult result : inbox.getAll()) {
+            if (BindingConstants.THING_TYPE_DEVICE.equals(result.getThingTypeUID())) {
+                Object deviceId = result.getProperties().get(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID);
+                inboxIds.add(deviceId == null ? result.getThingUID().getId() : deviceId.toString());
+            }
+        }
+        List<JsonElement> ordered = new ArrayList<>();
+        devices.forEach(ordered::add);
+        // Stable sorting preserves dashboard order within each priority group.
+        ordered.sort(Comparator.comparingInt(element -> {
+            JsonElement name = element.isJsonObject() ? element.getAsJsonObject().get("name") : null;
+            if (name == null || !name.isJsonPrimitive()) {
+                return 0;
+            }
+            String deviceId = name.getAsString();
+            return configuredIds.contains(deviceId) ? 2 : inboxIds.contains(deviceId) ? 1 : 0;
+        }));
+        return ordered;
     }
 
     private JsonObject get(String path) throws IOException {
