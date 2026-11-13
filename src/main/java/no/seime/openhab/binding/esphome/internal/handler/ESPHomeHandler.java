@@ -496,7 +496,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     encryptionKey = PROVISIONING_KEY;
                     provisioningConnection = true;
                 } else {
-                    rejectProvisioningKey(encryptionKey);
+                    rejectProvisioningKey(Objects.requireNonNull(encryptionKey));
                 }
 
                 frameHelper = new EncryptedFrameHelper(connectionSelector, createConnectionListener(generation),
