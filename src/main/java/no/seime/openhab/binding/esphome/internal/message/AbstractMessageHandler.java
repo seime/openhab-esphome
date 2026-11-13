@@ -4,6 +4,7 @@ import static org.openhab.core.library.CoreItemFactory.DATETIME;
 import static org.openhab.core.library.CoreItemFactory.NUMBER;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -51,11 +52,20 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             @Nullable final Set<String> tags, String category, EntityCategory entityCategory,
             boolean disabledByDefault) {
 
+        String label = createChannelLabel(entityName);
+        boolean advanced = disabledByDefault || entityCategory != EntityCategory.ENTITY_CATEGORY_NONE;
+        List<String> properties = new ArrayList<>(Arrays.asList(label, itemType, category, Boolean.toString(advanced)));
+        if (tags != null) {
+            // sort tags because their order is immaterial.
+            properties.addAll(new TreeSet<>(tags));
+        }
+        // Length-prefix each value to avoid ambiguous concatenations.
+        String key = properties.stream().map(value -> value == null ? "-1:" : value.length() + ":" + value)
+                .collect(Collectors.joining());
         final ChannelTypeUID channelTypeUID = new ChannelTypeUID(BindingConstants.BINDING_ID,
-                handler.getThing().getUID().getId() + "_" + UUID.randomUUID());
+                UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)).toString());
 
-        final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID,
-                createChannelLabel(entityName), itemType);
+        final StateChannelTypeBuilder channelTypeBuilder = ChannelTypeBuilder.state(channelTypeUID, label, itemType);
         if (tags != null && !tags.isEmpty()) {
             channelTypeBuilder.withTags(tags);
         }
@@ -65,7 +75,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
 
         channelTypeBuilder.withAutoUpdatePolicy(AutoUpdatePolicy.VETO);
-        channelTypeBuilder.isAdvanced(disabledByDefault || entityCategory != EntityCategory.ENTITY_CATEGORY_NONE);
+        channelTypeBuilder.isAdvanced(advanced);
 
         ChannelType channelType = channelTypeBuilder.build();
 

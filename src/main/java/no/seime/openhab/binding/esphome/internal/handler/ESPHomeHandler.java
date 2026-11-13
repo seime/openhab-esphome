@@ -299,6 +299,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             interrogatedCompilationTime = null;
             pendingCompilationTime = null;
         }
+        dynamicChannelTypeProvider.discardPendingTypes(thing.getUID());
         super.dispose();
     }
 
@@ -1011,6 +1012,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         // references stay resolvable in the type provider) until updateThing() in ListEntitiesDoneResponse replaces
         // them. Orphaned types are swept later, after updateThing() has propagated, to avoid racing with
         // ThingManagerImpl.normalizeConfiguration.
+        dynamicChannelTypeProvider.discardPendingTypes(thing.getUID());
         dynamicChannels.clear();
 
         // Clean up old actions
@@ -1108,7 +1110,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     public void addChannelType(ChannelType channelType) {
-        dynamicChannelTypeProvider.putChannelType(channelType);
+        dynamicChannelTypeProvider.addChannelType(thing.getUID(), channelType);
     }
 
     public void addDescription(ChannelUID channelUID, StateDescription stateDescription) {
