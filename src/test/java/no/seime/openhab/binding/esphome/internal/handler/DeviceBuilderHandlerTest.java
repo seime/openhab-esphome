@@ -173,6 +173,52 @@ class DeviceBuilderHandlerTest {
         }
     }
 
+    @Test
+    void cancellationStopsRemainingConfigurationRequests() throws Exception {
+        var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        List<String> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            requests.add(exchange.getRequestURI().toString());
+            String response;
+            if (exchange.getRequestURI().getPath().equals("/devices")) {
+                response = """
+                        {"configured":[{"configuration":"first.yaml"},{"configuration":"second.yaml"}]}
+                        """;
+            } else {
+                cancelled.set(true);
+                response = """
+                        {"esphome":{"name":"test"},"api":{"encryption":{"key":"resolved-key"}}}
+                        """;
+            }
+            byte[] body = response.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (var output = exchange.getResponseBody()) {
+                output.write(body);
+            }
+        });
+        server.start();
+        try {
+            ThingImpl thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE_BUILDER, "builder");
+            thing.setConfiguration(
+                    new Configuration(Map.of("url", "http://127.0.0.1:" + server.getAddress().getPort())));
+            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, mock(ThingRegistry.class),
+                    mock(Inbox.class));
+            handler.setCallback(mock(ThingHandlerCallback.class));
+            handler.initialize();
+            List<DiscoveryResult> results = new ArrayList<>();
+            handler.discover(results::add, cancelled::get);
+            assertEquals(List.of("/devices", "/json-config?configuration=first.yaml"), requests);
+            assertEquals(1, results.size(), "The in-flight configuration may finish before cancellation is checked");
+
+            requests.clear();
+            handler.discover(results::add, cancelled::get);
+            assertEquals(List.of("/devices"), requests, "A cancelled scan must not fetch device configurations");
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private void checkConfigurationFailures(boolean allFail, boolean empty) throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         ThingImpl thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE_BUILDER, "builder");

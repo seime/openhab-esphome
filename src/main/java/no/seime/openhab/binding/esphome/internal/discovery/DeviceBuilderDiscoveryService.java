@@ -28,8 +28,9 @@ import no.seime.openhab.binding.esphome.internal.handler.DeviceBuilderHandler;
 @NonNullByDefault
 public class DeviceBuilderDiscoveryService extends AbstractThingHandlerDiscoveryService<DeviceBuilderHandler> {
     private @Nullable ScheduledFuture<?> polling;
+    private @Nullable ScheduledFuture<?> manualScan;
     private final AtomicBoolean scanning = new AtomicBoolean();
-    private boolean disposed;
+    private volatile boolean disposed;
 
     @Override
     public synchronized void initialize() {
@@ -40,6 +41,7 @@ public class DeviceBuilderDiscoveryService extends AbstractThingHandlerDiscovery
     @Override
     public synchronized void dispose() {
         disposed = true;
+        stopScan();
         super.dispose();
     }
 
@@ -59,7 +61,7 @@ public class DeviceBuilderDiscoveryService extends AbstractThingHandlerDiscovery
                         thingDiscovered(result);
                     }
                 }
-            });
+            }, () -> disposed);
         } finally {
             scanning.set(false);
         }
@@ -70,12 +72,23 @@ public class DeviceBuilderDiscoveryService extends AbstractThingHandlerDiscovery
     }
 
     @Override
-    protected void startScan() {
-        scheduler.execute(this::scan);
+    protected synchronized void startScan() {
+        if (!disposed && (manualScan == null || manualScan.isDone())) {
+            manualScan = scheduler.schedule(this::scan, 0, TimeUnit.SECONDS);
+        }
     }
 
     @Override
-    protected void startBackgroundDiscovery() {
+    protected synchronized void stopScan() {
+        if (manualScan != null) {
+            manualScan.cancel(true);
+            manualScan = null;
+        }
+        super.stopScan();
+    }
+
+    @Override
+    protected synchronized void startBackgroundDiscovery() {
         int interval = thingHandler.getScanIntervalSeconds();
         if (interval > 0) {
             polling = scheduler.scheduleWithFixedDelay(this::scan, 0, interval, TimeUnit.SECONDS);
@@ -83,7 +96,7 @@ public class DeviceBuilderDiscoveryService extends AbstractThingHandlerDiscovery
     }
 
     @Override
-    protected void stopBackgroundDiscovery() {
+    protected synchronized void stopBackgroundDiscovery() {
         if (polling != null) {
             polling.cancel(true);
             polling = null;

@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -99,6 +100,10 @@ public class DeviceBuilderHandler extends BaseThingHandler {
     }
 
     public void discover(Consumer<DiscoveryResult> consumer) {
+        discover(consumer, () -> false);
+    }
+
+    public void discover(Consumer<DiscoveryResult> consumer, BooleanSupplier cancelled) {
         if (getThing().getStatusInfo().getStatusDetail() == ThingStatusDetail.CONFIGURATION_ERROR) {
             return;
         }
@@ -108,6 +113,9 @@ public class DeviceBuilderHandler extends BaseThingHandler {
             int attempted = 0;
             int succeeded = 0;
             for (var element : prioritizeDevices(devices.getAsJsonArray("configured"))) {
+                if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                 attempted++;
                 String filename = "<unknown configuration>";
                 try {
