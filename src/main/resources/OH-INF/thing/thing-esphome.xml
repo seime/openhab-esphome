@@ -56,6 +56,9 @@
 			<parameter-group name="firmware">
 				<label>Firmware upgrading</label>
 			</parameter-group>
+			<parameter-group name="voice">
+				<label>Voice assistant</label>
+			</parameter-group>
 
 			<parameter name="deviceId" type="text" required="true" groupName="network">
 				<label>ESPHome device ID</label>
@@ -189,6 +192,14 @@
 					yet supported. See https://bthome.io/</description>
 				<default>false</default>
 				<advanced>false</advanced>
+			</parameter>
+
+			<parameter name="voiceDialog" type="boolean" required="false" groupName="voice">
+				<label>Voice dialog</label>
+				<description>Start an openHAB voice dialog when the device detects its wake word. Uses openHAB's default voice
+					services. Changes will apply when the device reconnects. Turn off to set up your own dialog, such as one using
+					openHAB's wake word detection. Requires openHAB 5.1 or newer.</description>
+				<default>true</default>
 			</parameter>
 
 			<parameter name="configFileFullPath" type="text" required="false" groupName="firmware">

@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
@@ -54,6 +55,7 @@ import com.jano7.executor.KeySequentialExecutor;
 import io.esphome.api.*;
 import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 import no.seime.openhab.binding.esphome.internal.*;
+import no.seime.openhab.binding.esphome.internal.audio.AudioDialogProviderShim;
 import no.seime.openhab.binding.esphome.internal.audio.AudioUtil;
 import no.seime.openhab.binding.esphome.internal.audio.ESPHomeAudioSink;
 import no.seime.openhab.binding.esphome.internal.audio.ESPHomeVoiceAssistantAudioSource;
@@ -76,6 +78,9 @@ import no.seime.openhab.binding.esphome.internal.message.statesubscription.Event
  */
 @NonNullByDefault
 public class ESPHomeHandler extends BaseThingHandler implements CommunicationListener, ESPHomeVersionListener {
+
+    private static final int VOICE_DIALOG_RETRY_MIN_MS = 5000;
+    private static final int VOICE_DIALOG_RETRY_MAX_MS = 60000;
 
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 14;
@@ -139,6 +144,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final Map<Integer, ServiceRegistration<AudioSink>> audioSinkRegistrations = new HashMap<>();
     private @Nullable ESPHomeVoiceAssistantAudioSource audioSource;
     private @Nullable ServiceRegistration<AudioSource> audioSourceRegistration;
+    private final Object voiceDialogLock = new Object();
+    @Nullable
+    private ScheduledFuture<?> voiceDialogRestartFuture;
+    private final ExponentialBackoff voiceDialogBackoff = new ExponentialBackoff(VOICE_DIALOG_RETRY_MIN_MS,
+            VOICE_DIALOG_RETRY_MAX_MS);
+    private boolean voiceDialogRetryWarned;
     private int voiceAssistantFeatureFlags;
 
     private String logPrefix;
@@ -270,6 +281,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
             cancelDeepSleepWatchdog();
+            cancelVoiceDialogRestart();
             // ThingActions
             clearThingActions();
             // AudioSinks
@@ -324,6 +336,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         refreshAudioSink();
         refreshAudioSource();
+        refreshVoiceDialog();
     }
 
     private void refreshAudioSink() {
@@ -386,6 +399,136 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             audioSourceRegistration = bundleContext.registerService(AudioSource.class, newAudioSource,
                     new Hashtable<>());
             audioSource = newAudioSource;
+        }
+    }
+
+    private void refreshVoiceDialog() {
+        ESPHomeVoiceAssistantAudioSource source = audioSource;
+        ESPHomeConfiguration cfg = config;
+        if (source == null || cfg == null || !cfg.voiceDialog) {
+            return;
+        }
+        if (!source.hasDialogTrigger() && !startVoiceDialog(source)) {
+            return;
+        }
+        if (!source.subscribeForDialogTrigger()) {
+            retryVoiceDialog("could not subscribe to the device");
+            return;
+        }
+        synchronized (voiceDialogLock) {
+            voiceDialogBackoff.reset();
+            voiceDialogRetryWarned = false;
+        }
+    }
+
+    /**
+     * @return true if the dialog started
+     */
+    private boolean startVoiceDialog(ESPHomeVoiceAssistantAudioSource source) {
+        ESPHomeAudioSink sink = voiceDialogSink();
+        if (sink == null) {
+            logger.debug(mediaPlayers.isEmpty() ? "[{}] No media player, not starting voice dialog"
+                    : "[{}] Media player has no audio sink, not starting voice dialog", logPrefix);
+            return false;
+        }
+        AtomicBoolean stopped = new AtomicBoolean();
+        Runnable trigger;
+        try {
+            trigger = AudioDialogProviderShim.startDialog(bundleContext, sink, source,
+                    () -> onVoiceDialogStopped(source, stopped));
+        } catch (UnsupportedOperationException e) {
+            logger.debug("[{}] Voice dialog not supported: {}", logPrefix, e.getMessage());
+            return false;
+        } catch (IllegalStateException e) {
+            retryVoiceDialog(String.valueOf(e.getMessage()));
+            return false;
+        }
+        synchronized (voiceDialogLock) {
+            // openHAB already stopped it
+            if (stopped.get()) {
+                return false;
+            }
+            source.setDialogTrigger(trigger);
+        }
+        logger.debug("[{}] Voice dialog started for {} and {}", logPrefix, source.getId(), sink.getId());
+        return true;
+    }
+
+    /**
+     * Prefers a media player that supports announcements.
+     */
+    private @Nullable ESPHomeAudioSink voiceDialogSink() {
+        return mediaPlayers.values().stream()
+                .sorted(Comparator.comparing((ListEntitiesMediaPlayerResponse p) -> !supportsAnnouncements(p))
+                        .thenComparing(ListEntitiesMediaPlayerResponse::getObjectId))
+                .map(p -> audioSinks.get(p.getKey())).filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private static boolean supportsAnnouncements(ListEntitiesMediaPlayerResponse mediaPlayer) {
+        return mediaPlayer.getSupportedFormatsList().stream()
+                .anyMatch(f -> f.getPurpose() == MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT);
+    }
+
+    /**
+     * Called when openHAB stops the dialog.
+     */
+    private void onVoiceDialogStopped(ESPHomeVoiceAssistantAudioSource source, AtomicBoolean stopped) {
+        synchronized (voiceDialogLock) {
+            stopped.set(true);
+            source.setDialogTrigger(null);
+        }
+        logger.debug("[{}] Voice dialog stopped by openHAB, restarting", logPrefix);
+        scheduleVoiceDialogRestart();
+    }
+
+    private void retryVoiceDialog(String reason) {
+        synchronized (voiceDialogLock) {
+            if (!voiceDialogRetryWarned) {
+                voiceDialogRetryWarned = true;
+                logger.warn("[{}] Cannot start voice dialog, retrying: {}", logPrefix, reason);
+            } else {
+                logger.debug("[{}] Cannot start voice dialog, retrying: {}", logPrefix, reason);
+            }
+        }
+        scheduleVoiceDialogRestart();
+    }
+
+    private void scheduleVoiceDialogRestart() {
+        if (disposed) {
+            return;
+        }
+        synchronized (voiceDialogLock) {
+            ScheduledFuture<?> pending = voiceDialogRestartFuture;
+            if (pending != null && !pending.isDone()) {
+                return;
+            }
+            voiceDialogRestartFuture = schedule(this::restartVoiceDialog, voiceDialogBackoff.getNextDelay(),
+                    TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void restartVoiceDialog() {
+        // block disconnects until the dialog has started
+        synchronized (connectionStateLock) {
+            synchronized (voiceDialogLock) {
+                voiceDialogRestartFuture = null;
+            }
+            if (disposed || !interrogated || connectionState != ConnectionState.CONNECTED) {
+                return;
+            }
+            refreshVoiceDialog();
+        }
+    }
+
+    private void cancelVoiceDialogRestart() {
+        synchronized (voiceDialogLock) {
+            ScheduledFuture<?> pending = voiceDialogRestartFuture;
+            if (pending != null) {
+                pending.cancel(false);
+                voiceDialogRestartFuture = null;
+            }
+            voiceDialogBackoff.reset();
+            voiceDialogRetryWarned = false;
         }
     }
 
@@ -651,6 +794,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             cancelConnectionTimeoutWatchdog();
             unregisterAudioSinks();
             unregisterAudioSource();
+            // unregistering above schedules a restart
+            cancelVoiceDialogRestart();
             voiceAssistantFeatureFlags = 0;
 
             if (frameHelper != null) {
