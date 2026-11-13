@@ -227,7 +227,7 @@ public class EncryptedFrameHelper {
         scheduler.execute(new KeyRunnable<>(connectionId, () -> {
             try {
                 byte[] decrypted = decryptPacket(packetData);
-                int messageType = (decrypted[0] << 8) | decrypted[1];
+                int messageType = (Byte.toUnsignedInt(decrypted[0]) << 8) | Byte.toUnsignedInt(decrypted[1]);
                 byte[] messageData = Arrays.copyOfRange(decrypted, 4, decrypted.length);
                 decodeProtoMessage(messageType, messageData);
             } catch (Exception e) {
