@@ -93,6 +93,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final @Nullable ManagedThingProvider managedThingProvider;
     private boolean provisioningConnection;
     private boolean provisioningKeyPending;
+    private long connectionGeneration;
 
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
@@ -272,6 +273,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void dispose() {
         synchronized (connectionStateLock) {
             disposed = true;
+            connectionGeneration++;
             versionService.removeListener(this);
             eventSubscriber.removeEventSubscriptions(this);
             stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
@@ -462,6 +464,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 if (disposed) {
                     return;
                 }
+                long generation = ++connectionGeneration;
                 connectionState = ConnectionState.CONNECTING;
 
                 String hostname = config.hostname;
@@ -492,10 +495,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     }
                     encryptionKey = PROVISIONING_KEY;
                     provisioningConnection = true;
+                } else {
+                    rejectProvisioningKey(encryptionKey);
                 }
 
-                frameHelper = new EncryptedFrameHelper(connectionSelector, this, encryptionKey, config.deviceId,
-                        logPrefix, packetProcessor);
+                frameHelper = new EncryptedFrameHelper(connectionSelector, createConnectionListener(generation),
+                        encryptionKey, config.deviceId, logPrefix, packetProcessor);
 
                 frameHelper.connect(connectionTarget.connectHost, port);
 
@@ -507,6 +512,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
 
             } catch (ProtocolException e) {
+                connectionGeneration++;
                 logger.warn("[{}] Error initial connection", logPrefix, e);
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
                 connectionState = ConnectionState.UNINITIALIZED;
@@ -520,6 +526,57 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }
             }
         }
+    }
+
+    private void rejectProvisioningKey(String encryptionKey) throws ProtocolAPIError {
+        try {
+            if (Arrays.equals(Base64.getDecoder().decode(encryptionKey), new byte[32])) {
+                throw new ProtocolAPIError(
+                        "The reserved bootstrap encryption key cannot be configured; remove it to adopt the device automatically");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new ProtocolAPIError("Invalid base64 encryption key", e);
+        }
+    }
+
+    private CommunicationListener createConnectionListener(long generation) {
+        return new CommunicationListener() {
+            @Override
+            public void onConnect() throws ProtocolAPIError {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onConnect();
+                    }
+                }
+            }
+
+            @Override
+            public void onPacket(GeneratedMessage message) {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onPacket(message);
+                    }
+                }
+            }
+
+            @Override
+            public void onEndOfStream(String message) {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onEndOfStream(message);
+                    }
+                }
+            }
+
+            @Override
+            public void onParseError(CommunicationError error) {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onParseError(error);
+                    }
+                }
+            }
+        };
     }
 
     public void sendMessage(GeneratedMessage message) throws ProtocolAPIError {
@@ -664,6 +721,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 return;
             }
 
+            connectionGeneration++;
             eventSubscriber.removeEventSubscriptions(this);
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
@@ -814,6 +872,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
+            connectionGeneration++;
             if (frameHelper != null) {
                 frameHelper.close();
                 frameHelper = null;

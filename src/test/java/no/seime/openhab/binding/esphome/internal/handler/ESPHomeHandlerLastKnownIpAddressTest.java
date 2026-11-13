@@ -56,6 +56,7 @@ import io.esphome.api.SubscribeLogsRequest;
 import io.esphome.api.SubscribeStatesRequest;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
+import no.seime.openhab.binding.esphome.internal.comm.CommunicationError;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
@@ -499,6 +500,89 @@ class ESPHomeHandlerLastKnownIpAddressTest {
         verify(callback).statusUpdated(eq(thing), argThat(status -> status.getStatus() == ThingStatus.OFFLINE
                 && status.getStatusDetail() == ThingStatusDetail.CONFIGURATION_ERROR));
         assertNull(getField("connectFuture"));
+    }
+
+    @Test
+    void closedBootstrapCallbacksCannotAffectReplacementConnection() throws Exception {
+        setConnected();
+        setField("provisioningConnection", true);
+        CommunicationListener stale = (CommunicationListener) invokeMethod("createConnectionListener",
+                new Class<?>[] { long.class }, getField("connectionGeneration"));
+        handler.onEndOfStream("bootstrap closed");
+        invokeMethod("cancelConnectFuture", new Class<?>[0]);
+        setConnected();
+        setField("provisioningConnection", false);
+        setField("frameHelper", frameHelper);
+        clearInvocations(frameHelper, callback, eventSubscriber);
+
+        stale.onConnect();
+        stale.onPacket(HomeassistantActionRequest.newBuilder().setService("test.event").setIsEvent(true).build());
+        stale.onPacket(SubscribeHomeAssistantStateResponse.getDefaultInstance());
+        stale.onPacket(PingRequest.getDefaultInstance());
+        stale.onEndOfStream("stale EOF");
+        stale.onParseError(CommunicationError.PACKET_ERROR);
+
+        verifyNoInteractions(frameHelper, callback, eventSubscriber, eventPublisher);
+        CommunicationListener current = (CommunicationListener) invokeMethod("createConnectionListener",
+                new Class<?>[] { long.class }, getField("connectionGeneration"));
+        current.onPacket(PingRequest.getDefaultInstance());
+        verify(frameHelper).send(PingResponse.getDefaultInstance());
+    }
+
+    @Test
+    void replacedConnectionCallbacksAreIgnoredEvenWithoutDisconnect() throws Exception {
+        CommunicationListener stale = (CommunicationListener) invokeMethod("createConnectionListener",
+                new Class<?>[] { long.class }, getField("connectionGeneration"));
+        setField("connectionGeneration", (long) getField("connectionGeneration") + 1);
+        setConnected();
+        stale.onConnect();
+        stale.onPacket(PingRequest.getDefaultInstance());
+        stale.onEndOfStream("stale EOF");
+        stale.onParseError(CommunicationError.PACKET_ERROR);
+        verifyNoInteractions(frameHelper, callback);
+    }
+
+    @Test
+    void disconnectResponseInvalidatesConnectionCallbacks() throws Exception {
+        setConnected();
+        CommunicationListener listener = (CommunicationListener) invokeMethod("createConnectionListener",
+                new Class<?>[] { long.class }, getField("connectionGeneration"));
+        listener.onPacket(io.esphome.api.DisconnectResponse.getDefaultInstance());
+        verify(frameHelper).close();
+        clearInvocations(frameHelper);
+        listener.onConnect();
+        listener.onPacket(PingRequest.getDefaultInstance());
+        listener.onParseError(CommunicationError.PACKET_ERROR);
+        listener.onEndOfStream("closed");
+        verifyNoInteractions(frameHelper, callback);
+    }
+
+    @Test
+    void rejectsConfiguredBootstrapKeysFromThingAndBinding() throws Exception {
+        for (boolean bindingDefault : new boolean[] { false, true }) {
+            for (boolean padded : new boolean[] { false, true }) {
+                String key = Base64.getEncoder().encodeToString(new byte[32]);
+                if (!padded) {
+                    key = key.replace("=", "");
+                }
+                ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+                configuration.hostname = "127.0.0.1";
+                configuration.encryptionKey = bindingDefault ? "" : key;
+                configuration.deepSleep = true;
+                setField("config", configuration);
+                setField("bindingPropertyDefaultEncryptionKey", bindingDefault ? key : "");
+                clearInvocations(callback);
+
+                invokeMethod("connect", new Class<?>[0]);
+
+                verify(callback).statusUpdated(eq(thing), argThat(status -> status.getStatus() == ThingStatus.OFFLINE
+                        && status.getDescription().contains("reserved bootstrap encryption key")));
+                assertSame(frameHelper, getField("frameHelper"), "No new helper should be created for a public key");
+                assertFalse((boolean) getField("provisioningConnection"));
+                assertNull(getField("connectFuture"));
+            }
+        }
+        verifyNoInteractions(frameHelper);
     }
 
     private void prepareDeepSleepAdoption() throws Exception {
