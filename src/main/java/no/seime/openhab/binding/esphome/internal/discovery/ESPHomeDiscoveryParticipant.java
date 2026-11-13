@@ -13,6 +13,8 @@
 package no.seime.openhab.binding.esphome.internal.discovery;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 import javax.jmdns.ServiceInfo;
@@ -22,10 +24,13 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.discovery.DiscoveryResult;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
+import org.openhab.core.config.discovery.inbox.Inbox;
 import org.openhab.core.config.discovery.mdns.MDNSDiscoveryParticipant;
 import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.ThingUID;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +51,13 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
     public static final String PROPERTY_PORT = "port";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeDiscoveryParticipant.class);
+
+    private final Inbox inbox;
+
+    @Activate
+    public ESPHomeDiscoveryParticipant(@Reference Inbox inbox) {
+        this.inbox = inbox;
+    }
 
     @Override
     public Set<ThingTypeUID> getSupportedThingTypeUIDs() {
@@ -71,10 +83,14 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
 
             logger.debug("Found ESPHome device via mDNS: {} ", label);
 
+            Map<String, Object> properties = new HashMap<>();
+            inbox.stream().filter(result -> deviceUID.equals(result.getThingUID())).findFirst()
+                    .ifPresent(result -> properties.putAll(result.getProperties()));
+            properties.put(PROPERTY_HOSTNAME, service.getServer());
+            properties.put(PROPERTY_PORT, service.getPort());
+            properties.put(PROPERTY_DEVICEID, name);
             return DiscoveryResultBuilder.create(deviceUID).withThingType(BindingConstants.THING_TYPE_DEVICE)
-                    .withProperty(PROPERTY_HOSTNAME, service.getServer()).withProperty(PROPERTY_PORT, service.getPort())
-                    .withProperty(PROPERTY_DEVICEID, name).withLabel(label)
-                    .withRepresentationProperty(PROPERTY_DEVICEID).build();
+                    .withProperties(properties).withLabel(label).withRepresentationProperty(PROPERTY_DEVICEID).build();
         }
         return null;
     }

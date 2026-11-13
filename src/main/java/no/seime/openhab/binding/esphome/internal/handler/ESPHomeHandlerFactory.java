@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
 import org.openhab.core.audio.AudioHTTPServer;
+import org.openhab.core.config.discovery.inbox.Inbox;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.*;
@@ -58,7 +59,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandlerFactory.class);
 
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(BindingConstants.THING_TYPE_DEVICE,
-            BindingConstants.THING_TYPE_BLE_PROXY);
+            BindingConstants.THING_TYPE_BLE_PROXY, BindingConstants.THING_TYPE_DEVICE_BUILDER);
 
     private @Nullable String bindingPropertyDefaultEncryptionKey;
     private @Nullable String bindingPropertyAudioBaseUrl;
@@ -71,6 +72,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
 
     private final ThingRegistry thingRegistry;
+    private final Inbox inbox;
     private final EventPublisher eventPublisher;
     private final AudioHTTPServer audioHTTPServer;
     private final NetworkAddressService networkAddressService;
@@ -87,12 +89,14 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
             @Reference ESPStateDescriptionProvider stateDescriptionProvider,
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry,
             @Reference EventPublisher eventPublisher, @Reference ESPHomeMDNSHostnameResolver mdnsHostnameResolver,
-            @Reference AudioHTTPServer audioHTTPServer, @Reference NetworkAddressService networkAddressService) {
+            @Reference AudioHTTPServer audioHTTPServer, @Reference NetworkAddressService networkAddressService,
+            @Reference Inbox inbox) {
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         this.stateDescriptionProvider = stateDescriptionProvider;
         this.eventSubscriber = eventSubscriber;
         this.thingRegistry = thingRegistry;
+        this.inbox = inbox;
         this.eventPublisher = eventPublisher;
         this.mdnsHostnameResolver = mdnsHostnameResolver;
         this.audioHTTPServer = audioHTTPServer;
@@ -103,6 +107,9 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
+        if (BindingConstants.THING_TYPE_DEVICE_BUILDER.equals(thingTypeUID)) {
+            return new DeviceBuilderHandler(thing, thingRegistry, inbox);
+        }
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,

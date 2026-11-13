@@ -4,6 +4,31 @@
 	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
 	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
 
+	<thing-type id="device-builder">
+		<label>ESPHome Device Builder</label>
+		<description>Discover devices and their API settings from an ESPHome Device Builder dashboard.</description>
+		<config-description>
+			<parameter name="url" type="text" required="true">
+				<label>Dashboard URL</label>
+				<description>Dashboard base URL, including any path prefix, for example http://localhost:6052/</description>
+				<default>http://localhost:6052/</default>
+			</parameter>
+			<parameter name="scanInterval" type="integer" min="0" required="false" unit="s">
+				<label>Scan Interval</label>
+				<description>Seconds between background discovery scans. The first scan runs immediately. Set to 0 to disable
+					automatic scans. Manual discovery remains available.</description>
+				<default>300</default>
+			</parameter>
+			<parameter name="username" type="text">
+				<label>Username</label>
+			</parameter>
+			<parameter name="password" type="text">
+				<context>password</context>
+				<label>Password</label>
+			</parameter>
+		</config-description>
+	</thing-type>
+
 	<thing-type id="device">
 		<label>ESPHome Device</label>
 		<description>Device flashed with ESPHome firmware. See esphome.io</description>

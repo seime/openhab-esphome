@@ -243,7 +243,10 @@ bluetooth_proxy:
   active: true
 ```
 
-2. Configure the ESPHome `device` in openHAB with `enableBluetoothProxy = true`
+2. Configure the ESPHome `device` in openHAB with `enableBluetoothProxy = true`.
+   Device Builder discovery automatically enables this setting for discovered devices
+   whose resolved ESPHome configuration contains the `bluetooth_proxy` component.
+   For devices already added to openHAB, enable the setting manually.
 
 ```yaml
 esphome:device:garage-opener  "Garage ESP32" [ ... enableBluetoothProxy=true ]
@@ -468,3 +471,26 @@ Other functions are not yet supported:
 
 - Serial proxy
 - Infrared
+
+### Device Builder discovery
+
+Add an **ESPHome Device Builder** thing and set `url` to the dashboard base URL
+(for example `http://192.168.1.10:6052/`). Include any reverse proxy path prefix.
+For a dashboard with authentication enabled, set `username` and `password`.
+The URL must provide direct access to the dashboard API; a Home Assistant ingress
+page requiring a browser session is not suitable.
+
+The binding scans on startup and every five minutes by default. Set `scanInterval`
+in seconds on the Device Builder thing to change the interval, or set it to `0` to
+disable automatic scans. You can also start discovery from the inbox. For each
+configured device with a native `api`, it reads the resolved configuration,
+including substitutions, packages and secrets, and fills in the device address,
+API port and encryption key. It enables `allowActions` when the configuration
+contains outgoing Home Assistant actions, events or tag scans, or Home Assistant
+control entities. It also automatically enables `enableBluetoothProxy` when the
+resolved configuration contains a `bluetooth_proxy` component.
+
+Device Builder and mDNS discovery use the same `deviceId` representation property
+and thing UID, so they share one inbox entry. Later mDNS announcements preserve
+the additional settings already found in that entry. Discovery populates inbox
+entries; it does not change the configuration of devices already added as things.

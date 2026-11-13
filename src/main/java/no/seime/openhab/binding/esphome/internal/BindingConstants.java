@@ -27,6 +27,7 @@ public class BindingConstants {
     public static final String BINDING_ID = "esphome";
 
     // List of all Thing Type UIDs
+    public static final ThingTypeUID THING_TYPE_DEVICE_BUILDER = new ThingTypeUID(BINDING_ID, "device-builder");
     public static final ThingTypeUID THING_TYPE_DEVICE = new ThingTypeUID(BINDING_ID, "device");
     public static final ThingTypeUID THING_TYPE_BLE_PROXY = new ThingTypeUID("bluetooth", "esphome");
 
