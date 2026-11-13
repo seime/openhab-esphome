@@ -3,26 +3,34 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Dictionary;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +41,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.audio.AudioSink;
@@ -52,7 +61,9 @@ import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
 import org.openhab.core.thing.internal.ThingImpl;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
 
 import com.google.protobuf.ByteString;
@@ -67,18 +78,25 @@ import io.esphome.api.MediaPlayerFormatPurpose;
 import io.esphome.api.MediaPlayerState;
 import io.esphome.api.MediaPlayerStateResponse;
 import io.esphome.api.MediaPlayerSupportedFormat;
+import io.esphome.api.SubscribeVoiceAssistantRequest;
 import io.esphome.api.VoiceAssistantAudio;
+import io.esphome.api.VoiceAssistantEvent;
+import io.esphome.api.VoiceAssistantEventResponse;
 import io.esphome.api.VoiceAssistantRequest;
+import io.esphome.api.VoiceAssistantRequestFlag;
+import io.esphome.api.VoiceAssistantResponse;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
 import no.seime.openhab.binding.esphome.internal.MonitoredCompositeExecutorService;
 import no.seime.openhab.binding.esphome.internal.audio.ESPHomeAudioSink;
+import no.seime.openhab.binding.esphome.internal.audio.ESPHomeVoiceAssistantAudioSource;
 import no.seime.openhab.binding.esphome.internal.audio.MediaPlayerFeature;
 import no.seime.openhab.binding.esphome.internal.audio.VoiceAssistantFeature;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
+import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
 
@@ -114,6 +132,17 @@ class ESPHomeHandlerAudioServicesTest {
     private FirmwareUpgradeService firmwareUpgradeService;
     @Mock
     private ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
+    @Mock
+    private Bundle dialogProviderBundle;
+
+    private static final String DIALOG_PROVIDER = "org.openhab.core.audio.AudioDialogProvider";
+    private static final VoiceAssistantResponse ACCEPT = VoiceAssistantResponse.newBuilder().setPort(0).setError(false)
+            .build();
+    private static final VoiceAssistantResponse REJECT = VoiceAssistantResponse.newBuilder().setError(true).build();
+    private static final SubscribeVoiceAssistantRequest SUBSCRIBE = SubscribeVoiceAssistantRequest.newBuilder()
+            .setSubscribe(true).setFlags(1).build();
+    private static final SubscribeVoiceAssistantRequest UNSUBSCRIBE = SubscribeVoiceAssistantRequest.newBuilder()
+            .setSubscribe(false).build();
 
     private ESPHomeHandler handler;
     private MonitoredCompositeExecutorService executor;
@@ -376,6 +405,378 @@ class ESPHomeHandlerAudioServicesTest {
 
         // Closing stream should unblock and not deadlock => test should run without hanging the test runner
         stream.close();
+    }
+
+    @Test
+    void sendsPipelineEventsAroundVoiceSession() throws Exception {
+        AudioSource source = registerVoiceAssistantSource();
+        AudioStream stream = source.getInputStream(source.getSupportedFormats().iterator().next());
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+
+        verify(frameHelper).send(ACCEPT);
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_START));
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_STT_START));
+
+        stream.close();
+
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+        verify(frameHelper, never()).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END));
+    }
+
+    @Test
+    void rejectsVoiceRequestWhenNothingIsListening() throws Exception {
+        registerVoiceAssistantSource();
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+
+        verify(frameHelper).send(REJECT);
+        verify(frameHelper, never()).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_START));
+    }
+
+    @Test
+    void dialogTriggerStartsListeningOnWakeWordOffThePacketThread() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+        AudioStream[] dialogStream = new AudioStream[1];
+        Thread[] triggerThread = new Thread[1];
+        source.setDialogTrigger(() -> {
+            triggerThread[0] = Thread.currentThread();
+            dialogStream[0] = openStream(source);
+        });
+
+        invokeHandleConnected(
+                VoiceAssistantRequest.newBuilder().setStart(true).setWakeWordPhrase("Hey Jarvis").build());
+
+        verify(frameHelper, timeout(2000)).send(ACCEPT);
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_START));
+        assertNotNull(dialogStream[0]);
+        assertNotEquals(Thread.currentThread(), triggerThread[0]);
+        dialogStream[0].close();
+    }
+
+    @Test
+    void dialogTriggerIsNotUsedWhenDeviceAsksOpenHABToDetectTheWakeWord() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+        CountDownLatch triggered = new CountDownLatch(1);
+        source.setDialogTrigger(triggered::countDown);
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true)
+                .setFlags(VoiceAssistantRequestFlag.VOICE_ASSISTANT_REQUEST_USE_WAKE_WORD_VALUE).build());
+
+        verify(frameHelper).send(REJECT);
+        assertFalse(triggered.await(200, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    void failingDialogTriggerStillAnswersTheDevice() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+        source.setDialogTrigger(() -> {
+            throw new IllegalStateException("STT failed");
+        });
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+
+        verify(frameHelper, timeout(2000)).send(REJECT);
+    }
+
+    @Test
+    void stopRequestWhileDialogStartsIsHandledAfterIt() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+        CountDownLatch release = new CountDownLatch(1);
+        AudioStream[] dialogStream = new AudioStream[1];
+        source.setDialogTrigger(() -> {
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            dialogStream[0] = openStream(source);
+        });
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(false).build());
+        release.countDown();
+
+        verify(frameHelper, timeout(2000)).send(ACCEPT);
+        // the stop closes the dialog's stream
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertEquals(-1, dialogStream[0].read()));
+    }
+
+    @Test
+    void dialogTriggerIsNotUsedWhenSomethingIsAlreadyListening() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+        boolean[] triggered = new boolean[1];
+        source.setDialogTrigger(() -> triggered[0] = true);
+        AudioStream stream = openStream(source);
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+
+        assertFalse(triggered[0]);
+        verify(frameHelper).send(ACCEPT);
+        stream.close();
+    }
+
+    @Test
+    void dialogTriggerKeepsDeviceSubscribedBetweenRuns() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+
+        source.setDialogTrigger(() -> {
+        });
+        assertTrue(source.subscribeForDialogTrigger());
+        verify(frameHelper).send(SUBSCRIBE);
+
+        AudioStream stream = openStream(source);
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        stream.close();
+
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+        verify(frameHelper, times(1)).send(SUBSCRIBE);
+        verify(frameHelper, never()).send(UNSUBSCRIBE);
+
+        source.setDialogTrigger(null);
+        verify(frameHelper).send(UNSUBSCRIBE);
+    }
+
+    @Test
+    void doesNotLookUpDialogProviderWhenVoiceDialogIsDisabled() throws Exception {
+        ESPHomeConfiguration config = new ESPHomeConfiguration();
+        config.voiceDialog = false;
+        setField("config", config);
+        when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+        registerVoiceAssistantSourceWithMediaPlayer();
+
+        verify(bundleContext, never()).getServiceReference(DIALOG_PROVIDER);
+    }
+
+    @Test
+    void doesNotRetryVoiceDialogOnOpenHABWithoutDialogProvider() throws Exception {
+        ESPHomeConfiguration config = new ESPHomeConfiguration();
+        config.voiceDialog = true;
+        setField("config", config);
+        when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+
+        verify(bundleContext).getServiceReference(DIALOG_PROVIDER);
+        assertFalse(source.hasDialogTrigger());
+        assertNull(getField("voiceDialogRestartFuture"));
+    }
+
+    @Test
+    void doesNotRetryVoiceDialogWithIncompatibleDialogProvider() throws Exception {
+        voiceDialogProvider();
+        Mockito.doReturn(Runnable.class).when(dialogProviderBundle).loadClass(DIALOG_PROVIDER);
+
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+
+        assertFalse(source.hasDialogTrigger());
+        assertNull(getField("voiceDialogRestartFuture"));
+    }
+
+    @Test
+    void restartsVoiceDialogAfterOpenHABStopsIt() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        ArgumentCaptor<Runnable> onAbort = ArgumentCaptor.forClass(Runnable.class);
+        when(provider.startDialog(any(), any(), any(), any(), onAbort.capture())).thenReturn(() -> {
+        });
+
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+        assertTrue(source.hasDialogTrigger());
+
+        onAbort.getValue().run();
+        assertFalse(source.hasDialogTrigger());
+        assertNotNull(getField("voiceDialogRestartFuture"));
+
+        restartVoiceDialog();
+
+        verify(provider, times(2)).startDialog(any(), any(), any(), any(), any());
+        assertTrue(source.hasDialogTrigger());
+    }
+
+    @Test
+    void retriesVoiceDialogUntilOpenHABCanStartIt() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        when(provider.startDialog(any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("no default STT")).thenReturn(() -> {
+                });
+
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+        assertFalse(source.hasDialogTrigger());
+        assertNotNull(getField("voiceDialogRestartFuture"));
+
+        restartVoiceDialog();
+
+        verify(provider, times(2)).startDialog(any(), any(), any(), any(), any());
+        assertTrue(source.hasDialogTrigger());
+    }
+
+    @Test
+    void ignoresTriggerOfDialogStoppedWhileItStarted() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        when(provider.startDialog(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(4)).run();
+            return (Runnable) () -> {
+            };
+        }).thenReturn(() -> {
+        });
+
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+        assertFalse(source.hasDialogTrigger());
+        assertNotNull(getField("voiceDialogRestartFuture"));
+
+        restartVoiceDialog();
+
+        verify(provider, times(2)).startDialog(any(), any(), any(), any(), any());
+        assertTrue(source.hasDialogTrigger());
+    }
+
+    @Test
+    void retriesSubscriptionWithoutStartingAnotherDialog() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        when(provider.startDialog(any(), any(), any(), any(), any())).thenReturn(() -> {
+        });
+        Mockito.doThrow(new ProtocolAPIError("socket closed")).doNothing().when(frameHelper).send(SUBSCRIBE);
+
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+        assertTrue(source.hasDialogTrigger());
+        assertNotNull(getField("voiceDialogRestartFuture"));
+
+        restartVoiceDialog();
+
+        verify(frameHelper, times(2)).send(SUBSCRIBE);
+        verify(provider, times(1)).startDialog(any(), any(), any(), any(), any());
+        assertNull(getField("voiceDialogRestartFuture"));
+    }
+
+    @Test
+    void doesNotRestartVoiceDialogAfterDispose() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        ArgumentCaptor<Runnable> onAbort = ArgumentCaptor.forClass(Runnable.class);
+        when(provider.startDialog(any(), any(), any(), any(), onAbort.capture())).thenReturn(() -> {
+        });
+        registerVoiceAssistantSourceWithMediaPlayer();
+
+        onAbort.getValue().run();
+        handler.dispose();
+        restartVoiceDialog();
+
+        verify(provider, times(1)).startDialog(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void doesNotRestartVoiceDialogAfterDisconnect() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        ArgumentCaptor<Runnable> onAbort = ArgumentCaptor.forClass(Runnable.class);
+        when(provider.startDialog(any(), any(), any(), any(), onAbort.capture())).thenReturn(() -> {
+        });
+        registerVoiceAssistantSourceWithMediaPlayer();
+        // openHAB stops the dialog when the source is unregistered
+        Mockito.doAnswer(invocation -> {
+            onAbort.getValue().run();
+            return null;
+        }).when(audioSourceRegistration).unregister();
+
+        invokeMethod("handleDisconnection",
+                new Class<?>[] { org.openhab.core.thing.ThingStatusDetail.class, String.class },
+                org.openhab.core.thing.ThingStatusDetail.COMMUNICATION_ERROR, "test");
+
+        assertNull(getField("voiceDialogRestartFuture"));
+        restartVoiceDialog();
+        verify(provider, times(1)).startDialog(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void repliesOnTheMediaPlayerThatTakesAnnouncements() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        ArgumentCaptor<AudioSink> sink = ArgumentCaptor.forClass(AudioSink.class);
+        when(provider.startDialog(sink.capture(), any(), any(), any(), any())).thenReturn(() -> {
+        });
+        when(bundleContext.registerService(eq(AudioSource.class), any(AudioSource.class), any(Dictionary.class)))
+                .thenReturn(audioSourceRegistration);
+
+        invokeHandleConnected(voiceAssistantDeviceInfo());
+        invokeHandleConnected(
+                ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("a_media").setName("Media")
+                        .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("FLAC")
+                                .setPurpose(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_DEFAULT).build())
+                        .build());
+        invokeHandleConnected(
+                ListEntitiesMediaPlayerResponse.newBuilder().setKey(12).setObjectId("z_announce").setName("Announce")
+                        .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("FLAC")
+                                .setPurpose(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT).build())
+                        .build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        assertTrue(sink.getValue().getId().endsWith(":z_announce"));
+    }
+
+    private DialogProvider voiceDialogProvider() throws Exception {
+        ESPHomeConfiguration config = new ESPHomeConfiguration();
+        config.voiceDialog = true;
+        setField("config", config);
+        when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+        DialogProvider provider = Mockito.mock(DialogProvider.class);
+        ServiceReference<?> reference = Mockito.mock(ServiceReference.class);
+        Mockito.doReturn(reference).when(bundleContext).getServiceReference(DIALOG_PROVIDER);
+        Mockito.doReturn(dialogProviderBundle).when(reference).getBundle();
+        Mockito.doReturn(DialogProvider.class).when(dialogProviderBundle).loadClass(DIALOG_PROVIDER);
+        Mockito.doReturn(provider).when(bundleContext).getService(reference);
+        return provider;
+    }
+
+    private void restartVoiceDialog() throws Exception {
+        invokeMethod("restartVoiceDialog", new Class<?>[0]);
+    }
+
+    private static AudioStream openStream(AudioSource source) {
+        try {
+            return source.getInputStream(source.getSupportedFormats().iterator().next());
+        } catch (AudioException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static DeviceInfoResponse voiceAssistantDeviceInfo() {
+        return DeviceInfoResponse.newBuilder().setName("virtual").setMacAddress("AA").setModel("ESP32")
+                .setManufacturer("Espressif").setEsphomeVersion("2026.1.0").setCompilationTime("now")
+                .setVoiceAssistantFeatureFlags(VoiceAssistantFeature.API_AUDIO.getFlag()).build();
+    }
+
+    private AudioSource registerVoiceAssistantSource() throws Exception {
+        ArgumentCaptor<AudioSource> sourceCaptor = ArgumentCaptor.forClass(AudioSource.class);
+        when(bundleContext.registerService(eq(AudioSource.class), sourceCaptor.capture(), any(Dictionary.class)))
+                .thenReturn(audioSourceRegistration);
+        invokeHandleConnected(voiceAssistantDeviceInfo());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+        return sourceCaptor.getValue();
+    }
+
+    private AudioSource registerVoiceAssistantSourceWithMediaPlayer() throws Exception {
+        ArgumentCaptor<AudioSource> sourceCaptor = ArgumentCaptor.forClass(AudioSource.class);
+        when(bundleContext.registerService(eq(AudioSource.class), sourceCaptor.capture(), any(Dictionary.class)))
+                .thenReturn(audioSourceRegistration);
+        invokeHandleConnected(voiceAssistantDeviceInfo());
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("FLAC").build()).build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+        return sourceCaptor.getValue();
+    }
+
+    private static VoiceAssistantEventResponse event(VoiceAssistantEvent type) {
+        return VoiceAssistantEventResponse.newBuilder().setEventType(type).build();
+    }
+
+    /**
+     * Stand-in for openHAB 5.1's AudioDialogProvider.
+     */
+    public interface DialogProvider {
+        @Nullable
+        Runnable startDialog(AudioSink audioSink, AudioSource audioSource, @Nullable String locationItem,
+                @Nullable String listeningItem, @Nullable Runnable onAbort);
     }
 
     @Test
@@ -725,6 +1126,12 @@ class ESPHomeHandlerAudioServicesTest {
         Field field = ESPHomeHandler.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(handler, value);
+    }
+
+    private @Nullable Object getField(String name) throws Exception {
+        Field field = ESPHomeHandler.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(handler);
     }
 
     private Class<?> getFieldType(String name) throws Exception {

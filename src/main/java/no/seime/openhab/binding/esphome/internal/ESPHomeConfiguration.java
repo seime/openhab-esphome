@@ -56,4 +56,6 @@ public class ESPHomeConfiguration {
     public long deepSleepTimeoutSeconds;
 
     public boolean deepSleepAssumeOnline = false;
+
+    public boolean voiceDialog = true;
 }
