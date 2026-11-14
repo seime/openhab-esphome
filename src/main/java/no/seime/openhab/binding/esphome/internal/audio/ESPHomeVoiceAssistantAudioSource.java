@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -36,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import io.esphome.api.SubscribeVoiceAssistantRequest;
 import io.esphome.api.VoiceAssistantAudio;
 import io.esphome.api.VoiceAssistantEvent;
+import io.esphome.api.VoiceAssistantEventData;
 import io.esphome.api.VoiceAssistantEventResponse;
 import io.esphome.api.VoiceAssistantRequest;
 import io.esphome.api.VoiceAssistantRequestFlag;
@@ -58,6 +60,15 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     // must hold more audio than the stall timeout
     private static final int PIPE_SIZE = 128 * 1024;
     private static final long DEFAULT_READER_STALL_MS = 2000;
+    private static final long REPLY_TIMEOUT_SECONDS = 60;
+    // the device ignores TTS_START without text, and openHAB doesn't share the reply
+    private static final String REPLY_TEXT = "...";
+
+    private enum ReplyState {
+        NONE,
+        WAITING,
+        PLAYING
+    }
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeVoiceAssistantAudioSource.class);
 
@@ -79,6 +90,9 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private volatile boolean streaming;
     private int pendingDialogRequests;
     private volatile @Nullable Runnable dialogTrigger;
+    private ReplyState replyState = ReplyState.NONE;
+    private @Nullable Runnable replyStopper;
+    private @Nullable ScheduledFuture<?> replyTimeout;
 
     public ESPHomeVoiceAssistantAudioSource(ESPHomeHandler handler) {
         this(handler, DEFAULT_READER_STALL_MS);
@@ -228,8 +242,11 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private void handleRequest(VoiceAssistantRequest request) {
         if (!request.getStart()) {
             endSession();
+            // the device waits for RUN_END
+            endReply(true);
             return;
         }
+        clearReply();
 
         if (streamGroup.isEmpty()) {
             try {
@@ -307,10 +324,85 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         }
     }
 
+    /**
+     * Called before the dialog's sink plays audio.
+     *
+     * @param stopPlayback stops the audio if the device stops the run
+     * @return true if the audio is the dialog's reply
+     */
+    public boolean startReply(Runnable stopPlayback) {
+        synchronized (lock) {
+            if (streaming && dialogTrigger != null) {
+                // some speech-to-text services read until the reply plays
+                endRun();
+                endSession();
+            }
+            if (replyState != ReplyState.WAITING) {
+                return false;
+            }
+            replyState = ReplyState.PLAYING;
+            replyStopper = stopPlayback;
+            scheduleReplyTimeout();
+            sendEvent(VoiceAssistantEventResponse.newBuilder()
+                    .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_START)
+                    .addData(VoiceAssistantEventData.newBuilder().setName("text").setValue(REPLY_TEXT)).build());
+            return true;
+        }
+    }
+
+    /**
+     * Called when the reply has finished playing.
+     */
+    public void endReply() {
+        synchronized (lock) {
+            endReply(false);
+        }
+    }
+
+    private void endReply(boolean stopPlayback) {
+        if (replyState == ReplyState.NONE) {
+            return;
+        }
+        Runnable stopper = replyState == ReplyState.PLAYING && stopPlayback ? replyStopper : null;
+        clearReply();
+        if (stopper != null) {
+            stopper.run();
+        }
+        sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
+    }
+
+    private void clearReply() {
+        replyState = ReplyState.NONE;
+        replyStopper = null;
+        ScheduledFuture<?> timeout = replyTimeout;
+        if (timeout != null) {
+            timeout.cancel(false);
+            replyTimeout = null;
+        }
+    }
+
+    private void scheduleReplyTimeout() {
+        ScheduledFuture<?> timeout = replyTimeout;
+        if (timeout != null) {
+            timeout.cancel(false);
+        }
+        replyTimeout = handler.schedule(this::onReplyTimeout, REPLY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void onReplyTimeout() {
+        synchronized (lock) {
+            if (replyState != ReplyState.NONE) {
+                logger.debug("[{}] Reply took over {}s, ending the run", handler.getLogPrefix(), REPLY_TIMEOUT_SECONDS);
+                endReply(false);
+            }
+        }
+    }
+
     public void close() {
         synchronized (lock) {
             closed = true;
             dialogTrigger = null;
+            clearReply();
             endSession();
             unsubscribe();
             audioStreamExecutor.shutdownNow();
@@ -347,19 +439,30 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     }
 
     /**
-     * Tells the device to stop streaming. Older firmware ignores RUN_END after STT_VAD_END.
+     * Tells the device to stop streaming. In a dialog, the device shows it is thinking until the reply plays.
      */
     private void endRun() {
-        if (streaming) {
-            sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
+        if (!streaming) {
+            return;
         }
+        if (dialogTrigger == null) {
+            sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
+            return;
+        }
+        sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END);
+        replyState = ReplyState.WAITING;
+        scheduleReplyTimeout();
     }
 
     private void sendEvent(VoiceAssistantEvent event) {
+        sendEvent(VoiceAssistantEventResponse.newBuilder().setEventType(event).build());
+    }
+
+    private void sendEvent(VoiceAssistantEventResponse event) {
         try {
-            handler.sendMessage(VoiceAssistantEventResponse.newBuilder().setEventType(event).build());
+            handler.sendMessage(event);
         } catch (ProtocolAPIError e) {
-            logger.debug("[{}] Failed to send {}", handler.getLogPrefix(), event, e);
+            logger.debug("[{}] Failed to send {}", handler.getLogPrefix(), event.getEventType(), e);
         }
     }
 

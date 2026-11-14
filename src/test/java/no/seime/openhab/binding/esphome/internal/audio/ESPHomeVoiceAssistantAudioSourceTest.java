@@ -1,7 +1,11 @@
 package no.seime.openhab.binding.esphome.internal.audio;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,7 +20,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -27,6 +34,7 @@ import com.google.protobuf.ByteString;
 
 import io.esphome.api.VoiceAssistantAudio;
 import io.esphome.api.VoiceAssistantEvent;
+import io.esphome.api.VoiceAssistantEventData;
 import io.esphome.api.VoiceAssistantEventResponse;
 import io.esphome.api.VoiceAssistantRequest;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
@@ -39,6 +47,11 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     private static final long READER_STALL_MS = 200;
     private static final VoiceAssistantEventResponse RUN_END = VoiceAssistantEventResponse.newBuilder()
             .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END).build();
+    private static final VoiceAssistantEventResponse STT_VAD_END = VoiceAssistantEventResponse.newBuilder()
+            .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END).build();
+    private static final VoiceAssistantEventResponse TTS_START = VoiceAssistantEventResponse.newBuilder()
+            .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_START)
+            .addData(VoiceAssistantEventData.newBuilder().setName("text").setValue("...")).build();
 
     @Mock
     private ESPHomeHandler handler;
@@ -99,6 +112,58 @@ class ESPHomeVoiceAssistantAudioSourceTest {
         assertEquals(320, read.get());
         verify(handler, never()).sendMessage(RUN_END);
         stream.close();
+    }
+
+    @Test
+    void showsThinkingUntilTheReplyPlays() throws Exception {
+        startDialogRun().close();
+
+        verify(handler).sendMessage(STT_VAD_END);
+        assertTrue(source.startReply(() -> {
+        }));
+        verify(handler).sendMessage(TTS_START);
+        verify(handler, never()).sendMessage(RUN_END);
+    }
+
+    @Test
+    void stopsTheMicrophoneWhenTheReplyPlaysWhileListening() throws Exception {
+        AudioStream stream = startDialogRun();
+
+        assertTrue(source.startReply(() -> {
+        }));
+
+        InOrder inOrder = Mockito.inOrder(handler);
+        inOrder.verify(handler).sendMessage(STT_VAD_END);
+        inOrder.verify(handler).sendMessage(TTS_START);
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertEquals(-1, stream.read()));
+    }
+
+    @Test
+    void ignoresAudioThatIsNotAReply() throws Exception {
+        assertFalse(source.startReply(() -> {
+        }));
+        verify(handler, never()).sendMessage(TTS_START);
+    }
+
+    @Test
+    void endsTheRunWhenNoReplyComes() throws Exception {
+        startDialogRun().close();
+
+        ArgumentCaptor<Runnable> timeout = ArgumentCaptor.forClass(Runnable.class);
+        verify(handler).schedule(timeout.capture(), anyLong(), any());
+        timeout.getValue().run();
+
+        verify(handler).sendMessage(RUN_END);
+        assertFalse(source.startReply(() -> {
+        }));
+    }
+
+    private AudioStream startDialogRun() throws Exception {
+        source.setDialogTrigger(() -> {
+        });
+        AudioStream stream = source.getInputStream(source.getSupportedFormats().iterator().next());
+        source.handleVoiceAssistantRequest(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        return stream;
     }
 
     private static VoiceAssistantAudio audio() {

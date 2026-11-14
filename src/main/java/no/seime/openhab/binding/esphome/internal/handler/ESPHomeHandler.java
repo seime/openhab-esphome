@@ -449,6 +449,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             }
             source.setDialogTrigger(trigger);
         }
+        audioSinks.values().forEach(s -> s.setVoiceAssistant(s == sink ? source : null));
         logger.debug("[{}] Voice dialog started for {} and {}", logPrefix, source.getId(), sink.getId());
         return true;
     }

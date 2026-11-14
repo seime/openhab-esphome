@@ -36,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -81,6 +82,7 @@ import io.esphome.api.MediaPlayerSupportedFormat;
 import io.esphome.api.SubscribeVoiceAssistantRequest;
 import io.esphome.api.VoiceAssistantAudio;
 import io.esphome.api.VoiceAssistantEvent;
+import io.esphome.api.VoiceAssistantEventData;
 import io.esphome.api.VoiceAssistantEventResponse;
 import io.esphome.api.VoiceAssistantRequest;
 import io.esphome.api.VoiceAssistantRequestFlag;
@@ -143,6 +145,9 @@ class ESPHomeHandlerAudioServicesTest {
             .setSubscribe(true).setFlags(1).build();
     private static final SubscribeVoiceAssistantRequest UNSUBSCRIBE = SubscribeVoiceAssistantRequest.newBuilder()
             .setSubscribe(false).build();
+    private static final VoiceAssistantEventResponse TTS_START = VoiceAssistantEventResponse.newBuilder()
+            .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_START)
+            .addData(VoiceAssistantEventData.newBuilder().setName("text").setValue("...")).build();
 
     private ESPHomeHandler handler;
     private MonitoredCompositeExecutorService executor;
@@ -529,7 +534,7 @@ class ESPHomeHandlerAudioServicesTest {
         invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
         stream.close();
 
-        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END));
         verify(frameHelper, times(1)).send(SUBSCRIBE);
         verify(frameHelper, never()).send(UNSUBSCRIBE);
 
@@ -710,6 +715,69 @@ class ESPHomeHandlerAudioServicesTest {
         invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
 
         assertTrue(sink.getValue().getId().endsWith(":z_announce"));
+    }
+
+    @Test
+    void endsTheRunWhenTheReplyHasPlayed() throws Exception {
+        startReply();
+
+        InOrder inOrder = Mockito.inOrder(frameHelper);
+        inOrder.verify(frameHelper).send(TTS_START);
+        inOrder.verify(frameHelper).send(Mockito.isA(MediaPlayerCommandRequest.class));
+
+        // the API reports announcements as PLAYING
+        invokeHandleConnected(MediaPlayerStateResponse.newBuilder().setKey(11)
+                .setState(MediaPlayerState.MEDIA_PLAYER_STATE_PLAYING).build());
+        verify(frameHelper, never()).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+
+        invokeHandleConnected(MediaPlayerStateResponse.newBuilder().setKey(11)
+                .setState(MediaPlayerState.MEDIA_PLAYER_STATE_IDLE).build());
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+    }
+
+    @Test
+    void stopsTheReplyWhenTheDeviceStopsTheRun() throws Exception {
+        startReply();
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(false).build());
+
+        InOrder inOrder = Mockito.inOrder(frameHelper);
+        inOrder.verify(frameHelper)
+                .send(MediaPlayerCommandRequest.newBuilder().setKey(11).setHasCommand(true).setHasAnnouncement(true)
+                        .setAnnouncement(true).setCommand(MediaPlayerCommand.MEDIA_PLAYER_COMMAND_STOP).build());
+        inOrder.verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+    }
+
+    /**
+     * Runs a dialog up to its reply.
+     */
+    private void startReply() throws Exception {
+        DialogProvider provider = voiceDialogProvider();
+        ArgumentCaptor<AudioSink> sink = ArgumentCaptor.forClass(AudioSink.class);
+        when(provider.startDialog(sink.capture(), any(), any(), any(), any())).thenReturn(() -> {
+        });
+        ArgumentCaptor<AudioSource> source = ArgumentCaptor.forClass(AudioSource.class);
+        when(bundleContext.registerService(eq(AudioSource.class), source.capture(), any(Dictionary.class)))
+                .thenReturn(audioSourceRegistration);
+        invokeHandleConnected(voiceAssistantDeviceInfo());
+        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                .setName("Speaker One")
+                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3")
+                        .setPurpose(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT).build())
+                .build());
+        invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
+
+        AudioStream stream = openStream(source.getValue());
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        stream.close();
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END));
+
+        AudioStream reply = Mockito.mock(AudioStream.class);
+        when(reply.getFormat()).thenReturn(AudioFormat.MP3);
+        when(audioHTTPServer.serve(any(), anyInt(), anyBoolean())).thenReturn(
+                new StreamServed("/audio/reply.mp3", reply, new java.util.concurrent.atomic.AtomicInteger(1),
+                        new java.util.concurrent.atomic.AtomicLong(0), false, new CompletableFuture<>()));
+        sink.getValue().processAndComplete(reply);
     }
 
     private DialogProvider voiceDialogProvider() throws Exception {
