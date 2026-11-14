@@ -94,6 +94,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private boolean provisioningConnection;
     private boolean provisioningKeyPending;
     private long connectionGeneration;
+    private long connectionTimeoutGeneration;
 
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
@@ -504,12 +505,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
                 frameHelper.connect(connectionTarget.connectHost, port);
 
-                cancelConnectionTimeoutWatchdog();
-                connectionTimeoutFuture = executorService.schedule(() -> {
-                    logger.warn("[{}] Connection attempt timed out after {} seconds.", logPrefix,
-                            config.connectTimeout);
-                    handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, "Connection attempt timed out");
-                }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
+                scheduleConnectionTimeoutWatchdog("Connection watchdog", "Connection attempt timed out");
 
             } catch (ProtocolException e) {
                 connectionGeneration++;
@@ -872,11 +868,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
-            connectionGeneration++;
-            if (frameHelper != null) {
-                frameHelper.close();
-                frameHelper = null;
-            }
+            remoteDisconnect();
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
         } else if (message instanceof VoiceAssistantRequest voiceAssistantRequest) {
@@ -1090,15 +1082,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         provisioningKeyPending = true;
         // The API's bytes field carries the base64 text, not the decoded 32-byte key.
         frameHelper.send(NoiseEncryptionSetKeyRequest.newBuilder().setKey(ByteString.copyFromUtf8(encodedKey)).build());
-        cancelConnectionTimeoutWatchdog();
-        connectionTimeoutFuture = executorService.schedule(() -> {
-            synchronized (connectionStateLock) {
-                if (provisioningKeyPending) {
-                    handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR,
-                            "Timed out waiting for encryption key confirmation; reconnecting with the saved key");
-                }
-            }
-        }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Adoption watchdog", logPrefix));
+        scheduleConnectionTimeoutWatchdog("Adoption watchdog",
+                "Timed out waiting for encryption key confirmation; reconnecting with the saved key");
     }
 
     private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
@@ -1361,7 +1346,25 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    private void scheduleConnectionTimeoutWatchdog(String name, String message) {
+        synchronized (connectionStateLock) {
+            cancelConnectionTimeoutWatchdog();
+            long generation = connectionGeneration;
+            long timeoutGeneration = connectionTimeoutGeneration;
+            connectionTimeoutFuture = executorService.schedule(() -> {
+                synchronized (connectionStateLock) {
+                    // Cancellation cannot stop a task already waiting for this lock.
+                    if (!disposed && generation == connectionGeneration
+                            && timeoutGeneration == connectionTimeoutGeneration) {
+                        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, message);
+                    }
+                }
+            }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] %s", logPrefix, name));
+        }
+    }
+
     private void cancelConnectionTimeoutWatchdog() {
+        connectionTimeoutGeneration++;
         if (connectionTimeoutFuture != null) {
             connectionTimeoutFuture.cancel(true);
             connectionTimeoutFuture = null;

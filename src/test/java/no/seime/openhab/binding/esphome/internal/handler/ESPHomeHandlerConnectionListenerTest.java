@@ -57,15 +57,31 @@ class ESPHomeHandlerConnectionListenerTest extends AbstractESPHomeHandlerTest {
     @Test
     void disconnectResponseInvalidatesConnectionCallbacks() throws Exception {
         setConnected();
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.deepSleep = true;
+        configuration.deepSleepTimeoutSeconds = 60;
+        setField("config", configuration);
         CommunicationListener listener = (CommunicationListener) invokeMethod("createConnectionListener",
                 new Class<?>[] { long.class }, getField("connectionGeneration"));
         listener.onPacket(io.esphome.api.DisconnectResponse.getDefaultInstance());
         verify(frameHelper).close();
-        clearInvocations(frameHelper);
+        assertEquals("UNINITIALIZED", getField("connectionState").toString());
+        assertNull(getField("frameHelper"));
+        verify(eventSubscriber).removeEventSubscriptions(handler);
+        assertNotNull(getField("deepSleepWatchdogFuture"));
+        clearInvocations(frameHelper, callback);
         listener.onConnect();
         listener.onPacket(PingRequest.getDefaultInstance());
         listener.onParseError(CommunicationError.PACKET_ERROR);
         listener.onEndOfStream("closed");
         verifyNoInteractions(frameHelper, callback);
+
+        MonitoredCompositeExecutorService monitoredExecutor = spy(executor);
+        setField("executorService", monitoredExecutor);
+        doReturn(mock(java.util.concurrent.ScheduledFuture.class)).when(monitoredExecutor).schedule(any(Runnable.class),
+                eq(0L), eq(java.util.concurrent.TimeUnit.SECONDS), contains("Connect"), eq(7000L));
+        handler.onDeviceReappeared();
+        verify(monitoredExecutor).schedule(any(Runnable.class), eq(0L), eq(java.util.concurrent.TimeUnit.SECONDS),
+                contains("Connect"), eq(7000L));
     }
 }
