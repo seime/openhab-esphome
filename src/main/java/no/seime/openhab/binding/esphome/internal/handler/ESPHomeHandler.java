@@ -496,14 +496,35 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
 
             } catch (ProtocolException e) {
-                logger.warn("[{}] Error initial connection", logPrefix, e);
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+                Throwable cause = e.getCause();
+                String message = e.getMessage();
+                if (cause != null) {
+                    if (message == null) {
+                        message = cause.getMessage();
+                    } else {
+                        String causeMessage = cause.getMessage();
+                        if (causeMessage != null) {
+                            message += " (" + cause.getMessage() + ")";
+                        }
+                    }
+                }
+                if (logger.isDebugEnabled()) {
+                    logger.warn("[{}] Error initial connection: {}", logPrefix, message, e);
+                } else {
+                    logger.warn("[{}] Error initial connection: {}", logPrefix, message);
+                }
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
                 connectionState = ConnectionState.UNINITIALIZED;
                 resolvedIpAddressForCurrentConnection = null;
 
                 if (config.deepSleep) {
-                    logger.info("[{}] Error connecting to device in deep sleep mode. Will wait for next wakeup",
-                            logPrefix, e);
+                    if (logger.isDebugEnabled()) {
+                        logger.info("[{}] Error connecting to device in deep sleep mode. Will wait for next wakeup: {}",
+                                logPrefix, message, e);
+                    } else {
+                        logger.info("[{}] Error connecting to device in deep sleep mode. Will wait for next wakeup: {}",
+                                logPrefix, message);
+                    }
                 } else {
                     scheduleConnect(exponentialBackoff.getNextDelay());
                 }
