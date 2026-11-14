@@ -23,12 +23,15 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Dictionary;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -453,7 +456,7 @@ class ESPHomeHandlerAudioServicesTest {
                 VoiceAssistantRequest.newBuilder().setStart(true).setWakeWordPhrase("Hey Jarvis").build());
 
         verify(frameHelper, timeout(2000)).send(ACCEPT);
-        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_START));
+        verify(frameHelper, timeout(2000)).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_START));
         assertNotNull(dialogStream[0]);
         assertNotEquals(Thread.currentThread(), triggerThread[0]);
         dialogStream[0].close();
@@ -505,6 +508,66 @@ class ESPHomeHandlerAudioServicesTest {
         verify(frameHelper, timeout(2000)).send(ACCEPT);
         // the stop closes the dialog's stream
         assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertEquals(-1, dialogStream[0].read()));
+        verify(frameHelper, timeout(2000)).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+    }
+
+    @Test
+    void wakeWordAfterAStopWhileDialogStartsStartsAnotherDialog() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+        CountDownLatch opened = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        List<AudioStream> dialogStreams = new CopyOnWriteArrayList<>();
+        source.setDialogTrigger(() -> {
+            dialogStreams.add(openStream(source));
+            if (dialogStreams.size() == 1) {
+                opened.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        assertTrue(opened.await(2, TimeUnit.SECONDS));
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(false).build());
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        release.countDown();
+
+        verify(frameHelper, timeout(2000).times(2)).send(ACCEPT);
+        verify(frameHelper, never()).send(REJECT);
+        assertEquals(2, dialogStreams.size());
+        for (AudioStream stream : dialogStreams) {
+            stream.close();
+        }
+    }
+
+    @Test
+    void doesNotRunTriggerOfDialogStoppedWhileAWakeWordWaited() throws Exception {
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSource();
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger triggers = new AtomicInteger();
+        source.setDialogTrigger(() -> {
+            triggers.incrementAndGet();
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        assertTrue(started.await(2, TimeUnit.SECONDS));
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        // openHAB stopped the dialog
+        source.setDialogTrigger(null);
+        release.countDown();
+
+        verify(frameHelper, timeout(2000).times(2)).send(REJECT);
+        assertEquals(1, triggers.get());
     }
 
     @Test

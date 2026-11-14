@@ -89,6 +89,7 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private boolean closed;
     private volatile boolean streaming;
     private int pendingDialogRequests;
+    private boolean serverWakeWordWarned;
     private volatile @Nullable Runnable dialogTrigger;
     private ReplyState replyState = ReplyState.NONE;
     private @Nullable Runnable replyStopper;
@@ -194,33 +195,49 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
             if (closed) {
                 return;
             }
-            Runnable trigger = dialogTrigger;
-            if (request.getStart() && trigger != null && streamGroup.isEmpty()) {
-                if ((request.getFlags() & VoiceAssistantRequestFlag.VOICE_ASSISTANT_REQUEST_USE_WAKE_WORD_VALUE) != 0) {
-                    logger.debug("[{}] Device isn't detecting the wake word itself, not starting dialog",
-                            handler.getLogPrefix());
+            if (request.getStart() && dialogTrigger != null && streamGroup.isEmpty()) {
+                if (usesServerWakeWord(request)) {
+                    warnServerWakeWord();
                 } else {
                     logger.debug("[{}] Heard wake word '{}', starting dialog", handler.getLogPrefix(),
                             request.getWakeWordPhrase());
-                    handleOnDialogExecutor(request, trigger);
+                    handleOnDialogExecutor(request);
                     return;
                 }
             }
             if (pendingDialogRequests > 0) {
                 // wait for the dialog to start
-                handleOnDialogExecutor(request, null);
+                handleOnDialogExecutor(request);
                 return;
             }
             handleRequest(request);
         }
     }
 
+    private void warnServerWakeWord() {
+        if (!serverWakeWordWarned) {
+            serverWakeWordWarned = true;
+            logger.warn(
+                    "[{}] Device expects openHAB to detect its wake word. Turn off 'Voice dialog' on the thing to use your own dialog.",
+                    handler.getLogPrefix());
+        } else {
+            logger.debug("[{}] Device isn't detecting the wake word itself, not starting dialog",
+                    handler.getLogPrefix());
+        }
+    }
+
     /**
      * Runs on the dialog thread. Starting a dialog can be slow.
      */
-    private void handleOnDialogExecutor(VoiceAssistantRequest request, @Nullable Runnable trigger) {
+    private void handleOnDialogExecutor(VoiceAssistantRequest request) {
         pendingDialogRequests++;
         dialogExecutor.execute(() -> {
+            @Nullable
+            Runnable trigger;
+            synchronized (lock) {
+                // a stop, or openHAB stopping the dialog, may have run since the request arrived
+                trigger = closed ? null : dialogStartTrigger(request);
+            }
             try {
                 if (trigger != null) {
                     // opens a stream on this source
@@ -239,10 +256,24 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         });
     }
 
+    private @Nullable Runnable dialogStartTrigger(VoiceAssistantRequest request) {
+        Runnable trigger = dialogTrigger;
+        return request.getStart() && trigger != null && streamGroup.isEmpty() && !usesServerWakeWord(request) ? trigger
+                : null;
+    }
+
+    private static boolean usesServerWakeWord(VoiceAssistantRequest request) {
+        return (request.getFlags() & VoiceAssistantRequestFlag.VOICE_ASSISTANT_REQUEST_USE_WAKE_WORD_VALUE) != 0;
+    }
+
     private void handleRequest(VoiceAssistantRequest request) {
         if (!request.getStart()) {
+            boolean wasStreaming = streaming;
             endSession();
-            // the device waits for RUN_END
+            // the device only runs its end-of-run actions on RUN_END
+            if (wasStreaming) {
+                sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
+            }
             endReply(true);
             return;
         }
@@ -258,12 +289,15 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         }
 
         try {
-            handler.sendMessage(VoiceAssistantResponse.newBuilder().setPort(0).setError(false).build());
-            streaming = true;
-            sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_START);
-            sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_STT_START);
             audioQueue.clear();
             openStreams.forEach(ReadTrackingStream::restartStallTimer);
+            // the device can send audio as soon as it gets the response
+            streaming = true;
+            handler.sendMessage(VoiceAssistantResponse.newBuilder().setPort(0).setError(false).build());
+            sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_START);
+            // STT_START shows the device listening for a command
+            sendEvent(usesServerWakeWord(request) ? VoiceAssistantEvent.VOICE_ASSISTANT_WAKE_WORD_START
+                    : VoiceAssistantEvent.VOICE_ASSISTANT_STT_START);
             PipedAudioStream.Group activeGroup = streamGroup;
             workerFuture = audioStreamExecutor.submit(() -> processAudioQueue(activeGroup));
         } catch (ProtocolAPIError e) {
@@ -300,13 +334,11 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
                 if (chunk == END_OF_STREAM_MARKER || chunk.length == 0) {
                     break;
                 }
-                if (hasStalledReader()) {
-                    logger.debug("[{}] Audio stalled, stopping the microphone", handler.getLogPrefix());
-                    break;
-                }
+                closeStalledReaders(chunk.length);
                 try {
                     targetGroup.write(chunk);
                     targetGroup.flush();
+                    openStreams.forEach(stream -> stream.wrote(chunk.length));
                 } catch (RuntimeException e) {
                     logger.debug("[{}] Error forwarding ESPHome voice assistant audio", handler.getLogPrefix(), e);
                     break;
@@ -410,9 +442,21 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         }
     }
 
-    private boolean hasStalledReader() {
+    /**
+     * Closes streams whose reader stopped reading or can't take the next chunk. A full pipe blocks the write.
+     */
+    private void closeStalledReaders(int length) {
         long now = System.nanoTime();
-        return openStreams.stream().anyMatch(stream -> stream.isStalled(now, readerStallNanos));
+        for (ReadTrackingStream stream : openStreams) {
+            if (stream.isStalled(now, readerStallNanos) || !stream.hasRoomFor(length)) {
+                logger.debug("[{}] Audio reader stalled, closing its stream", handler.getLogPrefix());
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    logger.debug("[{}] Failed to close stalled audio stream", handler.getLogPrefix(), e);
+                }
+            }
+        }
     }
 
     private void ensureSubscribed() throws ProtocolAPIError {
@@ -488,6 +532,8 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         audioQueue.clear();
         streamGroup.close();
         streamGroup = PipedAudioStream.newGroup(AUDIO_FORMAT, PIPE_SIZE);
+        // closing the group doesn't close its streams, and their readers can still finish reading
+        openStreams.clear();
     }
 
     /**
@@ -497,6 +543,9 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         private final PipedAudioStream stream;
         private volatile boolean reading;
         private volatile long lastReadNanos = System.nanoTime();
+        private volatile long bytesRead;
+        // only the audio thread uses it
+        private long bytesWritten;
 
         ReadTrackingStream(PipedAudioStream stream) {
             this.stream = stream;
@@ -511,7 +560,11 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         public int read() throws IOException {
             reading = true;
             try {
-                return stream.read();
+                int b = stream.read();
+                if (b >= 0) {
+                    bytesRead++;
+                }
+                return b;
             } finally {
                 markRead();
             }
@@ -521,7 +574,11 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         public int read(byte @Nullable [] b, int off, int len) throws IOException {
             reading = true;
             try {
-                return stream.read(b, off, len);
+                int count = stream.read(b, off, len);
+                if (count > 0) {
+                    bytesRead += count;
+                }
+                return count;
             } finally {
                 markRead();
             }
@@ -543,6 +600,14 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
 
         boolean isStalled(long now, long stallNanos) {
             return !reading && now - lastReadNanos > stallNanos;
+        }
+
+        void wrote(int length) {
+            bytesWritten += length;
+        }
+
+        boolean hasRoomFor(int length) {
+            return bytesWritten - bytesRead + length <= PIPE_SIZE;
         }
     }
 }

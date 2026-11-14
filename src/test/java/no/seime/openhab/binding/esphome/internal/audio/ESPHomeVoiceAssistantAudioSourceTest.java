@@ -37,6 +37,7 @@ import io.esphome.api.VoiceAssistantEvent;
 import io.esphome.api.VoiceAssistantEventData;
 import io.esphome.api.VoiceAssistantEventResponse;
 import io.esphome.api.VoiceAssistantRequest;
+import io.esphome.api.VoiceAssistantRequestFlag;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -47,6 +48,10 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     private static final long READER_STALL_MS = 200;
     private static final VoiceAssistantEventResponse RUN_END = VoiceAssistantEventResponse.newBuilder()
             .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END).build();
+    private static final VoiceAssistantEventResponse STT_START = VoiceAssistantEventResponse.newBuilder()
+            .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_STT_START).build();
+    private static final VoiceAssistantEventResponse WAKE_WORD_START = VoiceAssistantEventResponse.newBuilder()
+            .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_WAKE_WORD_START).build();
     private static final VoiceAssistantEventResponse STT_VAD_END = VoiceAssistantEventResponse.newBuilder()
             .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END).build();
     private static final VoiceAssistantEventResponse TTS_START = VoiceAssistantEventResponse.newBuilder()
@@ -115,6 +120,70 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     }
 
     @Test
+    void keepsOtherReadersWhenOneStalls() throws Exception {
+        AudioStream reading = source.getInputStream(source.getSupportedFormats().iterator().next());
+        AudioStream stalled = source.getInputStream(source.getSupportedFormats().iterator().next());
+        source.handleVoiceAssistantRequest(VoiceAssistantRequest.newBuilder().setStart(true).build());
+
+        for (int i = 0; i < 30; i++) {
+            source.handleVoiceAssistantAudio(audio());
+            assertEquals(320, reading.read(new byte[320]));
+            Thread.sleep(20);
+        }
+
+        verify(handler, never()).sendMessage(RUN_END);
+        assertEquals(-1, stalled.read());
+        reading.close();
+        verify(handler).sendMessage(RUN_END);
+    }
+
+    @Test
+    void endsRunWhenTheReaderFallsTooFarBehind() throws Exception {
+        AudioStream stream = source.getInputStream(source.getSupportedFormats().iterator().next());
+        source.handleVoiceAssistantRequest(VoiceAssistantRequest.newBuilder().setStart(true).build());
+
+        CountDownLatch runEnded = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            runEnded.countDown();
+            return null;
+        }).when(handler).sendMessage(RUN_END);
+
+        // reads, but slower than the audio arrives
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            for (int i = 0; i < 100 && runEnded.getCount() > 0; i++) {
+                source.handleVoiceAssistantAudio(audio(4096));
+                stream.read();
+                runEnded.await(5, TimeUnit.MILLISECONDS);
+            }
+        });
+
+        verify(handler).sendMessage(RUN_END);
+    }
+
+    @Test
+    void endsTheRunWhenTheDeviceStopsIt() throws Exception {
+        AudioStream stream = startDialogRun();
+
+        source.handleVoiceAssistantRequest(VoiceAssistantRequest.newBuilder().setStart(false).build());
+
+        verify(handler).sendMessage(RUN_END);
+        verify(handler, never()).sendMessage(STT_VAD_END);
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertEquals(-1, stream.read()));
+    }
+
+    @Test
+    void doesNotShowListeningWhileOpenHABDetectsTheWakeWord() throws Exception {
+        AudioStream stream = source.getInputStream(source.getSupportedFormats().iterator().next());
+
+        source.handleVoiceAssistantRequest(VoiceAssistantRequest.newBuilder().setStart(true)
+                .setFlags(VoiceAssistantRequestFlag.VOICE_ASSISTANT_REQUEST_USE_WAKE_WORD_VALUE).build());
+
+        verify(handler).sendMessage(WAKE_WORD_START);
+        verify(handler, never()).sendMessage(STT_START);
+        stream.close();
+    }
+
+    @Test
     void showsThinkingUntilTheReplyPlays() throws Exception {
         startDialogRun().close();
 
@@ -167,6 +236,10 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     }
 
     private static VoiceAssistantAudio audio() {
-        return VoiceAssistantAudio.newBuilder().setData(ByteString.copyFrom(new byte[320])).build();
+        return audio(320);
+    }
+
+    private static VoiceAssistantAudio audio(int length) {
+        return VoiceAssistantAudio.newBuilder().setData(ByteString.copyFrom(new byte[length])).build();
     }
 }
