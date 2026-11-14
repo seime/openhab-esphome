@@ -2,4 +2,5 @@
 .idea
 .esphome
 .claude/
+src/main/history/dependencies.xml
 target/
