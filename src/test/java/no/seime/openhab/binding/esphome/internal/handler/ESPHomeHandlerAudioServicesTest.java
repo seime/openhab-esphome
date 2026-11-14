@@ -135,7 +135,8 @@ class ESPHomeHandlerAudioServicesTest {
         handler = new ESPHomeHandler(new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "device"),
                 new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider, eventSubscriber, executor,
                 new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null, null, bundleContext,
-                versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer, networkAddressService);
+                versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer, networkAddressService,
+                null);
         handler.setCallback(callback);
         setField("config", new ESPHomeConfiguration());
         setField("connectionState", enumValue(getFieldType("connectionState"), "CONNECTED"));

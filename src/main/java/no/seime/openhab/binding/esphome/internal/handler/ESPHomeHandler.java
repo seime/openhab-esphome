@@ -15,6 +15,7 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -48,6 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.net.InetAddresses;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
 import com.jano7.executor.KeySequentialExecutor;
 
@@ -85,6 +87,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
+
+    // Reserved bootstrap PSK accepted only by unprovisioned Noise devices.
+    private static final String PROVISIONING_KEY = Base64.getEncoder().encodeToString(new byte[32]);
+    private final @Nullable ManagedThingProvider managedThingProvider;
+    private boolean provisioningConnection;
+    private boolean provisioningKeyPending;
+    private long connectionGeneration;
+    private long connectionTimeoutGeneration;
 
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
@@ -155,8 +165,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             @Nullable String bindingPropertyDefaultEncryptionKey, @Nullable String bindingPropertyAudioBaseUrl,
             BundleContext bundleContext, ESPHomeVersionService versionService,
             FirmwareUpgradeService firmwareUpgradeService, ESPHomeMDNSHostnameResolver mdnsHostnameResolver,
-            AudioHTTPServer audioHTTPServer, NetworkAddressService networkAddressService) {
+            AudioHTTPServer audioHTTPServer, NetworkAddressService networkAddressService,
+            @Nullable ManagedThingProvider managedThingProvider) {
         super(thing);
+        this.managedThingProvider = managedThingProvider;
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         this.stateDescriptionProvider = stateDescriptionProvider;
@@ -262,6 +274,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void dispose() {
         synchronized (connectionStateLock) {
             disposed = true;
+            connectionGeneration++;
             versionService.removeListener(this);
             eventSubscriber.removeEventSubscriptions(this);
             stateDescriptionProvider.removeDescriptionsForThing(thing.getUID());
@@ -452,6 +465,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 if (disposed) {
                     return;
                 }
+                long generation = ++connectionGeneration;
                 connectionState = ConnectionState.CONNECTING;
 
                 String hostname = config.hostname;
@@ -468,34 +482,33 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                             String.format("Connecting to %s:%d", connectionTarget.statusTarget(), port));
                 }
 
-                // Default to using the default encryption key from the binding if not set in device configuration
+                provisioningConnection = false;
+                provisioningKeyPending = false;
                 String encryptionKey = config.encryptionKey;
-                if (encryptionKey == null || encryptionKey.isEmpty()) {
-                    if (bindingPropertyDefaultEncryptionKey != null) {
-                        encryptionKey = bindingPropertyDefaultEncryptionKey;
-                        logger.info("[{}] Using binding default encryption key", logPrefix);
-                    } else {
-                        logger.warn("[{}] No encryption key configured on neither binding nor thing. Cannot continue",
-                                logPrefix);
+                if (StringUtils.isBlank(encryptionKey)) {
+                    encryptionKey = bindingPropertyDefaultEncryptionKey;
+                }
+                if (StringUtils.isBlank(encryptionKey)) {
+                    if (managedThingProvider == null || managedThingProvider.get(thing.getUID()) == null) {
                         updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-                                "No encryption key configured. Please set 'encryptionKey' in thing configuration or a default one in binding configuration");
+                                "No encryption key configured. Automatic adoption requires an editable Thing; configure encryptionKey manually");
                         return;
                     }
+                    encryptionKey = PROVISIONING_KEY;
+                    provisioningConnection = true;
+                } else {
+                    rejectProvisioningKey(Objects.requireNonNull(encryptionKey));
                 }
 
-                frameHelper = new EncryptedFrameHelper(connectionSelector, this, encryptionKey, config.deviceId,
-                        logPrefix, packetProcessor);
+                frameHelper = new EncryptedFrameHelper(connectionSelector, createConnectionListener(generation),
+                        encryptionKey, config.deviceId, logPrefix, packetProcessor);
 
                 frameHelper.connect(connectionTarget.connectHost, port);
 
-                cancelConnectionTimeoutWatchdog();
-                connectionTimeoutFuture = executorService.schedule(() -> {
-                    logger.warn("[{}] Connection attempt timed out after {} seconds.", logPrefix,
-                            config.connectTimeout);
-                    handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, "Connection attempt timed out");
-                }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] Connection watchdog", logPrefix));
+                scheduleConnectionTimeoutWatchdog("Connection watchdog", "Connection attempt timed out");
 
             } catch (ProtocolException e) {
+                connectionGeneration++;
                 logger.warn("[{}] Error initial connection", logPrefix, e);
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
                 connectionState = ConnectionState.UNINITIALIZED;
@@ -511,12 +524,68 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    private void rejectProvisioningKey(String encryptionKey) throws ProtocolAPIError {
+        try {
+            if (Arrays.equals(Base64.getDecoder().decode(encryptionKey), new byte[32])) {
+                throw new ProtocolAPIError(
+                        "The reserved bootstrap encryption key cannot be configured; remove it to adopt the device automatically");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new ProtocolAPIError("Invalid base64 encryption key", e);
+        }
+    }
+
+    private CommunicationListener createConnectionListener(long generation) {
+        return new CommunicationListener() {
+            @Override
+            public void onConnect() throws ProtocolAPIError {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onConnect();
+                    }
+                }
+            }
+
+            @Override
+            public void onPacket(GeneratedMessage message) {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onPacket(message);
+                    }
+                }
+            }
+
+            @Override
+            public void onEndOfStream(String message) {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onEndOfStream(message);
+                    }
+                }
+            }
+
+            @Override
+            public void onParseError(CommunicationError error) {
+                synchronized (connectionStateLock) {
+                    if (!disposed && generation == connectionGeneration) {
+                        ESPHomeHandler.this.onParseError(error);
+                    }
+                }
+            }
+        };
+    }
+
     public void sendMessage(GeneratedMessage message) throws ProtocolAPIError {
-        EncryptedFrameHelper helper = frameHelper;
-        if (helper != null) {
-            helper.send(message);
-        } else {
-            throw new ProtocolAPIError(String.format("[%s] Device is not connected", logPrefix));
+        synchronized (connectionStateLock) {
+            if (provisioningConnection) {
+                throw new ProtocolAPIError("Device adoption is in progress; commands require the saved encryption key");
+            }
+            EncryptedFrameHelper helper = frameHelper;
+            if (helper != null) {
+                helper.send(message);
+            } else {
+                throw new ProtocolAPIError(String.format("[%s] Device is not connected", logPrefix));
+            }
         }
     }
 
@@ -532,7 +601,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
         synchronized (connectionStateLock) {
-            if (connectionState != ConnectionState.CONNECTED) {
+            if (connectionState != ConnectionState.CONNECTED || provisioningConnection) {
                 logger.warn("[{}] Not connected, ignoring command {}", logPrefix, command);
                 return;
             }
@@ -586,7 +655,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Override
     public void onConnect() throws ProtocolAPIError {
         synchronized (connectionStateLock) {
-            cancelConnectionTimeoutWatchdog();
+            if (!provisioningConnection) {
+                cancelConnectionTimeoutWatchdog();
+            }
             exponentialBackoff.reset();
             logger.debug("[{}] Encrypted connection established. Starting API handshake.", logPrefix);
             HelloRequest helloRequest = HelloRequest.newBuilder().setClientInfo("openHAB")
@@ -631,7 +702,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void remoteDisconnect() {
-        if (config.deepSleep) {
+        if (config.deepSleep && !provisioningConnection) {
             logger.info("[{}] Disconnecting from device in deep sleep mode", logPrefix);
             updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, "Deep sleep");
             scheduleDeepSleepWatchdog();
@@ -646,6 +717,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 return;
             }
 
+            connectionGeneration++;
             eventSubscriber.removeEventSubscriptions(this);
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
@@ -661,7 +733,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             connectionState = ConnectionState.UNINITIALIZED;
             resolvedIpAddressForCurrentConnection = null;
 
-            if (!config.deepSleep) {
+            if (!config.deepSleep || (provisioningConnection && StringUtils.isNotBlank(config.encryptionKey))) {
                 setUndefToAllChannels();
 
                 int nextDelay = exponentialBackoff.getNextDelay();
@@ -671,6 +743,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 updateStatus(ThingStatus.OFFLINE, detail, finalMessage);
 
                 scheduleConnect(nextDelay);
+            } else if (provisioningConnection) {
+                updateStatus(ThingStatus.OFFLINE, detail, message);
             }
         }
     }
@@ -687,6 +761,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             return;
         }
 
+        // The bootstrap PSK is public. Do not trust this session with actions, state updates,
+        // proxy data, or other normal traffic until it reconnects using the saved private key.
+        if (provisioningConnection && !(message instanceof AuthenticationResponse
+                || message instanceof DeviceInfoResponse || message instanceof NoiseEncryptionSetKeyResponse
+                || message instanceof PingRequest || message instanceof PingResponse
+                || message instanceof DisconnectRequest || message instanceof DisconnectResponse)) {
+            return;
+        }
+
         if (message instanceof AuthenticationResponse connectResponse) {
             if (connectResponse.getInvalidPassword()) {
                 logger.trace("[{}] Received login response {}", logPrefix, connectResponse);
@@ -696,7 +779,23 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             return;
         }
 
+        if (message instanceof NoiseEncryptionSetKeyResponse response && provisioningKeyPending) {
+            provisioningKeyPending = false;
+            if (!response.getSuccess()) {
+                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
+                        "Device rejected the encryption key. The generated key remains in the Thing configuration");
+            } else {
+                logger.info("[{}] Device encryption key provisioned", logPrefix);
+                handleDisconnection(ThingStatusDetail.NONE, "Encryption key provisioned; reconnecting");
+            }
+            return;
+        }
+
         if (message instanceof DeviceInfoResponse rsp) {
+            if (provisioningConnection) {
+                provisionEncryptionKey(rsp);
+                return;
+            }
             Map<String, String> props = new HashMap<>(thing.getProperties());
             props.put(Thing.PROPERTY_FIRMWARE_VERSION, rsp.getEsphomeVersion());
             props.put(Thing.PROPERTY_MAC_ADDRESS, rsp.getMacAddress());
@@ -769,10 +868,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
         } else if (message instanceof DisconnectResponse) {
-            if (frameHelper != null) {
-                frameHelper.close();
-                frameHelper = null;
-            }
+            remoteDisconnect();
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
         } else if (message instanceof VoiceAssistantRequest voiceAssistantRequest) {
@@ -876,7 +972,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void sendBluetoothCommand(GeneratedMessage message) {
         synchronized (connectionStateLock) {
             try {
-                if (connectionState == ConnectionState.CONNECTED) {
+                if (connectionState == ConnectionState.CONNECTED && !provisioningConnection) {
                     frameHelper.send(message);
                 } else {
                     logger.warn("[{}] Not connected, ignoring bluetooth command {}", logPrefix, message);
@@ -912,7 +1008,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public void handleOpenHABEvent(EventSubscription subscription, String esphomeState) {
         synchronized (connectionStateLock) {
-            if (disposed || connectionState != ConnectionState.CONNECTED) {
+            if (disposed || provisioningConnection || connectionState != ConnectionState.CONNECTED) {
                 logger.debug("[{}] Not connected, skipping OpenHAB event for {}", logPrefix,
                         subscription.getEntityId());
                 return;
@@ -941,6 +1037,55 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    private void provisionEncryptionKey(DeviceInfoResponse response) throws ProtocolAPIError {
+        if (provisioningKeyPending) {
+            return;
+        }
+        ManagedThingProvider provider = managedThingProvider;
+        if (!response.getApiEncryptionProvisionable() || !response.getApiEncryptionSupported() || provider == null
+                || provider.get(thing.getUID()) == null) {
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Device cannot be automatically adopted. Configure its existing encryptionKey manually");
+            return;
+        }
+        // Persist before changing the device so the credential survives a restart or lost response.
+        // Recheck the stored configuration to avoid replacing a key entered while connecting.
+        Thing storedThing = provider.get(thing.getUID());
+        if (storedThing == null
+                || StringUtils.isNotBlank((String) storedThing.getConfiguration().get("encryptionKey"))) {
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Thing configuration changed during adoption; reconnect with the configured key");
+            return;
+        }
+        byte[] key = new byte[32];
+        SecureRandom random = new SecureRandom();
+        String encodedKey;
+        do {
+            random.nextBytes(key);
+            encodedKey = Base64.getEncoder().encodeToString(key);
+        } while (PROVISIONING_KEY.equals(encodedKey));
+        var configuration = new org.openhab.core.config.core.Configuration(
+                storedThing.getConfiguration().getProperties());
+        configuration.put("encryptionKey", encodedKey);
+        try {
+            updateConfiguration(configuration);
+            Thing savedThing = provider.get(thing.getUID());
+            if (savedThing == null || !encodedKey.equals(savedThing.getConfiguration().get("encryptionKey"))) {
+                throw new IllegalStateException("Encryption key was not saved");
+            }
+        } catch (RuntimeException e) {
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Could not save encryption key to Thing configuration; device was not changed");
+            return;
+        }
+        config.encryptionKey = encodedKey;
+        provisioningKeyPending = true;
+        // The API's bytes field carries the base64 text, not the decoded 32-byte key.
+        frameHelper.send(NoiseEncryptionSetKeyRequest.newBuilder().setKey(ByteString.copyFromUtf8(encodedKey)).build());
+        scheduleConnectionTimeoutWatchdog("Adoption watchdog",
+                "Timed out waiting for encryption key confirmation; reconnecting with the saved key");
+    }
+
     private void handleHelloResponse(GeneratedMessage message) throws ProtocolAPIError {
         if (message instanceof HelloResponse helloResponse) {
             synchronized (connectionStateLock) {
@@ -949,6 +1094,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         logPrefix, helloResponse.getName(), helloResponse.getServerInfo(),
                         helloResponse.getApiVersionMajor(), helloResponse.getApiVersionMinor());
                 connectionState = ConnectionState.CONNECTED;
+                if (provisioningConnection) {
+                    updateStatus(ThingStatus.UNKNOWN);
+                    frameHelper.send(DeviceInfoRequest.getDefaultInstance());
+                    return;
+                }
                 persistLastKnownIpAddress();
 
                 if (config.allowActions) {
@@ -963,7 +1113,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                             .build());
                 }
 
-                updateStatus(ThingStatus.ONLINE);
+                updateStatus(provisioningConnection ? ThingStatus.UNKNOWN : ThingStatus.ONLINE);
                 logger.debug("[{}] Device login complete, requesting device info", logPrefix);
 
                 if (!config.deepSleep) {
@@ -1132,7 +1282,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     public void listenForBLEAdvertisements(ESPHomeBluetoothProxyHandler espHomeBluetoothProxyHandler) {
         synchronized (connectionStateLock) {
             this.espHomeBluetoothProxyHandler = espHomeBluetoothProxyHandler;
-            if (config.enableBluetoothProxy && !bluetoothProxyStarted && connectionState == ConnectionState.CONNECTED) {
+            if (config.enableBluetoothProxy && !bluetoothProxyStarted && connectionState == ConnectionState.CONNECTED
+                    && !provisioningConnection) {
                 try {
                     logger.info("[{}] Starting BLE proxy", logPrefix);
                     frameHelper.send(SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
@@ -1146,7 +1297,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public void stopListeningForBLEAdvertisements() {
         synchronized (connectionStateLock) {
-            if (connectionState == ConnectionState.CONNECTED) {
+            if (connectionState == ConnectionState.CONNECTED && !provisioningConnection) {
                 try {
                     logger.info("[{}] Stopping BLE proxy", logPrefix);
                     frameHelper.send(UnsubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
@@ -1162,7 +1313,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public void executeAPIAction(ExecuteServiceRequest cmd) {
         synchronized (connectionStateLock) {
-            if (disposed || connectionState != ConnectionState.CONNECTED) {
+            if (disposed || provisioningConnection || connectionState != ConnectionState.CONNECTED) {
                 logger.warn("[{}] Not connected, cannot execute API action {}", logPrefix, cmd.getKey());
             } else {
                 try {
@@ -1195,7 +1346,25 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
+    private void scheduleConnectionTimeoutWatchdog(String name, String message) {
+        synchronized (connectionStateLock) {
+            cancelConnectionTimeoutWatchdog();
+            long generation = connectionGeneration;
+            long timeoutGeneration = connectionTimeoutGeneration;
+            connectionTimeoutFuture = executorService.schedule(() -> {
+                synchronized (connectionStateLock) {
+                    // Cancellation cannot stop a task already waiting for this lock.
+                    if (!disposed && generation == connectionGeneration
+                            && timeoutGeneration == connectionTimeoutGeneration) {
+                        handleDisconnection(ThingStatusDetail.COMMUNICATION_ERROR, message);
+                    }
+                }
+            }, config.connectTimeout, TimeUnit.SECONDS, String.format("[%s] %s", logPrefix, name));
+        }
+    }
+
     private void cancelConnectionTimeoutWatchdog() {
+        connectionTimeoutGeneration++;
         if (connectionTimeoutFuture != null) {
             connectionTimeoutFuture.cancel(true);
             connectionTimeoutFuture = null;

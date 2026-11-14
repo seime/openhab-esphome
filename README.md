@@ -32,8 +32,19 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
    from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849
 4. Wait for discovery to find your device - or add manually in a thing file.
 
-> **Note:** Remember to edit your things and add the `encryptionKey` - or provide a default encryption key in the
-> binding configuration.
+Devices that already have an API encryption key require `encryptionKey` in the Thing configuration, or a default
+key in the binding configuration.
+
+For unprovisioned devices supporting encrypted API key provisioning, adoption is automatic after an editable
+(UI-managed) Thing is created, provided neither the Thing nor the binding supplies a key. The binding connects
+using ESPHome's reserved bootstrap key, checks that the device reports it is provisionable, generates a random
+32-byte key, saves it in the Thing's `encryptionKey`, and sends it to the device. After confirmation it reconnects
+with the saved key. File-defined Things require a manually configured key.
+
+The device must have API encryption enabled and accept provisioning within its provisioning window. Bootstrap
+provisioning protects against passive sniffing, but not an active attacker; use a trusted network for adoption.
+If provisioning fails after the key is saved, the key remains in the Thing configuration to avoid losing a credential
+the device may already have accepted. Check the device before clearing that key and retrying adoption.
 
 ## Discovery
 

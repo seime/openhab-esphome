@@ -71,6 +71,7 @@ public abstract class AbstractESPHomeDeviceTest {
     protected @Mock AudioHTTPServer audioHTTPServer;
     protected @Mock NetworkAddressService networkAddressService;
     private ESPHomeDeviceRunner emulator;
+    protected @Mock ManagedThingProvider managedThingProvider;
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -112,7 +113,7 @@ public abstract class AbstractESPHomeDeviceTest {
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, null,
                 bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                networkAddressService);
+                networkAddressService, managedThingProvider);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 

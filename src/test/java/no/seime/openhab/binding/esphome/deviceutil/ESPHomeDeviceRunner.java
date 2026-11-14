@@ -124,6 +124,8 @@ public class ESPHomeDeviceRunner {
             ProcessBuilder emulatorBuilder = new ProcessBuilder(emulatorBinary.toString());
             emulatorBuilder.redirectErrorStream(true);
             emulatorBuilder.directory(workDir.toFile());
+            // Host preferences include provisioned credentials; never share them across test runs.
+            emulatorBuilder.environment().put("ESPHOME_PREFDIR", workDir.resolve("prefs").toString());
             emulatorProcess = emulatorBuilder.start();
             emulatorProcess.onExit().thenRun(() -> {
                 logger.info("ESPHome emulator {} exited", deviceName);
