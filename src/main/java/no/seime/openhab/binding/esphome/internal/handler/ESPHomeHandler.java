@@ -508,14 +508,23 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         }
                     }
                 }
-                logger.warn("[{}] Error initial connection: {}", logPrefix, message);
+                if (logger.isDebugEnabled()) {
+                    logger.warn("[{}] Error initial connection: {}", logPrefix, message, e);
+                } else {
+                    logger.warn("[{}] Error initial connection: {}", logPrefix, message);
+                }
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
                 connectionState = ConnectionState.UNINITIALIZED;
                 resolvedIpAddressForCurrentConnection = null;
 
                 if (config.deepSleep) {
-                    logger.info("[{}] Error connecting to device in deep sleep mode. Will wait for next wakeup",
-                            logPrefix, e);
+                    if (logger.isDebugEnabled()) {
+                        logger.info("[{}] Error connecting to device in deep sleep mode. Will wait for next wakeup: {}",
+                                logPrefix, message, e);
+                    } else {
+                        logger.info("[{}] Error connecting to device in deep sleep mode. Will wait for next wakeup: {}",
+                                logPrefix, message);
+                    }
                 } else {
                     scheduleConnect(exponentialBackoff.getNextDelay());
                 }
