@@ -78,8 +78,11 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
     private boolean announcementStarted;
     private boolean playbackStarted;
     private @Nullable ScheduledFuture<?> pendingStreamTimeout;
+    private @Nullable ESPHomeVoiceAssistantAudioSource replySource;
+    private boolean replyStarted;
 
     private volatile @Nullable MediaPlayerStateResponse state;
+    private volatile @Nullable ESPHomeVoiceAssistantAudioSource voiceAssistant;
 
     public ESPHomeAudioSink(ESPHomeHandler handler, AudioHTTPServer audioHTTPServer,
             ListEntitiesMediaPlayerResponse mediaPlayer, String baseUrl) {
@@ -115,17 +118,40 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
         this.label = "ESPHome " + thingLabel + " (" + mediaPlayer.getName() + ")";
     }
 
+    /**
+     * Sets the voice assistant whose dialog replies on this sink.
+     */
+    public void setVoiceAssistant(@Nullable ESPHomeVoiceAssistantAudioSource voiceAssistant) {
+        this.voiceAssistant = voiceAssistant;
+    }
+
     public void updateState(@Nullable MediaPlayerStateResponse state) {
         this.state = state;
         if (state == null) {
             return;
+        }
+        MediaPlayerState playerState = state.getState();
+        ESPHomeVoiceAssistantAudioSource finishedReply = null;
+        synchronized (playbackLock) {
+            if (replySource != null) {
+                // the API reports announcements as PLAYING
+                if (playerState == MediaPlayerState.MEDIA_PLAYER_STATE_PLAYING
+                        || playerState == MediaPlayerState.MEDIA_PLAYER_STATE_ANNOUNCING) {
+                    replyStarted = true;
+                } else if (replyStarted) {
+                    finishedReply = replySource;
+                    replySource = null;
+                }
+            }
+        }
+        if (finishedReply != null) {
+            finishedReply.endReply();
         }
         // Track URL stream playback and only signal completion upon playback end
         synchronized (playbackLock) {
             if (pendingStream == null) {
                 return;
             }
-            MediaPlayerState playerState = state.getState();
             if (isPendingStreamAnnouncement) {
                 if (playerState == MediaPlayerState.MEDIA_PLAYER_STATE_ANNOUNCING) {
                     announcementStarted = true;
@@ -146,7 +172,42 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
 
     public void dispose() {
         synchronized (playbackLock) {
+            replySource = null;
             completePendingStream();
+        }
+    }
+
+    private void startReply(boolean announcement) {
+        ESPHomeVoiceAssistantAudioSource source = voiceAssistant;
+        if (source != null && source.startReply(() -> stopReply(announcement))) {
+            synchronized (playbackLock) {
+                replySource = source;
+                replyStarted = false;
+            }
+        }
+    }
+
+    private void endReply() {
+        ESPHomeVoiceAssistantAudioSource source;
+        synchronized (playbackLock) {
+            source = replySource;
+            replySource = null;
+        }
+        if (source != null) {
+            source.endReply();
+        }
+    }
+
+    private void stopReply(boolean announcement) {
+        synchronized (playbackLock) {
+            replySource = null;
+        }
+        try {
+            handler.sendMessage(MediaPlayerCommandRequest.newBuilder().setKey(mediaPlayerKey).setHasCommand(true)
+                    .setHasAnnouncement(true).setAnnouncement(announcement)
+                    .setCommand(io.esphome.api.MediaPlayerCommand.MEDIA_PLAYER_COMMAND_STOP).build());
+        } catch (ProtocolAPIError e) {
+            logger.debug("[{}] Failed to stop the reply on {}", handler.getLogPrefix(), mediaPlayerObjectId, e);
         }
     }
 
@@ -184,6 +245,7 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
 
     @Override
     protected void processAsynchronously(@Nullable AudioStream audioStream) throws UnsupportedAudioFormatException {
+        endReply();
         if (audioStream == null) {
             boolean stopAnnouncement;
             synchronized (playbackLock) {
@@ -213,6 +275,7 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
 
         try {
             boolean announcement = isAnnouncement(audioStream.getFormat());
+            startReply(announcement);
             if (audioStream instanceof URLAudioStream urlAudioStream) {
                 // For URLAudioStream, track playback completion by listening to playback state updates from the ESPHome
                 // device in updateState()
@@ -257,6 +320,7 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
                 });
             }
         } catch (IOException | ProtocolAPIError e) {
+            endReply();
             synchronized (playbackLock) {
                 if (pendingStream == audioStream) {
                     completePendingStream();
