@@ -38,6 +38,7 @@ import com.southernstorm.noise.protocol.CipherStatePair;
 import com.southernstorm.noise.protocol.HandshakeState;
 
 import io.esphome.api.ApiOptions;
+import io.esphome.api.NoiseEncryptionSetKeyRequest;
 import no.seime.openhab.binding.esphome.internal.CommunicationListener;
 
 public class EncryptedFrameHelper {
@@ -397,7 +398,8 @@ public class EncryptedFrameHelper {
         if (logger.isDebugEnabled()) {
             // ToString method costs a bit
             logger.debug("[{}] Sending message type {} with content '{}'", logPrefix,
-                    message.getClass().getSimpleName(), StringUtils.trimToEmpty(message.toString()));
+                    message.getClass().getSimpleName(), message instanceof NoiseEncryptionSetKeyRequest ? "[redacted]"
+                            : StringUtils.trimToEmpty(message.toString()));
         }
         synchronized (sendLock) {
             if (connection != null) {

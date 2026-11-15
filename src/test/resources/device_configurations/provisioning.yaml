@@ -1,0 +1,25 @@
+substitutions:
+  api_port: "6053"
+
+esphome:
+  name: virtual_provisioning
+
+host:
+  mac_address: "06:35:69:ab:f6:80"
+
+logger:
+  level: DEBUG
+
+api:
+  port: ${api_port}
+  # Enable encryption without a key so the binding can provision a fresh credential.
+  encryption: {}
+
+number:
+  - platform: template
+    name: "Provisioned Number"
+    optimistic: true
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 10
