@@ -30,6 +30,7 @@ import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.inbox.Inbox;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.ThingHandlerCallback;
 import org.openhab.core.thing.internal.ThingImpl;
@@ -39,6 +40,59 @@ import com.sun.net.httpserver.HttpServer;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 
 class DeviceBuilderHandlerTest {
+    @Test
+    void startsUnknownUntilAScanChecksReachability() {
+        for (int interval : List.of(0, 60)) {
+            ThingImpl thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE_BUILDER, "builder");
+            thing.setConfiguration(new Configuration(Map.of("url", "http://127.0.0.1", "scanInterval", interval)));
+            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, mock(ThingRegistry.class),
+                    mock(Inbox.class));
+            ThingHandlerCallback callback = mock(ThingHandlerCallback.class);
+            handler.setCallback(callback);
+
+            handler.initialize();
+
+            verify(callback).statusUpdated(eq(thing),
+                    argThat(status -> status.getStatus() == ThingStatus.UNKNOWN
+                            && status.getStatusDetail() == ThingStatusDetail.NONE
+                            && status.getDescription().equals(interval == 0
+                                    ? "Automatic scans are disabled. Start a discovery scan to check connectivity"
+                                    : "Waiting for the first discovery scan")));
+            verifyNoMoreInteractions(callback);
+        }
+    }
+
+    @Test
+    void failedScanChangesUnknownToOffline() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/devices", exchange -> {
+            exchange.sendResponseHeaders(503, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            ThingImpl thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE_BUILDER, "builder");
+            thing.setConfiguration(
+                    new Configuration(Map.of("url", "http://127.0.0.1:" + server.getAddress().getPort())));
+            DeviceBuilderHandler handler = new DeviceBuilderHandler(thing, mock(ThingRegistry.class),
+                    mock(Inbox.class));
+            ThingHandlerCallback callback = mock(ThingHandlerCallback.class);
+            handler.setCallback(callback);
+            handler.initialize();
+
+            handler.discover(result -> fail("A failed scan must not discover devices"));
+
+            var ordered = inOrder(callback);
+            ordered.verify(callback).statusUpdated(eq(thing),
+                    argThat(status -> status.getStatus() == ThingStatus.UNKNOWN));
+            ordered.verify(callback).statusUpdated(eq(thing),
+                    argThat(status -> status.getStatus() == ThingStatus.OFFLINE
+                            && status.getStatusDetail() == ThingStatusDetail.COMMUNICATION_ERROR));
+        } finally {
+            server.stop(0);
+        }
+    }
+
     @Test
     void emptyScanIntervalDisablesBackgroundDiscoveryAndCanBeConfigured() {
         ThingImpl thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE_BUILDER, "builder");
