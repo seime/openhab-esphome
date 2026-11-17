@@ -14,9 +14,11 @@ package no.seime.openhab.binding.esphome.internal.serial;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.util.ArrayDeque;
+import java.util.Objects;
 import java.util.TooManyListenersException;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -60,6 +62,7 @@ class ESPHomeSerialPort implements SerialPort {
     private volatile int parity = PARITY_NONE;
     private volatile int flowControlMode = FLOWCONTROL_NONE;
     private volatile int lineStates;
+    private int locallySetLines;
     private volatile boolean notifyOnDataAvailable;
     private volatile @Nullable SerialPortEventListener listener;
 
@@ -67,7 +70,11 @@ class ESPHomeSerialPort implements SerialPort {
         this.device = device;
         this.instance = instance;
         this.owner = owner;
-        sendRequest(SerialProxyRequestType.SERIAL_PROXY_REQUEST_TYPE_SUBSCRIBE);
+    }
+
+    void subscribe() throws ProtocolAPIError {
+        device.handler().sendMessage(SerialProxyRequest.newBuilder().setInstance(instance)
+                .setType(SerialProxyRequestType.SERIAL_PROXY_REQUEST_TYPE_SUBSCRIBE).build());
         sendGetModemPinsRequest();
     }
 
@@ -77,19 +84,14 @@ class ESPHomeSerialPort implements SerialPort {
 
     @Override
     public void close() {
-        if (closed) {
-            return;
-        }
-        closed = true;
-        sendRequest(SerialProxyRequestType.SERIAL_PROXY_REQUEST_TYPE_UNSUBSCRIBE);
-        inputStream.closeStream();
         device.close(instance, this);
     }
 
+    void unsubscribe() {
+        sendRequest(SerialProxyRequestType.SERIAL_PROXY_REQUEST_TYPE_UNSUBSCRIBE);
+    }
+
     void closeFromProvider() {
-        if (closed) {
-            return;
-        }
         closed = true;
         inputStream.closeStream();
     }
@@ -258,25 +260,21 @@ class ESPHomeSerialPort implements SerialPort {
 
     @Override
     public boolean isCTS() {
-        sendGetModemPinsRequest();
         return false;
     }
 
     @Override
     public boolean isDSR() {
-        sendGetModemPinsRequest();
         return false;
     }
 
     @Override
     public boolean isCD() {
-        sendGetModemPinsRequest();
         return false;
     }
 
     @Override
     public boolean isRI() {
-        sendGetModemPinsRequest();
         return false;
     }
 
@@ -298,16 +296,22 @@ class ESPHomeSerialPort implements SerialPort {
     }
 
     void handleModemPins(int lineStates) {
-        this.lineStates = lineStates;
+        synchronized (device.handler().getSerialProxyLock()) {
+            // A delayed response must not undo RTS/DTR changes made after the request.
+            this.lineStates = (lineStates & ~locallySetLines) | (this.lineStates & locallySetLines);
+        }
     }
 
     private void updateLineState(int flag, boolean enabled) {
-        if (enabled) {
-            lineStates |= flag;
-        } else {
-            lineStates &= ~flag;
+        synchronized (device.handler().getSerialProxyLock()) {
+            locallySetLines |= flag;
+            if (enabled) {
+                lineStates |= flag;
+            } else {
+                lineStates &= ~flag;
+            }
+            send(SerialProxySetModemPinsRequest.newBuilder().setInstance(instance).setLineStates(lineStates).build());
         }
-        send(SerialProxySetModemPinsRequest.newBuilder().setInstance(instance).setLineStates(lineStates).build());
     }
 
     private void sendRequest(SerialProxyRequestType type) {
@@ -377,69 +381,98 @@ class ESPHomeSerialPort implements SerialPort {
     }
 
     private static class QueueInputStream extends InputStream {
-        private final LinkedBlockingQueue<Integer> queue = new LinkedBlockingQueue<>();
-        private volatile int receiveTimeout = -1;
-        private volatile boolean closed;
+        private final ArrayDeque<byte[]> queue = new ArrayDeque<>();
+        private int offset;
+        private int available;
+        private int receiveTimeout = -1;
+        private boolean closed;
 
         @Override
-        public int read() throws IOException {
-            if (closed && queue.isEmpty()) {
-                return EOF;
-            }
-            try {
-                Integer value = receiveTimeout >= 0 ? queue.poll(receiveTimeout, TimeUnit.MILLISECONDS) : queue.take();
-                if (value == null) {
+        public synchronized int read() throws IOException {
+            if (!awaitData()) {
+                if (closed) {
                     return EOF;
                 }
-                return value;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Interrupted while waiting for serial data", e);
+                throw new InterruptedIOException("Serial receive timeout");
             }
+            byte[] chunk = Objects.requireNonNull(queue.peek());
+            int value = Byte.toUnsignedInt(chunk[offset++]);
+            available--;
+            if (offset == chunk.length) {
+                queue.remove();
+                offset = 0;
+            }
+            return value;
         }
 
         @Override
-        public int read(byte @Nullable [] b, int off, int len) throws IOException {
-            if (b == null) {
-                throw new NullPointerException("b");
-            }
+        public synchronized int read(byte @Nullable [] b, int off, int len) throws IOException {
+            Objects.requireNonNull(b);
+            Objects.checkFromIndexSize(off, len, b.length);
             if (len == 0) {
                 return 0;
             }
-            int first = read();
-            if (first == EOF) {
-                return EOF;
+            if (!awaitData()) {
+                return closed ? EOF : 0;
             }
-            b[off] = (byte) first;
-            int count = 1;
-            while (count < len) {
-                Integer value = queue.poll();
-                if (value == null || value == EOF) {
-                    break;
+            int count = 0;
+            while (count < len && !queue.isEmpty()) {
+                byte[] chunk = Objects.requireNonNull(queue.peek());
+                int size = Math.min(len - count, chunk.length - offset);
+                System.arraycopy(chunk, offset, b, off + count, size);
+                count += size;
+                offset += size;
+                available -= size;
+                if (offset == chunk.length) {
+                    queue.remove();
+                    offset = 0;
                 }
-                b[off + count++] = (byte) (int) value;
             }
             return count;
         }
 
-        @Override
-        public int available() {
-            return queue.size();
+        private boolean awaitData() throws IOException {
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(receiveTimeout);
+            while (queue.isEmpty() && !closed) {
+                try {
+                    if (receiveTimeout < 0) {
+                        wait();
+                    } else {
+                        long remaining = deadline - System.nanoTime();
+                        if (remaining <= 0) {
+                            return false;
+                        }
+                        TimeUnit.NANOSECONDS.timedWait(this, remaining);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting for serial data", e);
+                }
+            }
+            return !queue.isEmpty();
         }
 
-        void offer(byte[] data) {
-            for (byte value : data) {
-                queue.offer(Byte.toUnsignedInt(value));
+        @Override
+        public synchronized int available() {
+            return available;
+        }
+
+        synchronized void offer(byte[] data) {
+            if (!closed && data.length > 0) {
+                queue.add(data);
+                available += data.length;
+                notifyAll();
             }
         }
 
-        void setReceiveTimeout(int receiveTimeout) {
+        synchronized void setReceiveTimeout(int receiveTimeout) {
             this.receiveTimeout = receiveTimeout;
+            notifyAll();
         }
 
-        void closeStream() {
+        synchronized void closeStream() {
             closed = true;
-            queue.offer(EOF);
+            notifyAll();
         }
     }
 

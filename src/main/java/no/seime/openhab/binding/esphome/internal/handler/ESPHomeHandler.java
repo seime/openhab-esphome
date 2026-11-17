@@ -1626,6 +1626,17 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         return config != null ? config.hostname : null;
     }
 
+    /**
+     * Serial proxy lifecycle and writes share the connection lock so disconnect cannot race a subscription.
+     */
+    public Object getSerialProxyLock() {
+        return connectionStateLock;
+    }
+
+    public @Nullable String getResolvedIpAddress() {
+        return resolvedIpAddressForCurrentConnection;
+    }
+
     public int getPort() {
         return config != null ? config.port : 6053;
     }

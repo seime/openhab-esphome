@@ -12,11 +12,8 @@
  */
 package no.seime.openhab.binding.esphome.internal.serial;
 
-import java.net.InetAddress;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +25,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.io.transport.serial.PortInUseException;
 import org.openhab.core.io.transport.serial.ProtocolType;
 import org.openhab.core.io.transport.serial.ProtocolType.PathType;
 import org.openhab.core.io.transport.serial.SerialPortIdentifier;
@@ -40,6 +38,7 @@ import com.google.common.net.InetAddresses;
 import io.esphome.api.SerialProxyDataReceived;
 import io.esphome.api.SerialProxyGetModemPinsResponse;
 import io.esphome.api.SerialProxyInfo;
+import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 @NonNullByDefault
@@ -58,14 +57,23 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
         }
 
         String deviceName = StringUtils.trimToNull(portName.getHost());
+        int requestedPort = portName.getPort();
+        // Thing IDs may contain underscores, which URI does not accept as a DNS host.
+        if (deviceName == null && portName.getRawAuthority() != null
+                && portName.getRawAuthority().matches("[a-zA-Z0-9_.-]+(?::[0-9]{1,5})?")) {
+            String[] authority = portName.getRawAuthority().split(":", 2);
+            deviceName = authority[0];
+            requestedPort = authority.length == 2 ? Integer.parseInt(authority[1]) : -1;
+        }
         if (deviceName == null) {
             return null;
         }
 
-        int port = portName.getPort() > 0 ? portName.getPort() : DEFAULT_PORT;
+        int port = requestedPort > 0 ? requestedPort : DEFAULT_PORT;
+        String requestedDevice = deviceName;
         String proxyNameOrInstance = proxyNameOrInstance(portName);
 
-        return devices.values().stream().filter(device -> device.matchesDevice(deviceName, port))
+        return devices.values().stream().filter(device -> device.matchesDevice(requestedDevice, port))
                 .map(device -> device.identifier(proxyNameOrInstance)).filter(Objects::nonNull).findFirst()
                 .orElse(null);
     }
@@ -86,13 +94,18 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
             return;
         }
 
-        devices.put(handler.getThing().getUID(), new ESPHomeSerialProxyDevice(handler, serialProxies));
+        devices.compute(handler.getThing().getUID(), (ThingUID uid, @Nullable ESPHomeSerialProxyDevice previous) -> {
+            if (previous != null) {
+                previous.closePorts(true);
+            }
+            return new ESPHomeSerialProxyDevice(handler, serialProxies);
+        });
     }
 
     public void unregister(ESPHomeHandler handler) {
         ESPHomeSerialProxyDevice device = devices.remove(handler.getThing().getUID());
         if (device != null) {
-            device.closePorts();
+            device.closePorts(false);
         }
     }
 
@@ -111,12 +124,12 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
     }
 
     private static String proxyNameOrInstance(URI portName) {
-        String path = StringUtils.trimToEmpty(portName.getPath());
+        String path = StringUtils.defaultString(portName.getPath());
         if (path.isEmpty() || "/".equals(path)) {
             return "0";
         }
         String value = path.startsWith("/") ? path.substring(1) : path;
-        return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        return value;
     }
 
     static @Nullable String resolvedAddress(@Nullable String hostname) {
@@ -124,13 +137,7 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
         if (trimmed == null) {
             return null;
         }
-        try {
-            InetAddress address = InetAddresses.isInetAddress(trimmed) ? InetAddresses.forString(trimmed)
-                    : InetAddress.getByName(trimmed);
-            return address.getHostAddress();
-        } catch (UnknownHostException | IllegalArgumentException e) {
-            return null;
-        }
+        return InetAddresses.isInetAddress(trimmed) ? InetAddresses.forString(trimmed).getHostAddress() : null;
     }
 
     static class ESPHomeSerialProxyDevice {
@@ -138,11 +145,13 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
         private final List<SerialProxyInfo> serialProxies;
         private final Map<Integer, ESPHomeSerialPort> openPorts = new ConcurrentHashMap<>();
         private final @Nullable String configuredHostnameAddress;
+        private boolean retired;
 
         ESPHomeSerialProxyDevice(ESPHomeHandler handler, List<SerialProxyInfo> serialProxies) {
             this.handler = handler;
             this.serialProxies = List.copyOf(serialProxies);
-            this.configuredHostnameAddress = resolvedAddress(handler.getHostname());
+            this.configuredHostnameAddress = resolvedAddress(
+                    StringUtils.firstNonBlank(handler.getResolvedIpAddress(), handler.getHostname()));
         }
 
         boolean matchesDevice(String requestedDeviceName, int requestedPort) {
@@ -182,14 +191,32 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
             return IntStream.range(0, serialProxies.size()).mapToObj(i -> new ESPHomeSerialPortIdentifier(this, i));
         }
 
-        ESPHomeSerialPort open(int instance, String owner) {
-            ESPHomeSerialPort port = new ESPHomeSerialPort(this, instance, owner);
-            openPorts.put(instance, port);
-            return port;
+        ESPHomeSerialPort open(int instance, String owner) throws PortInUseException {
+            synchronized (handler.getSerialProxyLock()) {
+                if (retired || openPorts.containsKey(instance)) {
+                    throw new PortInUseException(
+                            new IllegalStateException("ESPHome serial proxy unavailable or already open"));
+                }
+                ESPHomeSerialPort port = new ESPHomeSerialPort(this, instance, owner);
+                openPorts.put(instance, port);
+                try {
+                    port.subscribe();
+                } catch (ProtocolAPIError e) {
+                    openPorts.remove(instance, port);
+                    port.closeFromProvider();
+                    throw new PortInUseException(e);
+                }
+                return port;
+            }
         }
 
         void close(int instance, ESPHomeSerialPort port) {
-            openPorts.remove(instance, port);
+            synchronized (handler.getSerialProxyLock()) {
+                port.closeFromProvider();
+                if (openPorts.remove(instance, port)) {
+                    port.unsubscribe();
+                }
+            }
         }
 
         boolean isOpen(int instance) {
@@ -216,9 +243,17 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
             }
         }
 
-        void closePorts() {
-            openPorts.values().forEach(ESPHomeSerialPort::closeFromProvider);
-            openPorts.clear();
+        void closePorts(boolean unsubscribe) {
+            synchronized (handler.getSerialProxyLock()) {
+                retired = true;
+                openPorts.values().forEach(port -> {
+                    port.closeFromProvider();
+                    if (unsubscribe) {
+                        port.unsubscribe();
+                    }
+                });
+                openPorts.clear();
+            }
         }
 
         ESPHomeHandler handler() {
@@ -233,7 +268,15 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
             String deviceName = StringUtils.defaultIfBlank(StringUtils.firstNonBlank(handler.getDeviceId(),
                     handler.getThing().getUID().getId(), handler.getHostname()), handler.getThing().getUID().getId());
             String proxyName = serialProxies.get(instance).getName();
-            return SCHEME + "://" + deviceName + "/" + (proxyName.isBlank() ? Integer.toString(instance) : proxyName);
+            String authority = deviceName + (handler.getPort() == DEFAULT_PORT ? "" : ":" + handler.getPort());
+            // Numeric names would otherwise select an instance rather than the named proxy.
+            String path = "/" + (proxyName.isBlank() || parseInstance(proxyName) != null ? Integer.toString(instance)
+                    : proxyName);
+            try {
+                return new URI(SCHEME, authority, path, null, null).toASCIIString();
+            } catch (URISyntaxException e) {
+                throw new IllegalStateException("Invalid ESPHome serial proxy identifier", e);
+            }
         }
 
         private static @Nullable Integer parseInstance(String value) {
@@ -262,10 +305,6 @@ public class ESPHomeSerialPortProvider implements SerialPortProvider {
         @Override
         public ESPHomeSerialPort open(String owner, int timeout)
                 throws org.openhab.core.io.transport.serial.PortInUseException {
-            if (device.isOpen(instance)) {
-                throw new org.openhab.core.io.transport.serial.PortInUseException(
-                        new IllegalStateException("ESPHome serial proxy is already open"));
-            }
             return device.open(instance, owner);
         }
 

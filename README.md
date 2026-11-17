@@ -316,7 +316,8 @@ The URI format is `esphome://<device>[:<api-port>]/<proxy-name-or-index>`:
 - `<device>` can be the ESPHome Thing's ID, its configured `deviceId`, the ESPHome device name, or its hostname/IP address.
 - `<api-port>` defaults to `6053`. Specify it when the ESPHome Thing uses a different native API port.
 - The path selects the proxy by its reported name or zero-based index, for example `esphome://my-device/0`.
-  Omitting the path also selects the first proxy.
+  Omitting the path also selects the first proxy. Percent-encode special characters in names (for example,
+  `RS485%20port` for `RS485 port`), or use the index. Discovered port identifiers include this encoding automatically.
 
 The consuming binding can set baud rate, data bits, stop bits and parity through the serial transport. RTS/CTS hardware
 flow control and RTS/DTR control are supported where the ESPHome hardware and configuration provide them; software

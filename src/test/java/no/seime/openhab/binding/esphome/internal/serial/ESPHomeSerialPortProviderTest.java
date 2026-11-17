@@ -56,10 +56,12 @@ class ESPHomeSerialPortProviderTest {
         provider = new ESPHomeSerialPortProvider();
         thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "thing-id");
 
+        when(handler.getSerialProxyLock()).thenReturn(new Object());
         when(handler.getThing()).thenReturn(thing);
         when(handler.getPort()).thenReturn(6053);
         when(handler.getDeviceId()).thenReturn("device-id");
         when(handler.getHostname()).thenReturn("localhost");
+        when(handler.getResolvedIpAddress()).thenReturn("127.0.0.1");
         when(handler.getEspHomeDeviceName()).thenReturn("esphome-name");
 
         provider.register(handler, proxies());
@@ -205,6 +207,8 @@ class ESPHomeSerialPortProviderTest {
         SerialPort port = identifier.open("owner", 1000);
 
         port.setRTS(true);
+        provider.handleModemPins(handler,
+                SerialProxyGetModemPinsResponse.newBuilder().setInstance(0).setLineStates(0).build());
         port.setDTR(true);
 
         SerialProxySetModemPinsRequest request = captureLast(SerialProxySetModemPinsRequest.class);
@@ -216,8 +220,109 @@ class ESPHomeSerialPortProviderTest {
         provider.handleModemPins(handler,
                 SerialProxyGetModemPinsResponse.newBuilder().setInstance(0).setLineStates(0).build());
 
-        assertFalse(port.isRTS());
-        assertFalse(port.isDTR());
+        assertTrue(port.isRTS());
+        assertTrue(port.isDTR());
+    }
+
+    @Test
+    void generatedIdentifiersRoundTripWithSpecialNamesAndNonDefaultPort() {
+        provider.unregister(handler);
+        when(handler.getPort()).thenReturn(6054);
+        when(handler.getDeviceId()).thenReturn(null);
+        thing = new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "my_device");
+        when(handler.getThing()).thenReturn(thing);
+        provider.register(handler,
+                java.util.List.of(SerialProxyInfo.newBuilder().setName(" RS485 + %25/#? café ").build(),
+                        SerialProxyInfo.newBuilder().setName("0").build()));
+
+        var identifiers = provider.getSerialPortIdentifiers().toList();
+        assertEquals(2, identifiers.size());
+        for (var identifier : identifiers) {
+            assertTrue(identifier.getName().startsWith("esphome://my_device:6054/"));
+            var lookedUp = provider.getPortIdentifier(URI.create(identifier.getName()));
+            assertNotNull(lookedUp);
+            assertEquals(identifier.getName(), lookedUp.getName());
+        }
+        assertNotNull(provider.getPortIdentifier(URI.create("esphome://my_device:6054/1")));
+    }
+
+    @Test
+    void replacementClosesOldPortsAndRetiresOldIdentifiers() throws Exception {
+        var identifier = provider.getSerialPortIdentifiers().findFirst().orElseThrow();
+        var port = identifier.open("owner", 1000);
+        provider.register(handler, proxies());
+
+        assertEquals(-1, requireNonNull(port.getInputStream()).read());
+        org.junit.jupiter.api.Assertions.assertThrows(PortInUseException.class, () -> identifier.open("stale", 1000));
+        assertFalse(identifier.isCurrentlyOwned());
+    }
+
+    @Test
+    void subscriptionFailureDoesNotLeavePortOwned() throws Exception {
+        var identifier = provider.getSerialPortIdentifiers().findFirst().orElseThrow();
+        org.mockito.Mockito.doThrow(new no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError("Disconnected"))
+                .when(handler).sendMessage(org.mockito.ArgumentMatchers.isA(SerialProxyRequest.class));
+        org.junit.jupiter.api.Assertions.assertThrows(PortInUseException.class, () -> identifier.open("owner", 1000));
+        assertFalse(identifier.isCurrentlyOwned());
+    }
+
+    @Test
+    void dataDeliveredDuringSubscribeIsBuffered() throws Exception {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            SerialProxyRequest request = invocation.getArgument(0);
+            provider.handleData(handler, SerialProxyDataReceived.newBuilder().setInstance(request.getInstance())
+                    .setData(ByteString.copyFrom(new byte[] { 42 })).build());
+            return null;
+        }).when(handler).sendMessage(org.mockito.ArgumentMatchers.isA(SerialProxyRequest.class));
+        var port = provider.getSerialPortIdentifiers().findFirst().orElseThrow().open("owner", 1000);
+        assertEquals(42, requireNonNull(port.getInputStream()).read());
+    }
+
+    @Test
+    void timeoutDoesNotSignalEofAndReadsSpanChunks() throws Exception {
+        var port = requireNonNull(provider.getPortIdentifier(URI.create("esphome://device-id/main"))).open("owner",
+                1000);
+        var input = requireNonNull(port.getInputStream());
+        port.enableReceiveTimeout(1);
+        byte[] buffer = new byte[4];
+        assertEquals(0, input.read(buffer));
+        org.junit.jupiter.api.Assertions.assertThrows(java.io.InterruptedIOException.class, input::read);
+        provider.handleData(handler, SerialProxyDataReceived.newBuilder().setInstance(0)
+                .setData(ByteString.copyFrom(new byte[] { 1, 2 })).build());
+        provider.handleData(handler, SerialProxyDataReceived.newBuilder().setInstance(0)
+                .setData(ByteString.copyFrom(new byte[] { 3, 4 })).build());
+        assertEquals(4, input.available());
+        assertEquals(3, input.read(buffer, 1, 3));
+        assertArrayEquals(new byte[] { 0, 1, 2, 3 }, buffer);
+        assertEquals(4, input.read());
+        port.close();
+        assertEquals(-1, input.read(buffer));
+    }
+
+    @Test
+    void concurrentOpensHaveExactlyOneOwner() throws Exception {
+        var identifier = provider.getSerialPortIdentifiers().findFirst().orElseThrow();
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<Boolean> open = () -> {
+                start.await();
+                try {
+                    identifier.open("owner", 1000);
+                    return true;
+                } catch (PortInUseException e) {
+                    return false;
+                }
+            };
+            var first = executor.submit(open);
+            var second = executor.submit(open);
+            start.countDown();
+            assertTrue(first.get(5, java.util.concurrent.TimeUnit.SECONDS)
+                    ^ second.get(5, java.util.concurrent.TimeUnit.SECONDS));
+        } finally {
+            executor.shutdownNow();
+            provider.unregister(handler);
+        }
     }
 
     private void assertIdentifier(String uri) {
