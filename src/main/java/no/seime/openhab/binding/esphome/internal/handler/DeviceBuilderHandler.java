@@ -73,7 +73,10 @@ public class DeviceBuilderHandler extends BaseThingHandler {
             if (getScanIntervalSeconds() < 0) {
                 throw new IllegalArgumentException();
             }
-            updateStatus(ThingStatus.UNKNOWN);
+            updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE,
+                    getScanIntervalSeconds() == 0
+                            ? "Automatic scans are disabled. Start a discovery scan to check connectivity"
+                            : "Waiting for the first discovery scan");
         } catch (IllegalArgumentException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Configure a valid dashboard URL and a scan interval of 0 or greater");
