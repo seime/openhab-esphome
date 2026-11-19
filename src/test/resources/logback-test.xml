@@ -4,7 +4,9 @@
     <!-- encoders are assigned the type
          ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
     <encoder>
-      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      <!-- ESPHome emits color codes (including incomplete extended colors such as ESC[0;38m)
+           that can break Maven's Jansi parser. Keep test output plain before Surefire forwards it. -->
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %replace(%msg){'\x1B\[[0-?]*[ -/]*[@-~]', ''}%n</pattern>
     </encoder>
   </appender>
 
