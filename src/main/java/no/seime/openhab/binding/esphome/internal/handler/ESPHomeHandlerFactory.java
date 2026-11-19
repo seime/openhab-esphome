@@ -46,6 +46,7 @@ import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxy
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
+import no.seime.openhab.binding.esphome.internal.serial.ESPHomeSerialPortProvider;
 
 /**
  * The {@link ESPHomeHandlerFactory} is responsible for creating things and thing
@@ -78,6 +79,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final AudioHTTPServer audioHTTPServer;
     private final NetworkAddressService networkAddressService;
     private MonitoredCompositeExecutorService scheduler;
+    private final ESPHomeSerialPortProvider serialPortProvider;
     private KeySequentialExecutor packetExecutor;
     private ConnectionSelector connectionSelector;
     private ESPHomeVersionService versionService;
@@ -91,7 +93,8 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
             @Reference ESPHomeEventSubscriber eventSubscriber, @Reference ThingRegistry thingRegistry,
             @Reference EventPublisher eventPublisher, @Reference ESPHomeMDNSHostnameResolver mdnsHostnameResolver,
             @Reference AudioHTTPServer audioHTTPServer, @Reference NetworkAddressService networkAddressService,
-            @Reference Inbox inbox, @Reference ManagedThingProvider managedThingProvider) {
+            @Reference Inbox inbox, @Reference ManagedThingProvider managedThingProvider,
+            @Reference ESPHomeSerialPortProvider serialPortProvider) {
 
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
         this.stateDescriptionProvider = stateDescriptionProvider;
@@ -103,6 +106,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         this.audioHTTPServer = audioHTTPServer;
         this.networkAddressService = networkAddressService;
         this.managedThingProvider = managedThingProvider;
+        this.serialPortProvider = serialPortProvider;
     }
 
     @Override
@@ -117,7 +121,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
                     bindingPropertyDefaultEncryptionKey, bindingPropertyAudioBaseUrl, getBundleContext(),
                     versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                    networkAddressService, managedThingProvider);
+                    networkAddressService, managedThingProvider, serialPortProvider);
             esphomeHandlers.put(thing.getUID(), handler);
             return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {

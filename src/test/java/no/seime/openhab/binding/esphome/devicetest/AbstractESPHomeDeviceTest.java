@@ -45,6 +45,7 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPChannelTypeProvider;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 import no.seime.openhab.binding.esphome.internal.handler.ESPStateDescriptionProvider;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
+import no.seime.openhab.binding.esphome.internal.serial.ESPHomeSerialPortProvider;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -70,6 +71,7 @@ public abstract class AbstractESPHomeDeviceTest {
     protected @Mock ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
     protected @Mock AudioHTTPServer audioHTTPServer;
     protected @Mock NetworkAddressService networkAddressService;
+    protected ESPHomeSerialPortProvider serialPortProvider;
     private ESPHomeDeviceRunner emulator;
     protected @Mock ManagedThingProvider managedThingProvider;
 
@@ -110,17 +112,19 @@ public abstract class AbstractESPHomeDeviceTest {
 
         FirmwareUpgradeService firmwareUpgradeService = Mockito.mock(FirmwareUpgradeService.class);
 
+        serialPortProvider = new ESPHomeSerialPortProvider();
+
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, null,
                 bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                networkAddressService, managedThingProvider);
+                networkAddressService, managedThingProvider, serialPortProvider);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 
         when(bundleContext.registerService(eq(ESPHomeHandler.class), eq(thingHandler), Mockito.any())).thenReturn(null);
     }
 
-    protected abstract File getEspDeviceConfigurationYamlFileName();
+    protected abstract File getEspDeviceConfigurationYamlFileName() throws Exception;
 
     private static int pickFreePort() throws Exception {
         try (ServerSocket socket = new ServerSocket(0)) {

@@ -9,6 +9,7 @@
 	<feature name="openhab-binding-esphome" description="ESPHome Binding" version="${project.version}">
 		<feature>openhab-runtime-base</feature>
 		<feature>openhab-transport-mdns</feature>
+		<feature>openhab-transport-serial</feature>
 		<feature>openhab-binding-bluetooth</feature>
 
 		<bundle start-level="80">

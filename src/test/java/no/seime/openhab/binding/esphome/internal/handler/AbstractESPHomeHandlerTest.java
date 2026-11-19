@@ -30,6 +30,7 @@ import no.seime.openhab.binding.esphome.internal.comm.ConnectionSelector;
 import no.seime.openhab.binding.esphome.internal.comm.EncryptedFrameHelper;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.message.statesubscription.ESPHomeEventSubscriber;
+import no.seime.openhab.binding.esphome.internal.serial.ESPHomeSerialPortProvider;
 
 @ExtendWith(MockitoExtension.class)
 abstract class AbstractESPHomeHandlerTest {
@@ -59,6 +60,8 @@ abstract class AbstractESPHomeHandlerTest {
 
     @Mock
     protected ManagedThingProvider managedThingProvider;
+    @Mock
+    protected ESPHomeSerialPortProvider serialPortProvider;
 
     protected ESPHomeHandler handler;
     protected ThingImpl thing;
@@ -78,7 +81,7 @@ abstract class AbstractESPHomeHandlerTest {
         handler = new ESPHomeHandler(thing, new ConnectionSelector(), channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(packetProcessorExecutor), eventPublisher, null,
                 null, bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                networkAddressService, managedThingProvider);
+                networkAddressService, managedThingProvider, serialPortProvider);
 
         setField("config", new ESPHomeConfiguration());
         setField("frameHelper", frameHelper);
