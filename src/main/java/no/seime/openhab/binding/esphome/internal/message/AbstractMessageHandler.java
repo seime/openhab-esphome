@@ -12,9 +12,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import javax.measure.Unit;
-import javax.validation.constraints.NotNull;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.CoreItemFactory;
@@ -39,6 +38,7 @@ import no.seime.openhab.binding.esphome.internal.message.deviceclass.DeviceClass
 import no.seime.openhab.binding.esphome.internal.message.deviceclass.SensorNumberDeviceClass;
 import no.seime.openhab.binding.esphome.internal.util.Debug;
 
+@NonNullByDefault
 public abstract class AbstractMessageHandler<S extends GeneratedMessage, T extends GeneratedMessage> {
 
     private final Logger logger = LoggerFactory.getLogger(AbstractMessageHandler.class);
@@ -49,12 +49,13 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     }
 
     protected ChannelType addChannelType(final String entityName, final String itemType,
-            @Nullable final Set<String> tags, String category, EntityCategory entityCategory,
+            @Nullable final Set<String> tags, @Nullable String category, EntityCategory entityCategory,
             boolean disabledByDefault) {
 
         String label = createChannelLabel(entityName);
         boolean advanced = disabledByDefault || entityCategory != EntityCategory.ENTITY_CATEGORY_NONE;
-        List<String> properties = new ArrayList<>(Arrays.asList(label, itemType, category, Boolean.toString(advanced)));
+        List<@Nullable String> properties = new ArrayList<>(
+                Arrays.asList(label, itemType, category, Boolean.toString(advanced)));
         if (tags != null) {
             // sort tags because their order is immaterial.
             properties.addAll(new TreeSet<>(tags));
@@ -151,7 +152,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         return builder.build();
     }
 
-    protected Configuration configuration(String entityType, int entityKey, String entityField) {
+    protected Configuration configuration(@Nullable String entityType, int entityKey, @Nullable String entityField) {
         Configuration configuration = new Configuration();
         configuration.put(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_KEY, entityKey);
         if (entityField != null) {
@@ -169,7 +170,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     public abstract void buildChannels(S rsp);
 
-    protected String resolveNumericItemType(String unit, String name, @NonNull DeviceClass deviceClass,
+    protected String resolveNumericItemType(String unit, String name, DeviceClass deviceClass,
             Configuration configuration) {
         // Guard against special "no unit" values before attempting to parse or validate
         if (unit == null || "None".equals(unit) || unit.isEmpty()) {
@@ -215,7 +216,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         return itemTypeToUse;
     }
 
-    private String getItemTypeBaseOnUnit(String unitOfMeasurement) {
+    private @Nullable String getItemTypeBaseOnUnit(String unitOfMeasurement) {
 
         unitOfMeasurement = transformUnit(unitOfMeasurement);
 
@@ -238,17 +239,16 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
 
     public abstract void handleState(T rsp);
 
-    protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType) {
+    protected void registerChannel(Channel channel, ChannelType channelType) {
         registerChannel(channel, channelType, null, null);
     }
 
-    protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType,
-            @NotNull StateDescription stateDescription) {
+    protected void registerChannel(Channel channel, ChannelType channelType, StateDescription stateDescription) {
         registerChannel(channel, channelType, stateDescription, null);
     }
 
-    protected void registerChannel(@NotNull Channel channel, @NotNull ChannelType channelType,
-            StateDescription stateDescription, CommandDescription commandDescription) {
+    protected void registerChannel(Channel channel, ChannelType channelType,
+            @Nullable StateDescription stateDescription, @Nullable CommandDescription commandDescription) {
         if (logger.isDebugEnabled()) {
             logger.debug("[{}] Registering channel {} with channel type {}", handler.getLogPrefix(), channel.getUID(),
                     channelType.getUID());
@@ -346,7 +346,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
     }
 
-    protected String getChannelIcon(String icon, String defaultCategoryIcon) {
+    protected @Nullable String getChannelIcon(String icon, @Nullable String defaultCategoryIcon) {
         if (icon.isEmpty()) {
             return defaultCategoryIcon;
         } else {
@@ -403,9 +403,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
         }
     }
 
-    @NonNull
-    protected DeviceClass resolveDeviceClassAndSetInConfiguration(Configuration configuration, DeviceClass deviceClass,
-            DeviceClass defaultDeviceClass, String rawDeviceClass, String entity, String documentationLink) {
+    protected DeviceClass resolveDeviceClassAndSetInConfiguration(@Nullable Configuration configuration,
+            @Nullable DeviceClass deviceClass, DeviceClass defaultDeviceClass, String rawDeviceClass, String entity,
+            String documentationLink) {
 
         if (deviceClass == null) {
             logger.warn(
