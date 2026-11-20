@@ -39,7 +39,7 @@ import no.seime.openhab.binding.esphome.internal.message.deviceclass.SensorNumbe
 import no.seime.openhab.binding.esphome.internal.util.Debug;
 
 @NonNullByDefault
-public abstract class AbstractMessageHandler<S extends GeneratedMessage, T extends GeneratedMessage> {
+public abstract class AbstractMessageHandler<S extends @Nullable GeneratedMessage, T extends @Nullable GeneratedMessage> {
 
     private final Logger logger = LoggerFactory.getLogger(AbstractMessageHandler.class);
     protected final ESPHomeHandler handler;
@@ -86,7 +86,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     }
 
     protected static StateDescription readOnlyStateDescription() {
-        return StateDescriptionFragmentBuilder.create().withReadOnly(true).build().toStateDescription();
+        return Objects.requireNonNull(
+                StateDescriptionFragmentBuilder.create().withReadOnly(true).build().toStateDescription());
     }
 
     protected static StateDescription patternStateDescription(String pattern) {
@@ -94,8 +95,8 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     }
 
     protected static StateDescription patternStateDescription(String pattern, boolean readOnly) {
-        return StateDescriptionFragmentBuilder.create().withPattern(pattern).withReadOnly(readOnly).build()
-                .toStateDescription();
+        return Objects.requireNonNull(StateDescriptionFragmentBuilder.create().withPattern(pattern)
+                .withReadOnly(readOnly).build().toStateDescription());
     }
 
     protected static StateDescription numericStateDescription(@Nullable String pattern, @Nullable BigDecimal step,
@@ -123,7 +124,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
             builder.withMaximum(max);
         }
 
-        return builder.build().toStateDescription();
+        return Objects.requireNonNull(builder.build().toStateDescription());
     }
 
     protected static StateDescription optionListStateDescription(final Collection<?> options) {
@@ -139,7 +140,7 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
                 .collect(Collectors.toList());
         builder.withOptions(stateOptions);
 
-        return builder.build().toStateDescription();
+        return Objects.requireNonNull(builder.build().toStateDescription());
     }
 
     protected static CommandDescription optionListCommandDescription(Collection<?> options) {
@@ -422,8 +423,9 @@ public abstract class AbstractMessageHandler<S extends GeneratedMessage, T exten
     protected Set<String> createSemanticTags(String point, DeviceClass deviceClass) {
         Set<String> semanticTags = new HashSet<>();
         semanticTags.add(point);
-        if (deviceClass.getSemanticType() != null) {
-            semanticTags.add(deviceClass.getSemanticType());
+        String semanticType = deviceClass.getSemanticType();
+        if (semanticType != null) {
+            semanticTags.add(semanticType);
         }
 
         return semanticTags;
