@@ -8,11 +8,9 @@ import static org.mockito.Mockito.*;
 import java.io.File;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
-import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -27,10 +25,7 @@ public class ProvisioningDeviceTest extends AbstractESPHomeDeviceTest {
 
     @Test
     public void provisionsKeyAndReconnectsToExchangeStatesAndCommands() {
-        deviceConfiguration.encryptionKey = "";
-        // Use a real, editable configuration so the saved key is visible to the provider.
-        thing.setConfiguration(new Configuration(Map.of("hostname", deviceConfiguration.hostname, "port",
-                deviceConfiguration.port, "deviceId", deviceConfiguration.deviceId)));
+        configuration.put("encryptionKey", "");
         when(managedThingProvider.get(thing.getUID())).thenReturn(thing);
         AtomicReference<String> savedKey = new AtomicReference<>();
         doAnswer(invocation -> {

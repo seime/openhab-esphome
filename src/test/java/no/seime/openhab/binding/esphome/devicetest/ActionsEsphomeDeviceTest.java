@@ -22,42 +22,43 @@ public class ActionsEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
     @Test
     public void testAction() throws ItemNotFoundException {
-        deviceConfiguration.allowActions = true;
+        configuration.put("allowActions", true);
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_action"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createActionEvent(deviceConfiguration.deviceId,
-                "some.action", Map.of("entity_id", "Something"), Map.of(), Map.of()));
+        verify(eventPublisher, timeout(2000))
+                .post(ESPHomeEventFactory.createActionEvent((String) configuration.get("deviceId"), "some.action",
+                        Map.of("entity_id", "Something"), Map.of(), Map.of()));
 
         thingHandler.dispose();
     }
 
     @Test
     public void testEvent() throws ItemNotFoundException {
-        deviceConfiguration.allowActions = true;
+        configuration.put("allowActions", true);
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_event"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createEventEvent(deviceConfiguration.deviceId,
-                "esphome.something", Map.of(), Map.of(), Map.of()));
+        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createEventEvent(
+                (String) configuration.get("deviceId"), "esphome.something", Map.of(), Map.of(), Map.of()));
 
         thingHandler.dispose();
     }
 
     @Test
     public void testTag() throws ItemNotFoundException {
-        deviceConfiguration.allowActions = true;
+        configuration.put("allowActions", true);
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_tag"), OnOffType.ON);
 
         verify(eventPublisher, timeout(2000))
-                .post(ESPHomeEventFactory.createTagScannedEvent(deviceConfiguration.deviceId, "mytag"));
+                .post(ESPHomeEventFactory.createTagScannedEvent((String) configuration.get("deviceId"), "mytag"));
 
         thingHandler.dispose();
     }

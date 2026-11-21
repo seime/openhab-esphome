@@ -62,9 +62,8 @@ public abstract class AbstractESPHomeDeviceTest {
     protected @Mock ThingRegistry thingRegistry;
     protected @Mock EventPublisher eventPublisher;
     protected ESPHomeEventSubscriber eventSubscriber;
-    protected ESPHomeConfiguration deviceConfiguration;
     private ConnectionSelector selector;
-    protected @Mock Configuration configuration;
+    protected Configuration configuration;
     protected @Mock ESPChannelTypeProvider channelTypeProvider;
     protected @Mock ESPStateDescriptionProvider stateDescriptionProvider;
     protected @Mock BundleContext bundleContext;
@@ -83,13 +82,12 @@ public abstract class AbstractESPHomeDeviceTest {
         emulator = new ESPHomeDeviceRunner(getEspDeviceConfigurationYamlFileName(), apiPort);
         emulator.compileAndRun();
 
-        deviceConfiguration = new ESPHomeConfiguration();
-        deviceConfiguration.hostname = "localhost";
-        deviceConfiguration.port = apiPort;
-        deviceConfiguration.encryptionKey = "TiFvlzL9tNB29cys/ZR4o+YYHvwawrTF8csI13hZaPw=";
-        deviceConfiguration.deviceId = emulator.getDeviceName();
-        deviceConfiguration.deviceLogLevel = LogLevel.VERY_VERBOSE;
-        when(configuration.as(ESPHomeConfiguration.class)).thenReturn(deviceConfiguration);
+        configuration = new Configuration();
+        configuration.put("hostname", "localhost");
+        configuration.put("port", apiPort);
+        configuration.put("encryptionKey", "TiFvlzL9tNB29cys/ZR4o+YYHvwawrTF8csI13hZaPw=");
+        configuration.put("deviceId", emulator.getDeviceName());
+        configuration.put("deviceLogLevel", LogLevel.VERY_VERBOSE.name());
 
         selector = new ConnectionSelector();
         selector.start();
