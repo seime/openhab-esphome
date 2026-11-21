@@ -2,10 +2,8 @@ package no.seime.openhab.binding.esphome.internal.audio;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -13,15 +11,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -68,11 +69,18 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     private ESPHomeHandler handler;
 
     private ESPHomeVoiceAssistantAudioSource source;
+    private final List<ScheduledTask> scheduled = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void setUp() {
         when(handler.getThing()).thenReturn(new ThingImpl(BindingConstants.THING_TYPE_DEVICE, "device"));
         when(handler.getLogPrefix()).thenReturn("device");
+        when(handler.schedule(any(), anyLong(), any())).thenAnswer(invocation -> {
+            TimeUnit unit = invocation.getArgument(2);
+            ScheduledTask task = new ScheduledTask(invocation.getArgument(0), unit.toMillis(invocation.getArgument(1)));
+            scheduled.add(task);
+            return task;
+        });
         source = new ESPHomeVoiceAssistantAudioSource(handler, READER_STALL_MS);
     }
 
@@ -204,15 +212,14 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     void stopsTheMicrophoneWhenTheReplyPlaysWhileListening() throws Exception {
         AudioStream stream = startDialogRun();
 
-        // the device can't play it while its microphone stops
-        assertEquals(ReplyPlayback.SINK, source.startReply(REPLY_URL, () -> {
+        assertEquals(ReplyPlayback.DEVICE, source.startReply(REPLY_URL, () -> {
         }));
 
-        InOrder inOrder = Mockito.inOrder(handler);
-        inOrder.verify(handler).sendMessage(STT_VAD_END);
-        inOrder.verify(handler).sendMessage(TTS_START);
-        verify(handler, never()).sendMessage(TTS_END);
+        verify(handler).sendMessage(STT_VAD_END);
         assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertEquals(-1, stream.read()));
+        verify(handler, never()).sendMessage(TTS_END);
+        runMicrophoneStopWait();
+        verify(handler).sendMessage(TTS_END);
     }
 
     @Test
@@ -226,9 +233,7 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     void endsTheRunWhenNoReplyComes() throws Exception {
         startDialogRun().close();
 
-        ArgumentCaptor<Runnable> timeout = ArgumentCaptor.forClass(Runnable.class);
-        verify(handler).schedule(timeout.capture(), anyLong(), any());
-        timeout.getValue().run();
+        takeScheduled(ESPHomeVoiceAssistantAudioSource.REPLY_TIMEOUT_SECONDS * 1000).run();
 
         verify(handler).sendMessage(RUN_END);
         assertEquals(ReplyPlayback.NONE, source.startReply(null, () -> {
@@ -243,12 +248,7 @@ class ESPHomeVoiceAssistantAudioSourceTest {
         source.onDialogIdle();
         verify(handler, never()).sendMessage(RUN_END);
 
-        ArgumentCaptor<Runnable> endRun = ArgumentCaptor.forClass(Runnable.class);
-        ArgumentCaptor<Long> delay = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<TimeUnit> unit = ArgumentCaptor.forClass(TimeUnit.class);
-        verify(handler, times(2)).schedule(endRun.capture(), delay.capture(), unit.capture());
-        assertTrue(unit.getValue().toMillis(delay.getValue()) > 0);
-        endRun.getValue().run();
+        runMicrophoneStopWait();
 
         verify(handler).sendMessage(RUN_END);
         assertEquals(ReplyPlayback.NONE, source.startReply(null, () -> {
@@ -259,11 +259,10 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     void doesNotEndTheNextRunWhenTheDialogFinishedWithoutAReply() throws Exception {
         startDialogRun().close();
         source.onDialogIdle();
-        ArgumentCaptor<Runnable> endRun = ArgumentCaptor.forClass(Runnable.class);
-        verify(handler, times(2)).schedule(endRun.capture(), anyLong(), any());
+        Runnable endRun = takeScheduled(0, ESPHomeVoiceAssistantAudioSource.MICROPHONE_STOP_MS);
 
         AudioStream stream = startDialogRun();
-        endRun.getValue().run();
+        endRun.run();
 
         verify(handler, never()).sendMessage(RUN_END);
         stream.close();
@@ -288,6 +287,8 @@ class ESPHomeVoiceAssistantAudioSourceTest {
 
         assertEquals(ReplyPlayback.DEVICE, source.startReply(REPLY_URL, () -> {
         }));
+        verify(handler, never()).sendMessage(TTS_START);
+        runMicrophoneStopWait();
 
         InOrder inOrder = Mockito.inOrder(handler);
         inOrder.verify(handler).sendMessage(STT_VAD_END);
@@ -300,10 +301,36 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     }
 
     @Test
-    void passesTheDevicesNextRunToOpenHABsFollowUp() throws Exception {
+    void endsTheRunWhenTheReplyEndsBeforeTheDeviceGetsIt() throws Exception {
         startDialogRun().close();
         source.startReply(REPLY_URL, () -> {
         });
+
+        source.endReply();
+
+        verify(handler).sendMessage(RUN_END);
+        verify(handler, never()).sendMessage(TTS_END);
+    }
+
+    @Test
+    void asksTheDeviceToListenAgainWhenTheFollowUpStartsBeforeItGetsTheReply() throws Exception {
+        startDialogRun().close();
+        source.startReply(REPLY_URL, () -> {
+        });
+
+        source.getInputStream(source.getSupportedFormats().iterator().next());
+        runMicrophoneStopWait();
+
+        InOrder inOrder = Mockito.inOrder(handler);
+        inOrder.verify(handler).sendMessage(continueConversation(true));
+        inOrder.verify(handler).sendMessage(TTS_END);
+        verify(handler, never()).sendMessage(continueConversation(false));
+    }
+
+    @Test
+    void passesTheDevicesNextRunToOpenHABsFollowUp() throws Exception {
+        startDialogRun().close();
+        startDeviceReply();
 
         AudioStream followUp = source.getInputStream(source.getSupportedFormats().iterator().next());
         verify(handler).sendMessage(continueConversation(true));
@@ -319,8 +346,7 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     @Test
     void tellsTheDeviceNotToListenAgainWhenOpenHABStopsTheFollowUp() throws Exception {
         startDialogRun().close();
-        source.startReply(REPLY_URL, () -> {
-        });
+        startDeviceReply();
 
         source.getInputStream(source.getSupportedFormats().iterator().next()).close();
 
@@ -341,28 +367,78 @@ class ESPHomeVoiceAssistantAudioSourceTest {
         source.endReply();
 
         verify(handler, never()).sendMessage(continueConversation(true));
-        runLastScheduledTask();
+        takeScheduled(ESPHomeVoiceAssistantAudioSource.FOLLOW_UP_START_MS).run();
         assertEquals(-1, followUp.read());
     }
 
     @Test
     void endsAFollowUpThatStartsAfterTheDeviceHasPlayedTheReply() throws Exception {
         startDialogRun().close();
-        source.startReply(REPLY_URL, () -> {
-        });
+        startDeviceReply();
         source.endReply();
 
         AudioStream followUp = source.getInputStream(source.getSupportedFormats().iterator().next());
 
         verify(handler, never()).sendMessage(continueConversation(true));
-        runLastScheduledTask();
+        takeScheduled(ESPHomeVoiceAssistantAudioSource.FOLLOW_UP_START_MS).run();
         assertEquals(-1, followUp.read());
     }
 
-    private void runLastScheduledTask() {
-        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
-        verify(handler, atLeastOnce()).schedule(task.capture(), anyLong(), any());
-        task.getValue().run();
+    private void startDeviceReply() {
+        assertEquals(ReplyPlayback.DEVICE, source.startReply(REPLY_URL, () -> {
+        }));
+        runMicrophoneStopWait();
+    }
+
+    private void runMicrophoneStopWait() {
+        takeScheduled(0, ESPHomeVoiceAssistantAudioSource.MICROPHONE_STOP_MS).run();
+    }
+
+    private Runnable takeScheduled(long delayMs) {
+        return takeScheduled(delayMs, delayMs);
+    }
+
+    /**
+     * Removes the last task still scheduled with a delay in the range.
+     */
+    private Runnable takeScheduled(long minDelayMs, long maxDelayMs) {
+        for (int i = scheduled.size() - 1; i >= 0; i--) {
+            ScheduledTask task = scheduled.get(i);
+            if (task.delayMs >= minDelayMs && task.delayMs <= maxDelayMs) {
+                scheduled.remove(i);
+                return task.task;
+            }
+        }
+        throw new AssertionError("Nothing scheduled within " + minDelayMs + "-" + maxDelayMs + " ms");
+    }
+
+    /**
+     * A task that only runs when the test runs it.
+     */
+    private class ScheduledTask extends CompletableFuture<Void> implements ScheduledFuture<Void> {
+        private final Runnable task;
+        private final long delayMs;
+
+        ScheduledTask(Runnable task, long delayMs) {
+            this.task = task;
+            this.delayMs = delayMs;
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            scheduled.remove(this);
+            return super.cancel(mayInterruptIfRunning);
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(delayMs, TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public int compareTo(Delayed other) {
+            return Long.compare(delayMs, other.getDelay(TimeUnit.MILLISECONDS));
+        }
     }
 
     private static VoiceAssistantEventResponse continueConversation(boolean continueConversation) {

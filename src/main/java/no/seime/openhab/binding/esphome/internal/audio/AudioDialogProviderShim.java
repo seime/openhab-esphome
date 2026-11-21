@@ -22,6 +22,8 @@ import org.openhab.core.audio.AudioSource;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Starts an openHAB dialog for the device's wake word.
@@ -34,6 +36,7 @@ import org.osgi.framework.ServiceReference;
 public final class AudioDialogProviderShim {
 
     private static final String PROVIDER_CLASS = "org.openhab.core.audio.AudioDialogProvider";
+    private static final Logger LOGGER = LoggerFactory.getLogger(AudioDialogProviderShim.class);
 
     private AudioDialogProviderShim() {
     }
@@ -67,7 +70,7 @@ public final class AudioDialogProviderShim {
                         String.class, String.class, Runnable.class, Runnable.class);
                 trigger = (Runnable) startDialog.invoke(provider, sink, source, null, null, onAbort, onIdle);
             } catch (NoSuchMethodException e) {
-                // older openHAB doesn't report when the dialog is idle
+                LOGGER.debug("openHAB doesn't report when the voice dialog is idle, using the older dialog start");
                 Method startDialog = providerClass.getMethod("startDialog", AudioSink.class, AudioSource.class,
                         String.class, String.class, Runnable.class);
                 trigger = (Runnable) startDialog.invoke(provider, sink, source, null, null, onAbort);

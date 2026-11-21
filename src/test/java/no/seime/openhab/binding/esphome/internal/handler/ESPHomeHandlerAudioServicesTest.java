@@ -836,6 +836,8 @@ class ESPHomeHandlerAudioServicesTest {
     void letsTheDevicePlayRepliesItCanAnnounce() throws Exception {
         startReply(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT);
 
+        // once the device's microphone has stopped
+        verify(frameHelper, timeout(5000)).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
         InOrder inOrder = Mockito.inOrder(frameHelper);
         inOrder.verify(frameHelper).send(TTS_START);
         inOrder.verify(frameHelper)
@@ -852,10 +854,44 @@ class ESPHomeHandlerAudioServicesTest {
         verify(frameHelper, times(1)).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
     }
 
+    @Test
+    void playsURLStreamRepliesOnTheMediaPlayer() throws Exception {
+        AudioSink sink = startDialog(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT);
+        URLAudioStream reply = Mockito.mock(URLAudioStream.class);
+        when(reply.getURL()).thenReturn("http://example.com/reply.mp3");
+        when(reply.getFormat()).thenReturn(AudioFormat.MP3);
+
+        sink.processAndComplete(reply);
+
+        InOrder inOrder = Mockito.inOrder(frameHelper);
+        inOrder.verify(frameHelper).send(TTS_START);
+        inOrder.verify(frameHelper).send(MediaPlayerCommandRequest.newBuilder().setKey(11).setHasMediaUrl(true)
+                .setMediaUrl("http://example.com/reply.mp3").setHasAnnouncement(true).setAnnouncement(true).build());
+        verify(frameHelper, never()).send(VoiceAssistantEventResponse.newBuilder()
+                .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_END)
+                .addData(VoiceAssistantEventData.newBuilder().setName("url").setValue("http://example.com/reply.mp3"))
+                .build());
+    }
+
     /**
      * Runs a dialog up to its reply.
      */
     private void startReply(MediaPlayerFormatPurpose purpose) throws Exception {
+        AudioSink sink = startDialog(purpose);
+        AudioStream reply = Mockito.mock(AudioStream.class);
+        when(reply.getFormat()).thenReturn(AudioFormat.MP3);
+        when(audioHTTPServer.serve(any(), anyInt(), anyBoolean())).thenReturn(
+                new StreamServed("/audio/reply.mp3", reply, new java.util.concurrent.atomic.AtomicInteger(1),
+                        new java.util.concurrent.atomic.AtomicLong(0), false, new CompletableFuture<>()));
+        sink.processAndComplete(reply);
+    }
+
+    /**
+     * Runs a dialog until it waits for its reply.
+     *
+     * @return the dialog's sink
+     */
+    private AudioSink startDialog(MediaPlayerFormatPurpose purpose) throws Exception {
         DialogProvider provider = voiceDialogProvider();
         ArgumentCaptor<AudioSink> sink = ArgumentCaptor.forClass(AudioSink.class);
         when(provider.startDialog(sink.capture(), any(), any(), any(), any())).thenReturn(() -> {
@@ -876,13 +912,7 @@ class ESPHomeHandlerAudioServicesTest {
         invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
         stream.close();
         verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END));
-
-        AudioStream reply = Mockito.mock(AudioStream.class);
-        when(reply.getFormat()).thenReturn(AudioFormat.MP3);
-        when(audioHTTPServer.serve(any(), anyInt(), anyBoolean())).thenReturn(
-                new StreamServed("/audio/reply.mp3", reply, new java.util.concurrent.atomic.AtomicInteger(1),
-                        new java.util.concurrent.atomic.AtomicLong(0), false, new CompletableFuture<>()));
-        sink.getValue().processAndComplete(reply);
+        return sink.getValue();
     }
 
     private DialogProvider voiceDialogProvider() throws Exception {

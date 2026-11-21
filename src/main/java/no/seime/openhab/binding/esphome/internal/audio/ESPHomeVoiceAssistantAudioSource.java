@@ -61,13 +61,13 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     // must hold more audio than the stall timeout
     private static final int PIPE_SIZE = 128 * 1024;
     private static final long DEFAULT_READER_STALL_MS = 2000;
-    private static final long REPLY_TIMEOUT_SECONDS = 60;
-    // the device ignores RUN_END while its microphone is still stopping after STT_VAD_END
-    private static final long MICROPHONE_STOP_MS = 1000;
+    static final long REPLY_TIMEOUT_SECONDS = 60;
+    // while its microphone stops after STT_VAD_END, the device ignores RUN_END and may leave the microphone on
+    static final long MICROPHONE_STOP_MS = 1000;
     // openHAB may start the follow-up just after the reply has played
     private static final long FOLLOW_UP_WINDOW_MS = 2000;
     // how long the device has to start listening for the follow-up after the reply
-    private static final long FOLLOW_UP_START_MS = 3000;
+    static final long FOLLOW_UP_START_MS = 3000;
     // the device ignores TTS_START without text, and openHAB doesn't share the reply
     private static final String REPLY_TEXT = "...";
 
@@ -116,6 +116,9 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private ReplyState replyState = ReplyState.NONE;
     private @Nullable Runnable replyStopper;
     private @Nullable ScheduledFuture<?> replyTimeout;
+    // a reply the device gets once its microphone has stopped
+    private @Nullable String pendingReplyUrl;
+    private @Nullable ScheduledFuture<?> pendingReplyStart;
     private long listeningEndNanos;
     private boolean replyEnded;
     private long replyEndNanos;
@@ -396,32 +399,47 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
      */
     public ReplyPlayback startReply(@Nullable String url, Runnable stopPlayback) {
         synchronized (lock) {
-            boolean stoppedListening = false;
             if (streaming && dialogTrigger != null) {
                 // some speech-to-text services read until the reply plays
                 endRun();
                 endSession();
-                stoppedListening = true;
             }
             if (replyState != ReplyState.WAITING) {
                 return ReplyPlayback.NONE;
             }
             replyStopper = stopPlayback;
             scheduleReplyTimeout();
-            // the device keeps its microphone on if it gets the reply while the microphone is still stopping
-            if (url == null || stoppedListening) {
+            if (url == null) {
                 replyState = ReplyState.PLAYING;
                 sendTtsStart();
                 return ReplyPlayback.SINK;
             }
             // like Home Assistant, so the device can listen again after the reply
             replyState = ReplyState.DEVICE_PLAYING;
-            sendContinueConversation(false);
+            pendingReplyUrl = url;
+            long waitMs = MICROPHONE_STOP_MS - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - listeningEndNanos);
+            if (waitMs > 0) {
+                pendingReplyStart = handler.schedule(() -> sendReplyToDevice(url), waitMs, TimeUnit.MILLISECONDS);
+            } else {
+                sendReplyToDevice(url);
+            }
+            return ReplyPlayback.DEVICE;
+        }
+    }
+
+    private void sendReplyToDevice(String url) {
+        synchronized (lock) {
+            // the reply may have ended or been replaced while the microphone stopped
+            if (!url.equals(pendingReplyUrl)) {
+                return;
+            }
+            pendingReplyUrl = null;
+            pendingReplyStart = null;
+            sendContinueConversation(followUpWaiting);
             sendTtsStart();
             sendEvent(VoiceAssistantEventResponse.newBuilder().setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_END)
                     .addData(VoiceAssistantEventData.newBuilder().setName("url").setValue(url)).build());
             sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
-            return ReplyPlayback.DEVICE;
         }
     }
 
@@ -431,7 +449,8 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     }
 
     /**
-     * Sets whether the device listens again once it has played the reply.
+     * Sets whether the device listens again once it has played the reply. The device reads it when the reply has
+     * finished, so it can still change after RUN_END (checked against ESPHome 2026.7.3).
      */
     private void sendContinueConversation(boolean continueConversation) {
         sendEvent(VoiceAssistantEventResponse.newBuilder().setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_INTENT_END)
@@ -456,10 +475,17 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         if (replyState == ReplyState.DEVICE_PLAYING) {
             logger.debug("[{}] openHAB listens for a follow-up, asking the device to listen after the reply",
                     handler.getLogPrefix());
-            sendContinueConversation(true);
+            // otherwise it goes along with the reply
+            if (isReplySentToDevice()) {
+                sendContinueConversation(true);
+            }
         } else if (replyState != ReplyState.PLAYING) {
             scheduleFollowUpTimeout();
         }
+    }
+
+    private boolean isReplySentToDevice() {
+        return replyState == ReplyState.DEVICE_PLAYING && pendingReplyUrl == null;
     }
 
     private void scheduleFollowUpTimeout() {
@@ -535,15 +561,15 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         if (replyState == ReplyState.NONE) {
             return;
         }
-        boolean played = replyState == ReplyState.PLAYING || replyState == ReplyState.DEVICE_PLAYING;
-        // the device got RUN_END with the reply, and may already listen for a follow-up
-        boolean endRun = replyState != ReplyState.DEVICE_PLAYING;
+        boolean sentToDevice = isReplySentToDevice();
+        boolean played = replyState == ReplyState.PLAYING || sentToDevice;
         Runnable stopper = played && stopPlayback ? replyStopper : null;
         clearReply();
         if (stopper != null) {
             stopper.run();
         }
-        if (endRun) {
+        // the device got RUN_END with the reply, and may already listen for a follow-up
+        if (!sentToDevice) {
             sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
         }
         if (played) {
@@ -558,6 +584,13 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private void clearReply() {
         replyState = ReplyState.NONE;
         replyStopper = null;
+        replyEnded = false;
+        pendingReplyUrl = null;
+        ScheduledFuture<?> start = pendingReplyStart;
+        if (start != null) {
+            start.cancel(false);
+            pendingReplyStart = null;
+        }
         ScheduledFuture<?> timeout = replyTimeout;
         if (timeout != null) {
             timeout.cancel(false);
@@ -630,7 +663,7 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private void onStreamClosed() {
         synchronized (lock) {
             if (streamGroup.isEmpty()) {
-                if (followUpWaiting && replyState == ReplyState.DEVICE_PLAYING) {
+                if (followUpWaiting && isReplySentToDevice()) {
                     // openHAB stopped listening for the follow-up
                     sendContinueConversation(false);
                 }

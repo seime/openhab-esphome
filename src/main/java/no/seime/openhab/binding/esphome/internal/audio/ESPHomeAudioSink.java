@@ -179,15 +179,15 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
     }
 
     /**
+     * @param deviceUrl where the device can fetch the audio to play it as the dialog's reply, or null if it can't
      * @return true if the device plays the audio as the dialog's reply
      */
-    private boolean startReply(String url, boolean announcement) {
+    private boolean startReply(@Nullable String deviceUrl, boolean announcement) {
         ESPHomeVoiceAssistantAudioSource source = voiceAssistant;
         if (source == null) {
             return false;
         }
-        // the device plays replies as announcements
-        ReplyPlayback playback = source.startReply(announcement ? url : null, () -> stopReply(announcement));
+        ReplyPlayback playback = source.startReply(deviceUrl, () -> stopReply(announcement));
         if (playback != ReplyPlayback.NONE) {
             synchronized (playbackLock) {
                 replySource = source;
@@ -306,13 +306,14 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
                         }
                     }, STREAM_URL_TTL_SECONDS, TimeUnit.SECONDS);
                 }
-                play(urlAudioStream.getURL(), announcement);
+                // it completes only once it has played, too late to ask the device to listen for a follow-up
+                play(urlAudioStream.getURL(), announcement, false);
             } else {
                 synchronized (playbackLock) {
                     lastPlaybackWasAnnouncement = announcement;
                 }
                 StreamServed servedStream = audioHTTPServer.serve(audioStream, STREAM_URL_TTL_SECONDS, false);
-                play(URI.create(baseUrl + servedStream.url()).toString(), announcement);
+                play(URI.create(baseUrl + servedStream.url()).toString(), announcement, true);
                 servedStream.playEnd().whenComplete((ignored, error) -> {
                     if (error != null) {
                         runnableByAudioStream.remove(audioStream).completeExceptionally(error);
@@ -334,8 +335,12 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
         }
     }
 
-    private void play(String url, boolean announcement) throws ProtocolAPIError {
-        if (!startReply(url, announcement)) {
+    /**
+     * @param replyByDevice whether the device may play the audio as the dialog's reply
+     */
+    private void play(String url, boolean announcement, boolean replyByDevice) throws ProtocolAPIError {
+        // the device plays replies as announcements
+        if (!startReply(announcement && replyByDevice ? url : null, announcement)) {
             handler.sendMessage(MediaPlayerCommandRequest.newBuilder().setKey(mediaPlayerKey).setHasMediaUrl(true)
                     .setMediaUrl(url).setHasAnnouncement(true).setAnnouncement(announcement).build());
         }
