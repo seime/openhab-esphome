@@ -39,12 +39,13 @@ public final class AudioDialogProviderShim {
     }
 
     /**
+     * @param onIdle runs when the dialog is idle, if openHAB supports it
      * @return the wake word trigger
      * @throws IllegalStateException if the dialog can't start yet
      * @throws UnsupportedOperationException if openHAB has no compatible dialog provider
      */
     public static Runnable startDialog(BundleContext bundleContext, AudioSink sink, AudioSource source,
-            Runnable onAbort) {
+            Runnable onAbort, Runnable onIdle) {
         ServiceReference<?> reference = bundleContext.getServiceReference(PROVIDER_CLASS);
         if (reference == null) {
             if (!providerExists()) {
@@ -59,9 +60,18 @@ public final class AudioDialogProviderShim {
                 throw new IllegalStateException("voice service not running");
             }
             // must come from the service's bundle
-            Method startDialog = providerBundle.loadClass(PROVIDER_CLASS).getMethod("startDialog", AudioSink.class,
-                    AudioSource.class, String.class, String.class, Runnable.class);
-            Runnable trigger = (Runnable) startDialog.invoke(provider, sink, source, null, null, onAbort);
+            Class<?> providerClass = providerBundle.loadClass(PROVIDER_CLASS);
+            Runnable trigger;
+            try {
+                Method startDialog = providerClass.getMethod("startDialog", AudioSink.class, AudioSource.class,
+                        String.class, String.class, Runnable.class, Runnable.class);
+                trigger = (Runnable) startDialog.invoke(provider, sink, source, null, null, onAbort, onIdle);
+            } catch (NoSuchMethodException e) {
+                // older openHAB doesn't report when the dialog is idle
+                Method startDialog = providerClass.getMethod("startDialog", AudioSink.class, AudioSource.class,
+                        String.class, String.class, Runnable.class);
+                trigger = (Runnable) startDialog.invoke(provider, sink, source, null, null, onAbort);
+            }
             if (trigger == null) {
                 throw new IllegalStateException("openHAB didn't start the dialog");
             }

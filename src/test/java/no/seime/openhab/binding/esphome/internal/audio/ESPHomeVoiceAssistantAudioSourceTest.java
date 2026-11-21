@@ -1,13 +1,14 @@
 package no.seime.openhab.binding.esphome.internal.audio;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +40,7 @@ import io.esphome.api.VoiceAssistantEventResponse;
 import io.esphome.api.VoiceAssistantRequest;
 import io.esphome.api.VoiceAssistantRequestFlag;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
+import no.seime.openhab.binding.esphome.internal.audio.ESPHomeVoiceAssistantAudioSource.ReplyPlayback;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,6 +59,10 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     private static final VoiceAssistantEventResponse TTS_START = VoiceAssistantEventResponse.newBuilder()
             .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_START)
             .addData(VoiceAssistantEventData.newBuilder().setName("text").setValue("...")).build();
+    private static final String REPLY_URL = "http://openhab:8080/audio/reply";
+    private static final VoiceAssistantEventResponse TTS_END = VoiceAssistantEventResponse.newBuilder()
+            .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_END)
+            .addData(VoiceAssistantEventData.newBuilder().setName("url").setValue(REPLY_URL)).build();
 
     @Mock
     private ESPHomeHandler handler;
@@ -188,7 +194,7 @@ class ESPHomeVoiceAssistantAudioSourceTest {
         startDialogRun().close();
 
         verify(handler).sendMessage(STT_VAD_END);
-        assertTrue(source.startReply(() -> {
+        assertEquals(ReplyPlayback.SINK, source.startReply(null, () -> {
         }));
         verify(handler).sendMessage(TTS_START);
         verify(handler, never()).sendMessage(RUN_END);
@@ -198,18 +204,20 @@ class ESPHomeVoiceAssistantAudioSourceTest {
     void stopsTheMicrophoneWhenTheReplyPlaysWhileListening() throws Exception {
         AudioStream stream = startDialogRun();
 
-        assertTrue(source.startReply(() -> {
+        // the device can't play it while its microphone stops
+        assertEquals(ReplyPlayback.SINK, source.startReply(REPLY_URL, () -> {
         }));
 
         InOrder inOrder = Mockito.inOrder(handler);
         inOrder.verify(handler).sendMessage(STT_VAD_END);
         inOrder.verify(handler).sendMessage(TTS_START);
+        verify(handler, never()).sendMessage(TTS_END);
         assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertEquals(-1, stream.read()));
     }
 
     @Test
     void ignoresAudioThatIsNotAReply() throws Exception {
-        assertFalse(source.startReply(() -> {
+        assertEquals(ReplyPlayback.NONE, source.startReply(null, () -> {
         }));
         verify(handler, never()).sendMessage(TTS_START);
     }
@@ -223,8 +231,145 @@ class ESPHomeVoiceAssistantAudioSourceTest {
         timeout.getValue().run();
 
         verify(handler).sendMessage(RUN_END);
-        assertFalse(source.startReply(() -> {
+        assertEquals(ReplyPlayback.NONE, source.startReply(null, () -> {
         }));
+    }
+
+    @Test
+    void endsTheRunOnceTheMicrophoneHasStoppedWhenTheDialogFinishesWithoutAReply() throws Exception {
+        startDialogRun().close();
+        verify(handler).sendMessage(STT_VAD_END);
+
+        source.onDialogIdle();
+        verify(handler, never()).sendMessage(RUN_END);
+
+        ArgumentCaptor<Runnable> endRun = ArgumentCaptor.forClass(Runnable.class);
+        ArgumentCaptor<Long> delay = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<TimeUnit> unit = ArgumentCaptor.forClass(TimeUnit.class);
+        verify(handler, times(2)).schedule(endRun.capture(), delay.capture(), unit.capture());
+        assertTrue(unit.getValue().toMillis(delay.getValue()) > 0);
+        endRun.getValue().run();
+
+        verify(handler).sendMessage(RUN_END);
+        assertEquals(ReplyPlayback.NONE, source.startReply(null, () -> {
+        }));
+    }
+
+    @Test
+    void doesNotEndTheNextRunWhenTheDialogFinishedWithoutAReply() throws Exception {
+        startDialogRun().close();
+        source.onDialogIdle();
+        ArgumentCaptor<Runnable> endRun = ArgumentCaptor.forClass(Runnable.class);
+        verify(handler, times(2)).schedule(endRun.capture(), anyLong(), any());
+
+        AudioStream stream = startDialogRun();
+        endRun.getValue().run();
+
+        verify(handler, never()).sendMessage(RUN_END);
+        stream.close();
+    }
+
+    @Test
+    void keepsTheRunUntilTheReplyHasPlayedWhenTheDialogFinishes() throws Exception {
+        startDialogRun().close();
+        assertEquals(ReplyPlayback.SINK, source.startReply(null, () -> {
+        }));
+
+        source.onDialogIdle();
+        verify(handler, never()).sendMessage(RUN_END);
+
+        source.endReply();
+        verify(handler).sendMessage(RUN_END);
+    }
+
+    @Test
+    void letsTheDevicePlayTheReplyAndEndTheRun() throws Exception {
+        startDialogRun().close();
+
+        assertEquals(ReplyPlayback.DEVICE, source.startReply(REPLY_URL, () -> {
+        }));
+
+        InOrder inOrder = Mockito.inOrder(handler);
+        inOrder.verify(handler).sendMessage(STT_VAD_END);
+        inOrder.verify(handler).sendMessage(continueConversation(false));
+        inOrder.verify(handler).sendMessage(TTS_START);
+        inOrder.verify(handler).sendMessage(TTS_END);
+        inOrder.verify(handler).sendMessage(RUN_END);
+        source.endReply();
+        verify(handler, times(1)).sendMessage(RUN_END);
+    }
+
+    @Test
+    void passesTheDevicesNextRunToOpenHABsFollowUp() throws Exception {
+        startDialogRun().close();
+        source.startReply(REPLY_URL, () -> {
+        });
+
+        AudioStream followUp = source.getInputStream(source.getSupportedFormats().iterator().next());
+        verify(handler).sendMessage(continueConversation(true));
+        source.endReply();
+
+        // the device listens again once it has played the reply
+        source.handleVoiceAssistantRequest(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        source.handleVoiceAssistantAudio(audio());
+        assertEquals(320, followUp.read(new byte[320]));
+        followUp.close();
+    }
+
+    @Test
+    void tellsTheDeviceNotToListenAgainWhenOpenHABStopsTheFollowUp() throws Exception {
+        startDialogRun().close();
+        source.startReply(REPLY_URL, () -> {
+        });
+
+        source.getInputStream(source.getSupportedFormats().iterator().next()).close();
+
+        InOrder inOrder = Mockito.inOrder(handler);
+        inOrder.verify(handler).sendMessage(continueConversation(false));
+        inOrder.verify(handler).sendMessage(continueConversation(true));
+        inOrder.verify(handler).sendMessage(continueConversation(false));
+    }
+
+    @Test
+    void endsAFollowUpTheDeviceCannotListenFor() throws Exception {
+        startDialogRun().close();
+        // the device only listens again after replies it plays itself
+        source.startReply(null, () -> {
+        });
+
+        AudioStream followUp = source.getInputStream(source.getSupportedFormats().iterator().next());
+        source.endReply();
+
+        verify(handler, never()).sendMessage(continueConversation(true));
+        runLastScheduledTask();
+        assertEquals(-1, followUp.read());
+    }
+
+    @Test
+    void endsAFollowUpThatStartsAfterTheDeviceHasPlayedTheReply() throws Exception {
+        startDialogRun().close();
+        source.startReply(REPLY_URL, () -> {
+        });
+        source.endReply();
+
+        AudioStream followUp = source.getInputStream(source.getSupportedFormats().iterator().next());
+
+        verify(handler, never()).sendMessage(continueConversation(true));
+        runLastScheduledTask();
+        assertEquals(-1, followUp.read());
+    }
+
+    private void runLastScheduledTask() {
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(handler, atLeastOnce()).schedule(task.capture(), anyLong(), any());
+        task.getValue().run();
+    }
+
+    private static VoiceAssistantEventResponse continueConversation(boolean continueConversation) {
+        return VoiceAssistantEventResponse.newBuilder().setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_INTENT_END)
+                .addData(VoiceAssistantEventData.newBuilder().setName("continue_conversation")
+                        .setValue(continueConversation ? "1" : "0"))
+                .build();
     }
 
     private AudioStream startDialogRun() throws Exception {

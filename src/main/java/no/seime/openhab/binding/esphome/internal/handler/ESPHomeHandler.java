@@ -448,7 +448,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         Runnable trigger;
         try {
             trigger = AudioDialogProviderShim.startDialog(bundleContext, sink, source,
-                    () -> onVoiceDialogStopped(source, stopped));
+                    () -> onVoiceDialogStopped(source, stopped), source::onDialogIdle);
         } catch (UnsupportedOperationException e) {
             logger.debug("[{}] Voice dialog not supported: {}", logPrefix, e.getMessage());
             return false;
@@ -1048,6 +1048,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             if (source != null) {
                 source.handleVoiceAssistantAudio(voiceAssistantAudio);
             }
+        } else if (message instanceof VoiceAssistantAnnounceFinished) {
+            // the media player state already shows when a reply has played
+            logger.debug("[{}] Device finished playing a voice assistant reply", logPrefix);
         } else if (message instanceof HomeassistantActionRequest serviceResponse) {
             Map<String, String> data = convertPbListToMap(serviceResponse.getDataList());
             Map<String, String> dataTemplate = convertPbListToMap(serviceResponse.getDataTemplateList());
