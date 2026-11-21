@@ -787,7 +787,7 @@ class ESPHomeHandlerAudioServicesTest {
 
     @Test
     void endsTheRunWhenTheReplyHasPlayed() throws Exception {
-        startReply();
+        startReply(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_DEFAULT);
 
         InOrder inOrder = Mockito.inOrder(frameHelper);
         inOrder.verify(frameHelper).send(TTS_START);
@@ -804,22 +804,62 @@ class ESPHomeHandlerAudioServicesTest {
     }
 
     @Test
+    void endsTheRunWhenOpenHABReportsTheDialogIdle() throws Exception {
+        IdleDialogProvider provider = voiceDialogProvider(IdleDialogProvider.class);
+        ArgumentCaptor<Runnable> onIdle = ArgumentCaptor.forClass(Runnable.class);
+        when(provider.startDialog(any(), any(), any(), any(), any(), onIdle.capture())).thenReturn(() -> {
+        });
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+
+        AudioStream stream = openStream(source);
+        invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(true).build());
+        stream.close();
+        verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END));
+        verify(frameHelper, never()).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+
+        onIdle.getValue().run();
+
+        verify(frameHelper, timeout(5000)).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+        verify(provider, never()).startDialog(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void stopsTheReplyWhenTheDeviceStopsTheRun() throws Exception {
-        startReply();
+        startReply(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_DEFAULT);
 
         invokeHandleConnected(VoiceAssistantRequest.newBuilder().setStart(false).build());
 
         InOrder inOrder = Mockito.inOrder(frameHelper);
         inOrder.verify(frameHelper)
                 .send(MediaPlayerCommandRequest.newBuilder().setKey(11).setHasCommand(true).setHasAnnouncement(true)
-                        .setAnnouncement(true).setCommand(MediaPlayerCommand.MEDIA_PLAYER_COMMAND_STOP).build());
+                        .setAnnouncement(false).setCommand(MediaPlayerCommand.MEDIA_PLAYER_COMMAND_STOP).build());
         inOrder.verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+    }
+
+    @Test
+    void letsTheDevicePlayRepliesItCanAnnounce() throws Exception {
+        startReply(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT);
+
+        InOrder inOrder = Mockito.inOrder(frameHelper);
+        inOrder.verify(frameHelper).send(TTS_START);
+        inOrder.verify(frameHelper)
+                .send(Mockito.<VoiceAssistantEventResponse> argThat(
+                        e -> e.getEventType() == VoiceAssistantEvent.VOICE_ASSISTANT_TTS_END
+                                && e.getData(0).getValue().endsWith("/audio/reply.mp3")));
+        inOrder.verify(frameHelper).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
+        verify(frameHelper, never()).send(Mockito.isA(MediaPlayerCommandRequest.class));
+
+        invokeHandleConnected(MediaPlayerStateResponse.newBuilder().setKey(11)
+                .setState(MediaPlayerState.MEDIA_PLAYER_STATE_ANNOUNCING).build());
+        invokeHandleConnected(MediaPlayerStateResponse.newBuilder().setKey(11)
+                .setState(MediaPlayerState.MEDIA_PLAYER_STATE_IDLE).build());
+        verify(frameHelper, times(1)).send(event(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END));
     }
 
     /**
      * Runs a dialog up to its reply.
      */
-    private void startReply() throws Exception {
+    private void startReply(MediaPlayerFormatPurpose purpose) throws Exception {
         DialogProvider provider = voiceDialogProvider();
         ArgumentCaptor<AudioSink> sink = ArgumentCaptor.forClass(AudioSink.class);
         when(provider.startDialog(sink.capture(), any(), any(), any(), any())).thenReturn(() -> {
@@ -828,11 +868,12 @@ class ESPHomeHandlerAudioServicesTest {
         when(bundleContext.registerService(eq(AudioSource.class), source.capture(), any(Dictionary.class)))
                 .thenReturn(audioSourceRegistration);
         invokeHandleConnected(voiceAssistantDeviceInfo());
-        invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
-                .setName("Speaker One")
-                .addSupportedFormats(MediaPlayerSupportedFormat.newBuilder().setFormat("MP3")
-                        .setPurpose(MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT).build())
-                .build());
+        invokeHandleConnected(
+                ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
+                        .setName("Speaker One")
+                        .addSupportedFormats(
+                                MediaPlayerSupportedFormat.newBuilder().setFormat("MP3").setPurpose(purpose).build())
+                        .build());
         invokeHandleConnected(ListEntitiesDoneResponse.getDefaultInstance());
 
         AudioStream stream = openStream(source.getValue());
@@ -849,16 +890,20 @@ class ESPHomeHandlerAudioServicesTest {
     }
 
     private DialogProvider voiceDialogProvider() throws Exception {
+        return voiceDialogProvider(DialogProvider.class);
+    }
+
+    private <T extends DialogProvider> T voiceDialogProvider(Class<T> type) throws Exception {
         ESPHomeConfiguration config = new ESPHomeConfiguration();
         config.voiceDialog = true;
         setField("config", config);
         when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
                 .thenReturn(audioSinkRegistration);
-        DialogProvider provider = Mockito.mock(DialogProvider.class);
+        T provider = Mockito.mock(type);
         ServiceReference<?> reference = Mockito.mock(ServiceReference.class);
         Mockito.doReturn(reference).when(bundleContext).getServiceReference(DIALOG_PROVIDER);
         Mockito.doReturn(dialogProviderBundle).when(reference).getBundle();
-        Mockito.doReturn(DialogProvider.class).when(dialogProviderBundle).loadClass(DIALOG_PROVIDER);
+        Mockito.doReturn(type).when(dialogProviderBundle).loadClass(DIALOG_PROVIDER);
         Mockito.doReturn(provider).when(bundleContext).getService(reference);
         return provider;
     }
@@ -913,6 +958,15 @@ class ESPHomeHandlerAudioServicesTest {
         @Nullable
         Runnable startDialog(AudioSink audioSink, AudioSource audioSource, @Nullable String locationItem,
                 @Nullable String listeningItem, @Nullable Runnable onAbort);
+    }
+
+    /**
+     * Stand-in for an AudioDialogProvider that reports when the dialog is idle.
+     */
+    public interface IdleDialogProvider extends DialogProvider {
+        @Nullable
+        Runnable startDialog(AudioSink audioSink, AudioSource audioSource, @Nullable String locationItem,
+                @Nullable String listeningItem, @Nullable Runnable onAbort, @Nullable Runnable onIdle);
     }
 
     @Test
