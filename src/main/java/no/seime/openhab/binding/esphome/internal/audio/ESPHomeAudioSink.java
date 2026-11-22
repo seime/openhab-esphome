@@ -40,6 +40,7 @@ import io.esphome.api.MediaPlayerFormatPurpose;
 import io.esphome.api.MediaPlayerState;
 import io.esphome.api.MediaPlayerStateResponse;
 import io.esphome.api.MediaPlayerSupportedFormat;
+import no.seime.openhab.binding.esphome.internal.audio.ESPHomeVoiceAssistantAudioSource.ReplyPlayback;
 import no.seime.openhab.binding.esphome.internal.comm.ProtocolAPIError;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
@@ -177,14 +178,23 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
         }
     }
 
-    private void startReply(boolean announcement) {
+    /**
+     * @param deviceUrl where the device can fetch the audio to play it as the dialog's reply, or null if it can't
+     * @return true if the device plays the audio as the dialog's reply
+     */
+    private boolean startReply(@Nullable String deviceUrl, boolean announcement) {
         ESPHomeVoiceAssistantAudioSource source = voiceAssistant;
-        if (source != null && source.startReply(() -> stopReply(announcement))) {
+        if (source == null) {
+            return false;
+        }
+        ReplyPlayback playback = source.startReply(deviceUrl, () -> stopReply(announcement));
+        if (playback != ReplyPlayback.NONE) {
             synchronized (playbackLock) {
                 replySource = source;
                 replyStarted = false;
             }
         }
+        return playback == ReplyPlayback.DEVICE;
     }
 
     private void endReply() {
@@ -275,7 +285,6 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
 
         try {
             boolean announcement = isAnnouncement(audioStream.getFormat());
-            startReply(announcement);
             if (audioStream instanceof URLAudioStream urlAudioStream) {
                 // For URLAudioStream, track playback completion by listening to playback state updates from the ESPHome
                 // device in updateState()
@@ -297,20 +306,14 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
                         }
                     }, STREAM_URL_TTL_SECONDS, TimeUnit.SECONDS);
                 }
-                handler.sendMessage(MediaPlayerCommandRequest.newBuilder().setKey(mediaPlayerKey).setHasMediaUrl(true)
-                        .setMediaUrl(urlAudioStream.getURL()).setHasAnnouncement(true).setAnnouncement(announcement)
-                        .build());
+                // it completes only once it has played, too late to ask the device to listen for a follow-up
+                play(urlAudioStream.getURL(), announcement, false);
             } else {
                 synchronized (playbackLock) {
                     lastPlaybackWasAnnouncement = announcement;
                 }
                 StreamServed servedStream = audioHTTPServer.serve(audioStream, STREAM_URL_TTL_SECONDS, false);
-                String absoluteUrl = URI.create(baseUrl + servedStream.url()).toString();
-
-                MediaPlayerCommandRequest request = MediaPlayerCommandRequest.newBuilder().setKey(mediaPlayerKey)
-                        .setHasMediaUrl(true).setMediaUrl(absoluteUrl).setHasAnnouncement(true)
-                        .setAnnouncement(announcement).build();
-                handler.sendMessage(request);
+                play(URI.create(baseUrl + servedStream.url()).toString(), announcement, true);
                 servedStream.playEnd().whenComplete((ignored, error) -> {
                     if (error != null) {
                         runnableByAudioStream.remove(audioStream).completeExceptionally(error);
@@ -329,6 +332,17 @@ public class ESPHomeAudioSink extends AudioSinkAsync {
             logger.debug("[{}] Unable to send audio stream to ESPHome media player {}", handler.getLogPrefix(),
                     mediaPlayerObjectId, e);
             throw new IllegalStateException("Unable to send audio stream to ESPHome media player", e);
+        }
+    }
+
+    /**
+     * @param replyByDevice whether the device may play the audio as the dialog's reply
+     */
+    private void play(String url, boolean announcement, boolean replyByDevice) throws ProtocolAPIError {
+        // the device plays replies as announcements
+        if (!startReply(announcement && replyByDevice ? url : null, announcement)) {
+            handler.sendMessage(MediaPlayerCommandRequest.newBuilder().setKey(mediaPlayerKey).setHasMediaUrl(true)
+                    .setMediaUrl(url).setHasAnnouncement(true).setAnnouncement(announcement).build());
         }
     }
 

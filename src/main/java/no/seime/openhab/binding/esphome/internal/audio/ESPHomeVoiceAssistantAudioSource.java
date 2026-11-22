@@ -13,6 +13,7 @@
 package no.seime.openhab.binding.esphome.internal.audio;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -60,14 +61,35 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     // must hold more audio than the stall timeout
     private static final int PIPE_SIZE = 128 * 1024;
     private static final long DEFAULT_READER_STALL_MS = 2000;
-    private static final long REPLY_TIMEOUT_SECONDS = 60;
+    static final long REPLY_TIMEOUT_SECONDS = 60;
+    // while its microphone stops after STT_VAD_END, the device ignores RUN_END and may leave the microphone on
+    static final long MICROPHONE_STOP_MS = 1000;
+    // openHAB may start the follow-up just after the reply has played
+    private static final long FOLLOW_UP_WINDOW_MS = 2000;
+    // how long the device has to start listening for the follow-up after the reply
+    static final long FOLLOW_UP_START_MS = 3000;
     // the device ignores TTS_START without text, and openHAB doesn't share the reply
     private static final String REPLY_TEXT = "...";
+
+    /**
+     * Who plays the audio a sink was given.
+     */
+    public enum ReplyPlayback {
+        /** The audio isn't the dialog's reply. */
+        NONE,
+        /** The sink plays the reply. */
+        SINK,
+        /** The device plays the reply, so the sink must not. */
+        DEVICE
+    }
 
     private enum ReplyState {
         NONE,
         WAITING,
-        PLAYING
+        // the sink plays the reply, and the run ends when it has played
+        PLAYING,
+        // the device plays the reply and ends the run itself
+        DEVICE_PLAYING
     }
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeVoiceAssistantAudioSource.class);
@@ -94,6 +116,14 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private ReplyState replyState = ReplyState.NONE;
     private @Nullable Runnable replyStopper;
     private @Nullable ScheduledFuture<?> replyTimeout;
+    // a reply the device gets once its microphone has stopped
+    private @Nullable String pendingReplyUrl;
+    private @Nullable ScheduledFuture<?> pendingReplyStart;
+    private long listeningEndNanos;
+    private boolean replyEnded;
+    private long replyEndNanos;
+    private boolean followUpWaiting;
+    private @Nullable ScheduledFuture<?> followUpTimeout;
 
     public ESPHomeVoiceAssistantAudioSource(ESPHomeHandler handler) {
         this(handler, DEFAULT_READER_STALL_MS);
@@ -150,6 +180,9 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
                 stream.onClose(() -> openStreams.remove(trackedStream));
                 stream.onClose(this::onStreamClosed);
                 ensureSubscribed();
+                if (isFollowUp()) {
+                    startFollowUp();
+                }
                 return trackedStream;
             }
         } catch (IOException | ProtocolAPIError e) {
@@ -278,6 +311,7 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
             return;
         }
         clearReply();
+        cancelFollowUp();
 
         if (streamGroup.isEmpty()) {
             try {
@@ -359,10 +393,11 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     /**
      * Called before the dialog's sink plays audio.
      *
+     * @param url the audio for the device to play in the run, or null if only the sink can play it
      * @param stopPlayback stops the audio if the device stops the run
-     * @return true if the audio is the dialog's reply
+     * @return who plays the audio
      */
-    public boolean startReply(Runnable stopPlayback) {
+    public ReplyPlayback startReply(@Nullable String url, Runnable stopPlayback) {
         synchronized (lock) {
             if (streaming && dialogTrigger != null) {
                 // some speech-to-text services read until the reply plays
@@ -370,15 +405,123 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
                 endSession();
             }
             if (replyState != ReplyState.WAITING) {
-                return false;
+                return ReplyPlayback.NONE;
             }
-            replyState = ReplyState.PLAYING;
             replyStopper = stopPlayback;
             scheduleReplyTimeout();
-            sendEvent(VoiceAssistantEventResponse.newBuilder()
-                    .setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_START)
-                    .addData(VoiceAssistantEventData.newBuilder().setName("text").setValue(REPLY_TEXT)).build());
-            return true;
+            if (url == null) {
+                replyState = ReplyState.PLAYING;
+                sendTtsStart();
+                return ReplyPlayback.SINK;
+            }
+            // like Home Assistant, so the device can listen again after the reply
+            replyState = ReplyState.DEVICE_PLAYING;
+            pendingReplyUrl = url;
+            long waitMs = MICROPHONE_STOP_MS - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - listeningEndNanos);
+            if (waitMs > 0) {
+                pendingReplyStart = handler.schedule(() -> sendReplyToDevice(url), waitMs, TimeUnit.MILLISECONDS);
+            } else {
+                sendReplyToDevice(url);
+            }
+            return ReplyPlayback.DEVICE;
+        }
+    }
+
+    private void sendReplyToDevice(String url) {
+        synchronized (lock) {
+            // the reply may have ended or been replaced while the microphone stopped
+            if (!url.equals(pendingReplyUrl)) {
+                return;
+            }
+            pendingReplyUrl = null;
+            pendingReplyStart = null;
+            sendContinueConversation(followUpWaiting);
+            sendTtsStart();
+            sendEvent(VoiceAssistantEventResponse.newBuilder().setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_END)
+                    .addData(VoiceAssistantEventData.newBuilder().setName("url").setValue(url)).build());
+            sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
+        }
+    }
+
+    private void sendTtsStart() {
+        sendEvent(VoiceAssistantEventResponse.newBuilder().setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_TTS_START)
+                .addData(VoiceAssistantEventData.newBuilder().setName("text").setValue(REPLY_TEXT)).build());
+    }
+
+    /**
+     * Sets whether the device listens again once it has played the reply. The device reads it when the reply has
+     * finished, so it can still change after RUN_END (checked against ESPHome 2026.7.3).
+     */
+    private void sendContinueConversation(boolean continueConversation) {
+        sendEvent(VoiceAssistantEventResponse.newBuilder().setEventType(VoiceAssistantEvent.VOICE_ASSISTANT_INTENT_END)
+                .addData(VoiceAssistantEventData.newBuilder().setName("continue_conversation")
+                        .setValue(continueConversation ? "1" : "0"))
+                .build());
+    }
+
+    /**
+     * A stream opened outside a run, while or just after the reply plays, is openHAB listening for a follow-up.
+     */
+    private boolean isFollowUp() {
+        if (dialogTrigger == null || streaming || pendingDialogRequests > 0) {
+            return false;
+        }
+        return replyState == ReplyState.PLAYING || replyState == ReplyState.DEVICE_PLAYING || (replyEnded
+                && TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - replyEndNanos) < FOLLOW_UP_WINDOW_MS);
+    }
+
+    private void startFollowUp() {
+        followUpWaiting = true;
+        if (replyState == ReplyState.DEVICE_PLAYING) {
+            logger.debug("[{}] openHAB listens for a follow-up, asking the device to listen after the reply",
+                    handler.getLogPrefix());
+            // otherwise it goes along with the reply
+            if (isReplySentToDevice()) {
+                sendContinueConversation(true);
+            }
+        } else if (replyState != ReplyState.PLAYING) {
+            scheduleFollowUpTimeout();
+        }
+    }
+
+    private boolean isReplySentToDevice() {
+        return replyState == ReplyState.DEVICE_PLAYING && pendingReplyUrl == null;
+    }
+
+    private void scheduleFollowUpTimeout() {
+        ScheduledFuture<?> timeout = followUpTimeout;
+        if (timeout != null) {
+            timeout.cancel(false);
+        }
+        followUpTimeout = handler.schedule(this::onFollowUpTimeout, FOLLOW_UP_START_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private void cancelFollowUp() {
+        followUpWaiting = false;
+        ScheduledFuture<?> timeout = followUpTimeout;
+        if (timeout != null) {
+            timeout.cancel(false);
+            followUpTimeout = null;
+        }
+    }
+
+    /**
+     * Ends openHAB's follow-up if the device didn't start a run for it.
+     */
+    private void onFollowUpTimeout() {
+        synchronized (lock) {
+            if (!followUpWaiting || streaming) {
+                return;
+            }
+            logger.debug("[{}] Device didn't listen for the follow-up, closing its stream", handler.getLogPrefix());
+            cancelFollowUp();
+            for (ReadTrackingStream stream : List.copyOf(openStreams)) {
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    logger.debug("[{}] Failed to close follow-up stream", handler.getLogPrefix(), e);
+                }
+            }
         }
     }
 
@@ -391,21 +534,63 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
         }
     }
 
+    /**
+     * Called when the dialog is idle. Ends the run if no reply is coming.
+     */
+    public void onDialogIdle() {
+        synchronized (lock) {
+            // a reply that is still playing ends the run when it finishes
+            if (replyState != ReplyState.WAITING) {
+                return;
+            }
+            long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - listeningEndNanos);
+            scheduleReplyEnd(this::onNoReply, Math.max(0, MICROPHONE_STOP_MS - elapsedMs), TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void onNoReply() {
+        synchronized (lock) {
+            if (replyState == ReplyState.WAITING) {
+                logger.debug("[{}] Dialog finished without a reply, ending the run", handler.getLogPrefix());
+                endReply(false);
+            }
+        }
+    }
+
     private void endReply(boolean stopPlayback) {
         if (replyState == ReplyState.NONE) {
             return;
         }
-        Runnable stopper = replyState == ReplyState.PLAYING && stopPlayback ? replyStopper : null;
+        boolean sentToDevice = isReplySentToDevice();
+        boolean played = replyState == ReplyState.PLAYING || sentToDevice;
+        Runnable stopper = played && stopPlayback ? replyStopper : null;
         clearReply();
         if (stopper != null) {
             stopper.run();
         }
-        sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
+        // the device got RUN_END with the reply, and may already listen for a follow-up
+        if (!sentToDevice) {
+            sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_RUN_END);
+        }
+        if (played) {
+            replyEnded = true;
+            replyEndNanos = System.nanoTime();
+            if (followUpWaiting) {
+                scheduleFollowUpTimeout();
+            }
+        }
     }
 
     private void clearReply() {
         replyState = ReplyState.NONE;
         replyStopper = null;
+        replyEnded = false;
+        pendingReplyUrl = null;
+        ScheduledFuture<?> start = pendingReplyStart;
+        if (start != null) {
+            start.cancel(false);
+            pendingReplyStart = null;
+        }
         ScheduledFuture<?> timeout = replyTimeout;
         if (timeout != null) {
             timeout.cancel(false);
@@ -414,11 +599,15 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     }
 
     private void scheduleReplyTimeout() {
+        scheduleReplyEnd(this::onReplyTimeout, REPLY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void scheduleReplyEnd(Runnable task, long delay, TimeUnit unit) {
         ScheduledFuture<?> timeout = replyTimeout;
         if (timeout != null) {
             timeout.cancel(false);
         }
-        replyTimeout = handler.schedule(this::onReplyTimeout, REPLY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        replyTimeout = handler.schedule(task, delay, unit);
     }
 
     private void onReplyTimeout() {
@@ -435,6 +624,7 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
             closed = true;
             dialogTrigger = null;
             clearReply();
+            cancelFollowUp();
             endSession();
             unsubscribe();
             audioStreamExecutor.shutdownNow();
@@ -473,6 +663,11 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
     private void onStreamClosed() {
         synchronized (lock) {
             if (streamGroup.isEmpty()) {
+                if (followUpWaiting && isReplySentToDevice()) {
+                    // openHAB stopped listening for the follow-up
+                    sendContinueConversation(false);
+                }
+                cancelFollowUp();
                 endRun();
                 endSession();
                 if (dialogTrigger == null) {
@@ -494,6 +689,7 @@ public class ESPHomeVoiceAssistantAudioSource implements AudioSource {
             return;
         }
         sendEvent(VoiceAssistantEvent.VOICE_ASSISTANT_STT_VAD_END);
+        listeningEndNanos = System.nanoTime();
         replyState = ReplyState.WAITING;
         scheduleReplyTimeout();
     }
