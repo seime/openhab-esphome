@@ -23,8 +23,7 @@
 package com.southernstorm.noise.tests;
 
 import java.io.UnsupportedEncodingException;
-
-import javax.xml.bind.DatatypeConverter;
+import java.util.HexFormat;
 
 public class TestUtils {
 
@@ -40,7 +39,7 @@ public class TestUtils {
      */
     public static byte[] stringToData(String data) {
         if (data.startsWith("0x")) {
-            return DatatypeConverter.parseHexBinary(data.substring(2));
+            return HexFormat.of().parseHex(data.substring(2));
         } else {
             try {
                 return data.getBytes("UTF-8");

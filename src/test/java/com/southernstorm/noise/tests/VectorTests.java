@@ -26,10 +26,10 @@ import static org.junit.Assert.*;
 
 import java.io.*;
 import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.ShortBufferException;
-import javax.xml.bind.DatatypeConverter;
 
 import com.southernstorm.json.JsonReader;
 import com.southernstorm.noise.protocol.CipherState;
@@ -323,43 +323,43 @@ public class VectorTests {
             } else if (name.equals("fallback_pattern")) {
                 vec.fallback_pattern = reader.nextString();
             } else if (name.equals("init_prologue")) {
-                vec.init_prologue = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_prologue = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("init_ephemeral")) {
-                vec.init_ephemeral = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_ephemeral = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("init_hybrid_ephemeral")) {
-                vec.init_hybrid = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_hybrid = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("init_static")) {
-                vec.init_static = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_static = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("init_remote_static")) {
-                vec.init_remote_static = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_remote_static = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("init_psks")) {
                 reader.beginArray();
-                vec.init_psk = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_psk = HexFormat.of().parseHex(reader.nextString());
                 reader.endArray();
             } else if (name.equals("init_psk")) {
-                vec.init_psk = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_psk = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("init_ssk")) {
-                vec.init_ssk = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.init_ssk = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("resp_prologue")) {
-                vec.resp_prologue = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_prologue = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("resp_ephemeral")) {
-                vec.resp_ephemeral = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_ephemeral = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("resp_hybrid_ephemeral")) {
-                vec.resp_hybrid = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_hybrid = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("resp_static")) {
-                vec.resp_static = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_static = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("resp_remote_static")) {
-                vec.resp_remote_static = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_remote_static = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("resp_psk")) {
-                vec.resp_psk = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_psk = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("resp_psks")) {
                 reader.beginArray();
-                vec.resp_psk = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_psk = HexFormat.of().parseHex(reader.nextString());
                 reader.endArray();
             } else if (name.equals("resp_ssk")) {
-                vec.resp_ssk = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.resp_ssk = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("handshake_hash")) {
-                vec.handshake_hash = DatatypeConverter.parseHexBinary(reader.nextString());
+                vec.handshake_hash = HexFormat.of().parseHex(reader.nextString());
             } else if (name.equals("fail")) {
                 vec.failure_expected = reader.nextBoolean();
             } else if (name.equals("fallback")) {
@@ -372,9 +372,9 @@ public class VectorTests {
                     while (reader.hasNext()) {
                         name = reader.nextName();
                         if (name.equals("payload")) {
-                            msg.payload = DatatypeConverter.parseHexBinary(reader.nextString());
+                            msg.payload = HexFormat.of().parseHex(reader.nextString());
                         } else if (name.equals("ciphertext")) {
-                            msg.ciphertext = DatatypeConverter.parseHexBinary(reader.nextString());
+                            msg.ciphertext = HexFormat.of().parseHex(reader.nextString());
                         } else {
                             reader.skipValue();
                         }
