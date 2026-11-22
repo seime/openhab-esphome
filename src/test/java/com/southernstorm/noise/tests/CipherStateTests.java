@@ -22,7 +22,7 @@
 
 package com.southernstorm.noise.tests;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -30,7 +30,7 @@ import java.util.Arrays;
 import javax.crypto.BadPaddingException;
 import javax.crypto.ShortBufferException;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import com.southernstorm.noise.protocol.CipherState;
 import com.southernstorm.noise.protocol.Noise;

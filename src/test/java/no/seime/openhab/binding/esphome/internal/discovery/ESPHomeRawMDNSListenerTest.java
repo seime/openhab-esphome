@@ -1,13 +1,15 @@
 package no.seime.openhab.binding.esphome.internal.discovery;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.net.DatagramPacket;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 public class ESPHomeRawMDNSListenerTest {
 
@@ -207,7 +209,8 @@ public class ESPHomeRawMDNSListenerTest {
         assertTrue(ids.contains("node-b"));
     }
 
-    @Test(timeout = 500)
+    @Test
+    @Timeout(value = 500, unit = TimeUnit.MILLISECONDS)
     public void truncatedPacketDoesNotLoopForever() {
         byte[] broken = new byte[] { 0x00, 0x00, (byte) 0x84, 0x00, 0x00, 0x00, 0x00, 0x01 };
 

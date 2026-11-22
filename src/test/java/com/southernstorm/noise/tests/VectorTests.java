@@ -22,7 +22,7 @@
 
 package com.southernstorm.noise.tests;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.*;
 import java.security.NoSuchAlgorithmException;
@@ -105,7 +105,7 @@ public class VectorTests {
 
     private void assertSubArrayEquals(String msg, byte[] expected, byte[] actual) {
         for (int index = 0; index < expected.length; ++index) {
-            assertEquals(msg + "[" + Integer.toString(index) + "]", expected[index], actual[index]);
+            assertEquals(expected[index], actual[index], msg + "[" + Integer.toString(index) + "]");
         }
     }
 

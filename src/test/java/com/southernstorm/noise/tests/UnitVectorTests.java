@@ -3,8 +3,8 @@ package com.southernstorm.noise.tests;
 import java.io.InputStream;
 import java.net.URL;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class UnitVectorTests {
 
@@ -16,7 +16,7 @@ public class UnitVectorTests {
                 + "/tests/vector/noise-c-basic.txt").openStream()) {
             VectorTests vectorTests = new VectorTests();
             vectorTests.processInputStream(stream);
-            Assert.assertEquals(0, vectorTests.getFailed());
+            Assertions.assertEquals(0, vectorTests.getFailed());
         }
     }
 
@@ -26,7 +26,7 @@ public class UnitVectorTests {
                 "https://raw.githubusercontent.com/centromere/cacophony/master/vectors/cacophony.txt").openStream()) {
             VectorTests vectorTests = new VectorTests();
             vectorTests.processInputStream(stream);
-            Assert.assertEquals(0, vectorTests.getFailed());
+            Assertions.assertEquals(0, vectorTests.getFailed());
         }
     }
 }

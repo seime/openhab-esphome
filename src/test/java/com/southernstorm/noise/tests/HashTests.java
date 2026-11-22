@@ -22,13 +22,13 @@
 
 package com.southernstorm.noise.tests;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import com.southernstorm.noise.protocol.Noise;
 

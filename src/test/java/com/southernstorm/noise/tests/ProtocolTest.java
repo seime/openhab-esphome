@@ -1,12 +1,12 @@
 package com.southernstorm.noise.tests;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import com.southernstorm.noise.protocol.HandshakeState;
 
