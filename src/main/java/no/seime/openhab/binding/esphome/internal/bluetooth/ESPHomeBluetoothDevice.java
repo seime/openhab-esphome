@@ -290,8 +290,13 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public boolean connect() {
-        if (connectionState == ConnectionState.CONNECTED || connectionState == ConnectionState.CONNECTING) {
-            logger.debug("[{}] connect() called while already {}", address, connectionState);
+        // Refuse while still bound to an ESP (connecting, connected or disconnecting). Starting a new connection
+        // via another ESP would leave the old BLE link open, and the peripheral rejects the second connection.
+        // The binding is released when the ESP reports the disconnect or the ESP itself goes offline.
+        ESPHomeHandler currentHandler = lockToHandler;
+        if (currentHandler != null) {
+            logger.debug("[{}] connect() called while {} via ESPHome proxy {}", address, connectionState,
+                    currentHandler.getThing().getUID());
             return false;
         }
 
@@ -340,9 +345,9 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
             logger.debug("[{}] discoverServices() called with no proxy handler", address);
             return false;
         }
-        connectionState = ConnectionState.DISCOVERING;
-        notifyListeners(BluetoothEventType.CONNECTION_STATE,
-                new BluetoothConnectionStatusNotification(ConnectionState.DISCOVERING));
+        // Service discovery happens on an established connection, so the connection state stays CONNECTED.
+        // ConnectionState.DISCOVERING means "device not yet discovered / not available" in the openHAB API;
+        // reporting it here made handlers (e.g. Airthings) treat the device as disconnected and reconnect.
         handler.sendBluetoothCommand(
                 BluetoothGATTGetServicesRequest.newBuilder().setAddress(getAddressAsLong()).build());
         return true;
