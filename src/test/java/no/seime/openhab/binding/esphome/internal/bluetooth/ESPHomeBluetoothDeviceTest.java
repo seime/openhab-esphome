@@ -7,6 +7,9 @@ import static org.mockito.Mockito.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,9 +42,22 @@ public class ESPHomeBluetoothDeviceTest {
     private final List<ConnectionState> notifiedStates = new ArrayList<>();
     private boolean servicesDiscovered;
 
+    private final List<Runnable> scheduledTimeouts = new ArrayList<>();
+    private final List<ScheduledFuture<?>> scheduledFutures = new ArrayList<>();
+    private final List<Long> scheduledDelaysMillis = new ArrayList<>();
+
     @BeforeEach
     void setUp() {
         proxyHandler = mock(ESPHomeBluetoothProxyHandler.class);
+        ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+        when(scheduler.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class))).thenAnswer(invocation -> {
+            scheduledTimeouts.add(invocation.getArgument(0));
+            scheduledDelaysMillis.add(invocation.<TimeUnit> getArgument(2).toMillis(invocation.<Long> getArgument(1)));
+            ScheduledFuture<?> future = mock(ScheduledFuture.class);
+            scheduledFutures.add(future);
+            return future;
+        });
+        when(proxyHandler.getScheduler()).thenReturn(scheduler);
         espA = mockEspHandler("esphome:device:a");
         espB = mockEspHandler("esphome:device:b");
         device = new ESPHomeBluetoothDevice(proxyHandler, new BluetoothAddress("F4:60:77:6D:66:1A"));
@@ -125,6 +141,65 @@ public class ESPHomeBluetoothDeviceTest {
 
         when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
         assertTrue(device.connect());
+    }
+
+    private void fireLastTimeout() {
+        assertFalse(scheduledTimeouts.isEmpty(), "no timeout was scheduled");
+        scheduledTimeouts.get(scheduledTimeouts.size() - 1).run();
+    }
+
+    private static boolean isDisconnectRequest(GeneratedMessage message) {
+        return message instanceof BluetoothDeviceRequest request
+                && request.getRequestType() == BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_DISCONNECT;
+    }
+
+    @Test
+    void connectTimeoutUsesDefaultDelay() {
+        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espA);
+        device.connect();
+        assertEquals(List.of(ESPHomeBluetoothDevice.DEFAULT_STATE_TIMEOUT_MILLIS), scheduledDelaysMillis);
+    }
+
+    @Test
+    void releasesConnectionWhenEspNeverAnswersConnect() {
+        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espA);
+        assertTrue(device.connect());
+        assertEquals(ConnectionState.CONNECTING, device.getConnectionState());
+
+        fireLastTimeout();
+
+        assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
+        assertEquals(ConnectionState.DISCONNECTED, notifiedStates.get(notifiedStates.size() - 1));
+        verify(espA).sendBluetoothCommand(argThat(ESPHomeBluetoothDeviceTest::isDisconnectRequest));
+        verify(proxyHandler).unlinkDevice(device);
+
+        // No longer bound, so the next attempt may use another ESP.
+        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        assertTrue(device.connect());
+    }
+
+    @Test
+    void releasesConnectionWhenEspNeverAnswersDisconnect() {
+        connectVia(espA);
+        assertTrue(device.disconnect());
+
+        fireLastTimeout();
+
+        assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
+        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        assertTrue(device.connect());
+    }
+
+    @Test
+    void timeoutIsCancelledAndIgnoredOnceEspAnswers() {
+        connectVia(espA);
+        verify(scheduledFutures.get(0)).cancel(false);
+
+        // Even if the cancelled task still runs (race), it must not tear down the live connection.
+        scheduledTimeouts.get(0).run();
+
+        assertEquals(ConnectionState.CONNECTED, device.getConnectionState());
+        verify(espA, never()).sendBluetoothCommand(argThat(ESPHomeBluetoothDeviceTest::isDisconnectRequest));
     }
 
     private class RecordingListener implements BluetoothDeviceListener {
