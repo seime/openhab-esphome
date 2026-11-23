@@ -253,7 +253,15 @@ public class MonitoredCompositeExecutorService implements ScheduledExecutorServi
                 callerSignature), delay, timeUnit));
     }
 
-    private record ImmediateScheduledFuture<V> (@NonNull Future<V> delegate) implements ScheduledFuture<V> {
+    // Plain class rather than a generic record: openHAB 4.x and 5.x spotless configs disagree on generic record
+    // header formatting
+    private static final class ImmediateScheduledFuture<V> implements ScheduledFuture<V> {
+
+        private final @NonNull Future<V> delegate;
+
+        ImmediateScheduledFuture(@NonNull Future<V> delegate) {
+            this.delegate = delegate;
+        }
 
         @Override
         public long getDelay(TimeUnit unit) {

@@ -11,7 +11,6 @@ import java.io.File;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openhab.core.items.ItemNotFoundException;
-import org.openhab.core.items.events.ItemEventFactory;
 import org.openhab.core.library.items.SwitchItem;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.thing.ChannelUID;
@@ -37,8 +36,7 @@ public class JeffJamesOpenhabStateToEsphomeDeviceTest extends AbstractESPHomeDev
                 .stateUpdated(eq(new ChannelUID(thing.getUID(), "set_sensor_zero_readback")), eq(OnOffType.ON));
 
         // Send the new state to the event subscriber, verify that the copy sensor sends the new state back
-        eventSubscriber
-                .receive(ItemEventFactory.createStateChangedEvent("ItemStateChanged", OnOffType.OFF, OnOffType.ON));
+        eventSubscriber.receive(ItemEventFactoryCompat.stateChanged("ItemStateChanged", OnOffType.OFF, OnOffType.ON));
         verify(thingHandlerCallback, timeout(2000))
                 .stateUpdated(eq(new ChannelUID(thing.getUID(), "set_sensor_zero_readback")), eq(OnOffType.OFF));
 

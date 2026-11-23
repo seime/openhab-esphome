@@ -58,16 +58,16 @@ public class OpenhabStateToEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         // Items
         testParameters.add(new Parameter("ItemStateChanged_Default",
-                ItemEventFactory.createStateChangedEvent("ItemStateChanged_Default", itemNewState, itemExistingState),
+                ItemEventFactoryCompat.stateChanged("ItemStateChanged_Default", itemNewState, itemExistingState),
                 itemExistingState, itemNewState));
         testParameters.add(new Parameter("ItemStateChanged",
-                ItemEventFactory.createStateChangedEvent("ItemStateChanged", itemNewState, itemExistingState),
+                ItemEventFactoryCompat.stateChanged("ItemStateChanged", itemNewState, itemExistingState),
                 itemExistingState, itemNewState));
         testParameters.add(new Parameter("ItemState", ItemEventFactory.createStateEvent("ItemState", itemNewState),
                 itemExistingState, itemNewState));
-        testParameters.add(new Parameter("ItemStateUpdated",
-                ItemEventFactory.createStateUpdatedEvent("ItemStateUpdated", itemNewState), itemExistingState,
-                itemNewState));
+        testParameters.add(
+                new Parameter("ItemStateUpdated", ItemEventFactoryCompat.stateUpdated("ItemStateUpdated", itemNewState),
+                        itemExistingState, itemNewState));
         testParameters.add(
                 new Parameter("ItemCommand", ItemEventFactory.createCommandEvent("ItemCommand", (Command) itemNewState),
                         itemExistingState, itemNewState));
@@ -76,12 +76,12 @@ public class OpenhabStateToEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
                 itemNewState));
 
         // Group items
-        testParameters.add(new Parameter("GroupItemStateChanged",
-                ItemEventFactory.createGroupStateChangedEvent("GroupItemStateChanged", "ItemThatChanged", itemNewState,
-                        itemExistingState),
-                itemExistingState, itemNewState));
-        testParameters.add(new Parameter("GroupStateUpdated", ItemEventFactory.createGroupStateUpdatedEvent(
-                "GroupStateUpdated", "ItemThatChanged", itemNewState, "source"), itemExistingState, itemNewState));
+        testParameters.add(
+                new Parameter("GroupItemStateChanged", ItemEventFactoryCompat.groupStateChanged("GroupItemStateChanged",
+                        "ItemThatChanged", itemNewState, itemExistingState), itemExistingState, itemNewState));
+        testParameters
+                .add(new Parameter("GroupStateUpdated", ItemEventFactoryCompat.groupStateUpdated("GroupStateUpdated",
+                        "ItemThatChanged", itemNewState, "source"), itemExistingState, itemNewState));
 
         // Prepopulate item state so initial state can be transferred to the homeassistant sensor.
         for (Parameter parameter : testParameters) {

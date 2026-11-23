@@ -117,7 +117,18 @@ public abstract class AbstractESPHomeDeviceTest {
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, null,
                 bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                networkAddressService, managedThingProvider, serialPortProvider);
+                networkAddressService, managedThingProvider, serialPortProvider) {
+            @Override
+            protected <T> T getConfigAs(Class<T> configurationClass) {
+                // openHAB 5+ resolves the thing configuration into a fresh Configuration copy, bypassing the mocked
+                // Configuration.as(). Return the (mutable) test configuration directly while the mock is in use.
+                if (getThing().getConfiguration() == configuration
+                        && configurationClass.isInstance(deviceConfiguration)) {
+                    return configurationClass.cast(deviceConfiguration);
+                }
+                return super.getConfigAs(configurationClass);
+            }
+        };
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 

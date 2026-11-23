@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -624,6 +626,8 @@ class ESPHomeHandlerAudioServicesTest {
 
     @Test
     void doesNotRetryVoiceDialogOnOpenHABWithoutDialogProvider() throws Exception {
+        // AudioDialogProvider was added in openHAB 5.1
+        assumeFalse(dialogProviderClassExists(), "openHAB 5.1+ has AudioDialogProvider");
         ESPHomeConfiguration config = new ESPHomeConfiguration();
         config.voiceDialog = true;
         setField("config", config);
@@ -635,6 +639,31 @@ class ESPHomeHandlerAudioServicesTest {
         verify(bundleContext).getServiceReference(DIALOG_PROVIDER);
         assertFalse(source.hasDialogTrigger());
         assertNull(getField("voiceDialogRestartFuture"));
+    }
+
+    @Test
+    void retriesVoiceDialogWhenDialogProviderServiceIsNotRunning() throws Exception {
+        assumeTrue(dialogProviderClassExists(), "requires openHAB 5.1+ AudioDialogProvider");
+        ESPHomeConfiguration config = new ESPHomeConfiguration();
+        config.voiceDialog = true;
+        setField("config", config);
+        when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
+                .thenReturn(audioSinkRegistration);
+
+        ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
+
+        verify(bundleContext).getServiceReference(DIALOG_PROVIDER);
+        assertFalse(source.hasDialogTrigger());
+        assertNotNull(getField("voiceDialogRestartFuture"));
+    }
+
+    private static boolean dialogProviderClassExists() {
+        try {
+            Class.forName(DIALOG_PROVIDER, false, AudioSink.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 
     @Test
