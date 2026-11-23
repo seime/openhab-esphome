@@ -68,8 +68,7 @@ The release name is the same as the version openHAB reports, so you can find the
 ```
 
 For openHAB 4.0 - 4.1 use the unmaintained
-[`latest_4.1_release`](https://github.com/seime/openhab-esphome/releases/tag/latest_4.1_release). The old
-`latest_oh4` release is deprecated, but is kept up to date so existing links keep working.
+[`latest_4.1_release`](https://github.com/seime/openhab-esphome/releases/tag/latest_4.1_release).
 
 ## Discovery
 

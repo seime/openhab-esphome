@@ -79,9 +79,6 @@ jobs:
       # a permanent download link (used by the openHAB Marketplace entry):
       #   https://github.com/<repo>/releases/latest/download/no.seime.openhab.binding.esphome.jar
       STABLE_JAR_NAME: no.seime.openhab.binding.esphome.jar
-      # Deprecated rolling release, kept up to date only so old links keep working:
-      #   releases/download/latest_oh4/no.seime.openhab.binding.esphome-4.2.0-SNAPSHOT.jar
-      LEGACY_TAG: latest_oh4
 
     steps:
       - uses: actions/checkout@v7
@@ -113,43 +110,6 @@ jobs:
           echo "jar=$jar" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Bundle-Version: $version"
-
-      - name: Update legacy rolling release
-        env:
-          JAR: ${{ steps.version.outputs.jar }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f "$LEGACY_TAG" "$GITHUB_SHA"
-          git push -f origin "refs/tags/$LEGACY_TAG"
-
-          {
-            echo "**Deprecated download location**, kept up to date for existing links only."
-            echo "Use https://github.com/$GH_REPO/releases/latest instead, or the permanent download link"
-            echo "https://github.com/$GH_REPO/releases/latest/download/$STABLE_JAR_NAME"
-            echo
-            echo "This build is bundle version \`$VERSION\` (as shown by \`bundle:list\`), see release [$VERSION](https://github.com/$GH_REPO/releases/tag/$VERSION)."
-          } > legacy-notes.md
-
-          title="Legacy link: latest build (deprecated)"
-          # Pre-release so it can never take GitHub's "Latest" badge from the versioned releases
-          if gh release view "$LEGACY_TAG" > /dev/null 2>&1; then
-            gh release edit "$LEGACY_TAG" --title "$title" --notes-file legacy-notes.md --prerelease --latest=false
-          else
-            gh release create "$LEGACY_TAG" --verify-tag --title "$title" --notes-file legacy-notes.md --prerelease --latest=false
-          fi
-
-          gh release upload "$LEGACY_TAG" "$JAR" --clobber
-
-          # Remove any other assets so stale jars can't pile up
-          keep=$(basename "$JAR")
-          gh release view "$LEGACY_TAG" --json assets --jq '.assets[].name' | while read -r asset; do
-            if [ "$asset" != "$keep" ]; then
-              echo "Deleting stale asset $asset"
-              gh release delete-asset "$LEGACY_TAG" "$asset" -y
-            fi
-          done
 
       - name: Create versioned release
         env:
