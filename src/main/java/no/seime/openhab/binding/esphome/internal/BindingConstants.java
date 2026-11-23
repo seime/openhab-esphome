@@ -31,6 +31,15 @@ public class BindingConstants {
     public static final ThingTypeUID THING_TYPE_DEVICE = new ThingTypeUID(BINDING_ID, "device");
     public static final ThingTypeUID THING_TYPE_BLE_PROXY = new ThingTypeUID("bluetooth", "esphome");
 
+    // Thing configuration parameters for THING_TYPE_DEVICE; must match field names in ESPHomeConfiguration
+    public static final String CONFIG_HOSTNAME = "hostname";
+    public static final String CONFIG_PORT = "port";
+    public static final String CONFIG_DEVICE_ID = "deviceId";
+    public static final String CONFIG_ENCRYPTION_KEY = "encryptionKey";
+    public static final String CONFIG_ALLOW_ACTIONS = "allowActions";
+    public static final String CONFIG_DEVICE_LOG_LEVEL = "deviceLogLevel";
+    public static final String CONFIG_ENABLE_BLUETOOTH_PROXY = "enableBluetoothProxy";
+
     public static final String CHANNEL_CONFIGURATION_ENTITY_KEY = "entity_key";
     public static final String CHANNEL_CONFIGURATION_ENTITY_TYPE = "entity_type";
     public static final String CHANNEL_CONFIGURATION_ENTITY_FIELD = "entity_field";

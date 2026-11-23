@@ -12,6 +12,8 @@
  */
 package no.seime.openhab.binding.esphome.internal.handler;
 
+import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
+
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -46,7 +48,6 @@ import com.google.gson.JsonParser;
 import no.seime.openhab.binding.esphome.internal.BindingConstants;
 import no.seime.openhab.binding.esphome.internal.discovery.DeviceBuilderDevice;
 import no.seime.openhab.binding.esphome.internal.discovery.DeviceBuilderDiscoveryService;
-import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeDiscoveryParticipant;
 
 /** Contacts the Device Builder for resolved device configurations. */
 @NonNullByDefault
@@ -157,9 +158,9 @@ public class DeviceBuilderHandler extends BaseThingHandler {
         Set<String> configuredIds = new HashSet<>();
         for (Thing thing : thingRegistry.getAll()) {
             if (BindingConstants.THING_TYPE_DEVICE.equals(thing.getThingTypeUID())) {
-                Object deviceId = thing.getConfiguration().get(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID);
+                Object deviceId = thing.getConfiguration().get(CONFIG_DEVICE_ID);
                 if (deviceId == null) {
-                    deviceId = thing.getProperties().get(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID);
+                    deviceId = thing.getProperties().get(CONFIG_DEVICE_ID);
                 }
                 configuredIds.add(deviceId == null ? thing.getUID().getId() : deviceId.toString());
             }
@@ -167,7 +168,7 @@ public class DeviceBuilderHandler extends BaseThingHandler {
         Set<String> inboxIds = new HashSet<>();
         for (DiscoveryResult result : inbox.getAll()) {
             if (BindingConstants.THING_TYPE_DEVICE.equals(result.getThingTypeUID())) {
-                Object deviceId = result.getProperties().get(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID);
+                Object deviceId = result.getProperties().get(CONFIG_DEVICE_ID);
                 inboxIds.add(deviceId == null ? result.getThingUID().getId() : deviceId.toString());
             }
         }

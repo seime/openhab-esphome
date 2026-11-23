@@ -12,6 +12,8 @@
  */
 package no.seime.openhab.binding.esphome.internal.discovery;
 
+import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,21 +44,21 @@ public final class DeviceBuilderDevice {
         String name = esphome.get("name").getAsString();
         String address = text(entry, "address", name + ".local");
         Map<String, Object> properties = new HashMap<>();
-        properties.put(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID, name);
-        properties.put(ESPHomeDiscoveryParticipant.PROPERTY_HOSTNAME, address);
-        properties.put(ESPHomeDiscoveryParticipant.PROPERTY_PORT, api.has("port") ? api.get("port").getAsInt() : 6053);
+        properties.put(CONFIG_DEVICE_ID, name);
+        properties.put(CONFIG_HOSTNAME, address);
+        properties.put(CONFIG_PORT, api.has("port") ? api.get("port").getAsInt() : 6053);
         if (!api.has("encryption") || !api.get("encryption").isJsonObject()) {
             return null;
         }
         String key = text(api.getAsJsonObject("encryption"), "key", "");
         if (!key.isBlank()) {
-            properties.put("encryptionKey", key);
+            properties.put(CONFIG_ENCRYPTION_KEY, key);
         }
-        properties.put("allowActions", hasActions(config) || hasControlEntities(config));
-        properties.put("enableBluetoothProxy", config.has("bluetooth_proxy"));
+        properties.put(CONFIG_ALLOW_ACTIONS, hasActions(config) || hasControlEntities(config));
+        properties.put(CONFIG_ENABLE_BLUETOOTH_PROXY, config.has("bluetooth_proxy"));
         return DiscoveryResultBuilder.create(new ThingUID(BindingConstants.THING_TYPE_DEVICE, name))
                 .withProperties(properties).withLabel(text(esphome, "friendly_name", name))
-                .withRepresentationProperty(ESPHomeDiscoveryParticipant.PROPERTY_DEVICEID).build();
+                .withRepresentationProperty(CONFIG_DEVICE_ID).build();
     }
 
     private static String text(JsonObject object, String key, String fallback) {

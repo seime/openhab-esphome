@@ -12,6 +12,8 @@
  */
 package no.seime.openhab.binding.esphome.internal.handler;
 
+import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
+
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -1242,7 +1244,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         // Recheck the stored configuration to avoid replacing a key entered while connecting.
         Thing storedThing = provider.get(thing.getUID());
         if (storedThing == null
-                || StringUtils.isNotBlank((String) storedThing.getConfiguration().get("encryptionKey"))) {
+                || StringUtils.isNotBlank((String) storedThing.getConfiguration().get(CONFIG_ENCRYPTION_KEY))) {
             handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
                     "Thing configuration changed during adoption; reconnect with the configured key");
             return;
@@ -1256,11 +1258,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         } while (PROVISIONING_KEY.equals(encodedKey));
         var configuration = new org.openhab.core.config.core.Configuration(
                 storedThing.getConfiguration().getProperties());
-        configuration.put("encryptionKey", encodedKey);
+        configuration.put(CONFIG_ENCRYPTION_KEY, encodedKey);
         try {
             updateConfiguration(configuration);
             Thing savedThing = provider.get(thing.getUID());
-            if (savedThing == null || !encodedKey.equals(savedThing.getConfiguration().get("encryptionKey"))) {
+            if (savedThing == null || !encodedKey.equals(savedThing.getConfiguration().get(CONFIG_ENCRYPTION_KEY))) {
                 throw new IllegalStateException("Encryption key was not saved");
             }
         } catch (RuntimeException e) {

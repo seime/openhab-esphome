@@ -62,9 +62,8 @@ public abstract class AbstractESPHomeDeviceTest {
     protected @Mock ThingRegistry thingRegistry;
     protected @Mock EventPublisher eventPublisher;
     protected ESPHomeEventSubscriber eventSubscriber;
-    protected ESPHomeConfiguration deviceConfiguration;
     private ConnectionSelector selector;
-    protected @Mock Configuration configuration;
+    protected Configuration configuration;
     protected @Mock ESPChannelTypeProvider channelTypeProvider;
     protected @Mock ESPStateDescriptionProvider stateDescriptionProvider;
     protected @Mock BundleContext bundleContext;
@@ -83,13 +82,12 @@ public abstract class AbstractESPHomeDeviceTest {
         emulator = new ESPHomeDeviceRunner(getEspDeviceConfigurationYamlFileName(), apiPort);
         emulator.compileAndRun();
 
-        deviceConfiguration = new ESPHomeConfiguration();
-        deviceConfiguration.hostname = "localhost";
-        deviceConfiguration.port = apiPort;
-        deviceConfiguration.encryptionKey = "TiFvlzL9tNB29cys/ZR4o+YYHvwawrTF8csI13hZaPw=";
-        deviceConfiguration.deviceId = emulator.getDeviceName();
-        deviceConfiguration.deviceLogLevel = LogLevel.VERY_VERBOSE;
-        when(configuration.as(ESPHomeConfiguration.class)).thenReturn(deviceConfiguration);
+        configuration = new Configuration();
+        configuration.put(BindingConstants.CONFIG_HOSTNAME, "localhost");
+        configuration.put(BindingConstants.CONFIG_PORT, apiPort);
+        configuration.put(BindingConstants.CONFIG_ENCRYPTION_KEY, "TiFvlzL9tNB29cys/ZR4o+YYHvwawrTF8csI13hZaPw=");
+        configuration.put(BindingConstants.CONFIG_DEVICE_ID, emulator.getDeviceName());
+        configuration.put(BindingConstants.CONFIG_DEVICE_LOG_LEVEL, LogLevel.VERY_VERBOSE.name());
 
         selector = new ConnectionSelector();
         selector.start();
@@ -117,18 +115,7 @@ public abstract class AbstractESPHomeDeviceTest {
         thingHandler = new ESPHomeHandler(thing, selector, channelTypeProvider, stateDescriptionProvider,
                 eventSubscriber, executor, new KeySequentialExecutor(executor), eventPublisher, null, null,
                 bundleContext, versionService, firmwareUpgradeService, mdnsHostnameResolver, audioHTTPServer,
-                networkAddressService, managedThingProvider, serialPortProvider) {
-            @Override
-            protected <T> T getConfigAs(Class<T> configurationClass) {
-                // openHAB 5+ resolves the thing configuration into a fresh Configuration copy, bypassing the mocked
-                // Configuration.as(). Return the (mutable) test configuration directly while the mock is in use.
-                if (getThing().getConfiguration() == configuration
-                        && configurationClass.isInstance(deviceConfiguration)) {
-                    return configurationClass.cast(deviceConfiguration);
-                }
-                return super.getConfigAs(configurationClass);
-            }
-        };
+                networkAddressService, managedThingProvider, serialPortProvider);
         thingHandlerCallback = Mockito.mock(ThingHandlerCallback.class);
         thingHandler.setCallback(thingHandlerCallback);
 
@@ -136,6 +123,10 @@ public abstract class AbstractESPHomeDeviceTest {
     }
 
     protected abstract File getEspDeviceConfigurationYamlFileName() throws Exception;
+
+    protected String deviceId() {
+        return (String) configuration.get(BindingConstants.CONFIG_DEVICE_ID);
+    }
 
     private static int pickFreePort() throws Exception {
         try (ServerSocket socket = new ServerSocket(0)) {

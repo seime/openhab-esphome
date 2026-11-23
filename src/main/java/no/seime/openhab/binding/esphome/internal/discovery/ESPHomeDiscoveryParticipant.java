@@ -12,6 +12,8 @@
  */
 package no.seime.openhab.binding.esphome.internal.discovery;
 
+import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,10 +47,6 @@ import no.seime.openhab.binding.esphome.internal.BindingConstants;
 @Component(service = MDNSDiscoveryParticipant.class)
 @NonNullByDefault
 public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
-
-    public static final String PROPERTY_HOSTNAME = "hostname";
-    public static final String PROPERTY_DEVICEID = "deviceId";
-    public static final String PROPERTY_PORT = "port";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeDiscoveryParticipant.class);
 
@@ -86,11 +84,11 @@ public class ESPHomeDiscoveryParticipant implements MDNSDiscoveryParticipant {
             Map<String, Object> properties = new HashMap<>();
             inbox.stream().filter(result -> deviceUID.equals(result.getThingUID())).findFirst()
                     .ifPresent(result -> properties.putAll(result.getProperties()));
-            properties.put(PROPERTY_HOSTNAME, service.getServer());
-            properties.put(PROPERTY_PORT, service.getPort());
-            properties.put(PROPERTY_DEVICEID, name);
+            properties.put(CONFIG_HOSTNAME, service.getServer());
+            properties.put(CONFIG_PORT, service.getPort());
+            properties.put(CONFIG_DEVICE_ID, name);
             return DiscoveryResultBuilder.create(deviceUID).withThingType(BindingConstants.THING_TYPE_DEVICE)
-                    .withProperties(properties).withLabel(label).withRepresentationProperty(PROPERTY_DEVICEID).build();
+                    .withProperties(properties).withLabel(label).withRepresentationProperty(CONFIG_DEVICE_ID).build();
         }
         return null;
     }

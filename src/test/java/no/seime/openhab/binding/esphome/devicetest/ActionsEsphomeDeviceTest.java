@@ -1,5 +1,6 @@
 package no.seime.openhab.binding.esphome.devicetest;
 
+import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -22,42 +23,41 @@ public class ActionsEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
     @Test
     public void testAction() throws ItemNotFoundException {
-        deviceConfiguration.allowActions = true;
+        configuration.put(CONFIG_ALLOW_ACTIONS, true);
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_action"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createActionEvent(deviceConfiguration.deviceId,
-                "some.action", Map.of("entity_id", "Something"), Map.of(), Map.of()));
+        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createActionEvent(deviceId(), "some.action",
+                Map.of("entity_id", "Something"), Map.of(), Map.of()));
 
         thingHandler.dispose();
     }
 
     @Test
     public void testEvent() throws ItemNotFoundException {
-        deviceConfiguration.allowActions = true;
+        configuration.put(CONFIG_ALLOW_ACTIONS, true);
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_event"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createEventEvent(deviceConfiguration.deviceId,
-                "esphome.something", Map.of(), Map.of(), Map.of()));
+        verify(eventPublisher, timeout(2000)).post(
+                ESPHomeEventFactory.createEventEvent(deviceId(), "esphome.something", Map.of(), Map.of(), Map.of()));
 
         thingHandler.dispose();
     }
 
     @Test
     public void testTag() throws ItemNotFoundException {
-        deviceConfiguration.allowActions = true;
+        configuration.put(CONFIG_ALLOW_ACTIONS, true);
         thingHandler.initialize();
         await().until(() -> thingHandler.isInterrogated());
 
         thingHandler.handleCommand(new ChannelUID(thing.getUID(), "trigger_tag"), OnOffType.ON);
 
-        verify(eventPublisher, timeout(2000))
-                .post(ESPHomeEventFactory.createTagScannedEvent(deviceConfiguration.deviceId, "mytag"));
+        verify(eventPublisher, timeout(2000)).post(ESPHomeEventFactory.createTagScannedEvent(deviceId(), "mytag"));
 
         thingHandler.dispose();
     }
