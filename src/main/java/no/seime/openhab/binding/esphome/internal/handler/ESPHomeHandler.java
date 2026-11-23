@@ -26,7 +26,6 @@ import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.AudioHTTPServer;
-import org.openhab.core.events.AbstractEvent;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.library.types.OpenClosedType;
 import org.openhab.core.library.types.StringType;
@@ -48,7 +47,6 @@ import com.google.protobuf.GeneratedMessage;
 import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.*;
-import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.audio.DeviceAudioManager;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
@@ -76,7 +74,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 14;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
-    private static final String ACTION_TAG_SCANNED = "esphome.tag_scanned";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
@@ -96,7 +93,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredCompositeExecutorService executorService;
     private final KeySequentialExecutor packetProcessor;
-    private final EventPublisher eventPublisher;
+    private final HomeAssistantBridge homeAssistantBridge;
     @Nullable
     private final String bindingPropertyDefaultEncryptionKey;
     private final BundleContext bundleContext;
@@ -159,7 +156,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.eventSubscriber = eventSubscriber;
         this.executorService = executorService;
         this.packetProcessor = packetProcessor;
-        this.eventPublisher = eventPublisher;
+        this.homeAssistantBridge = new HomeAssistantBridge(this, eventPublisher, eventSubscriber);
         this.bindingPropertyDefaultEncryptionKey = bindingPropertyDefaultEncryptionKey;
         this.bundleContext = bundleContext;
         this.versionService = versionService;
@@ -755,27 +752,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         } else if (message instanceof VoiceAssistantAnnounceFinished) {
             // the media player state already shows when a reply has played
             logger.debug("[{}] Device finished playing a voice assistant reply", logPrefix);
-        } else if (message instanceof HomeassistantActionRequest serviceResponse) {
-            Map<String, String> data = convertPbListToMap(serviceResponse.getDataList());
-            Map<String, String> dataTemplate = convertPbListToMap(serviceResponse.getDataTemplateList());
-            Map<String, String> variables = convertPbListToMap(serviceResponse.getVariablesList());
-            AbstractEvent event;
-            if (serviceResponse.getIsEvent()) {
-                String tagId;
-                if (serviceResponse.getService().equals(ACTION_TAG_SCANNED) && dataTemplate.isEmpty()
-                        && variables.isEmpty() && data.size() == 1 && (tagId = data.get("tag_id")) != null) {
-                    event = ESPHomeEventFactory.createTagScannedEvent(config.deviceId, tagId);
-                } else {
-                    event = ESPHomeEventFactory.createEventEvent(config.deviceId, serviceResponse.getService(), data,
-                            dataTemplate, variables);
-                }
-            } else {
-                event = ESPHomeEventFactory.createActionEvent(config.deviceId, serviceResponse.getService(), data,
-                        dataTemplate, variables);
-            }
-            eventPublisher.post(event);
+        } else if (message instanceof HomeassistantActionRequest actionRequest) {
+            homeAssistantBridge.onActionRequest(actionRequest, config.deviceId);
         } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
-            initializeStateSubscription(subscribeHomeAssistantStateResponse);
+            sendStateToDevice(homeAssistantBridge.subscribe(subscribeHomeAssistantStateResponse));
         } else if (message instanceof GetTimeRequest) {
             logger.debug("[{}] Received time sync request", logPrefix);
             GetTimeResponse getTimeResponse = GetTimeResponse.newBuilder()
@@ -857,29 +837,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private void initializeStateSubscription(SubscribeHomeAssistantStateResponse rsp) {
-        // Setup event subscriber
-        logger.debug("[{}] Start subscribe to OH events entity: {}, attribute: {}", logPrefix, rsp.getEntityId(),
-                rsp.getAttribute());
-
-        EventSubscription subscription = eventSubscriber.createEventSubscription(rsp.getEntityId(), rsp.getAttribute(),
-                this);
-        eventSubscriber.addEventSubscription(this, subscription);
-
-        String state = eventSubscriber.getInitialState(logPrefix, subscription);
-
-        logger.debug("[{}] Sending initial state for subscription {} with state '{}'", logPrefix, subscription, state);
-
-        HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
-                .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute()).setState(state)
-                .build();
-        try {
-            frameHelper.send(ohStateUpdate);
-        } catch (ProtocolAPIError e) {
-            logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
-        }
-    }
-
     public void handleOpenHABEvent(EventSubscription subscription, String esphomeState) {
         synchronized (connectionStateLock) {
             if (disposed || provisioningConnection || connectionState != ConnectionState.CONNECTED) {
@@ -887,14 +844,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         subscription.getEntityId());
                 return;
             }
-            HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
-                    .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute())
-                    .setState(esphomeState).build();
-            try {
-                frameHelper.send(ohStateUpdate);
-            } catch (ProtocolAPIError e) {
-                logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
-            }
+            sendStateToDevice(HomeAssistantBridge.stateResponse(subscription, esphomeState));
+        }
+    }
+
+    private void sendStateToDevice(HomeAssistantStateResponse stateResponse) {
+        try {
+            frameHelper.send(stateResponse);
+        } catch (ProtocolAPIError e) {
+            logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
         }
     }
 
@@ -1191,14 +1149,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public String getLogPrefix() {
         return logPrefix;
-    }
-
-    private Map<String, String> convertPbListToMap(List<HomeassistantServiceMap> list) {
-        Map<String, String> map = new HashMap<>();
-        for (HomeassistantServiceMap kv : list) {
-            map.put(kv.getKey(), kv.getValue());
-        }
-        return Collections.unmodifiableMap(map);
     }
 
     public void onDeviceReappeared() {
