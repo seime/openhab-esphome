@@ -15,7 +15,6 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
 
 import java.math.BigDecimal;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -56,6 +55,7 @@ import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxy
 import no.seime.openhab.binding.esphome.internal.comm.*;
 import no.seime.openhab.binding.esphome.internal.comm.ConnectionTargetResolver.ResolvedConnectionTarget;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
+import no.seime.openhab.binding.esphome.internal.handler.EncryptionKeyProvisioning.AdoptionFailedException;
 import no.seime.openhab.binding.esphome.internal.handler.action.AbstractESPHomeThingAction;
 import no.seime.openhab.binding.esphome.internal.handler.action.DynamicThingActionsGenerator;
 import no.seime.openhab.binding.esphome.internal.handler.action.FirmwareUpgradeAction;
@@ -81,8 +81,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
 
-    // Reserved bootstrap PSK accepted only by unprovisioned Noise devices.
-    private static final String PROVISIONING_KEY = Base64.getEncoder().encodeToString(new byte[32]);
     private final @Nullable ManagedThingProvider managedThingProvider;
     private boolean provisioningConnection;
     private boolean provisioningKeyPending;
@@ -360,10 +358,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                                 "No encryption key configured. Automatic adoption requires an editable Thing; configure encryptionKey manually");
                         return;
                     }
-                    encryptionKey = PROVISIONING_KEY;
+                    encryptionKey = EncryptionKeyProvisioning.PROVISIONING_KEY;
                     provisioningConnection = true;
                 } else {
-                    rejectProvisioningKey(Objects.requireNonNull(encryptionKey));
+                    EncryptionKeyProvisioning.rejectProvisioningKey(Objects.requireNonNull(encryptionKey));
                 }
 
                 frameHelper = new EncryptedFrameHelper(connectionSelector, createConnectionListener(generation),
@@ -408,17 +406,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     scheduleConnect(exponentialBackoff.getNextDelay());
                 }
             }
-        }
-    }
-
-    private void rejectProvisioningKey(String encryptionKey) throws ProtocolAPIError {
-        try {
-            if (Arrays.equals(Base64.getDecoder().decode(encryptionKey), new byte[32])) {
-                throw new ProtocolAPIError(
-                        "The reserved bootstrap encryption key cannot be configured; remove it to adopt the device automatically");
-            }
-        } catch (IllegalArgumentException e) {
-            throw new ProtocolAPIError("Invalid base64 encryption key", e);
         }
     }
 
@@ -647,12 +634,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             return;
         }
 
-        // The bootstrap PSK is public. Do not trust this session with actions, state updates,
-        // proxy data, or other normal traffic until it reconnects using the saved private key.
-        if (provisioningConnection && !(message instanceof AuthenticationResponse
-                || message instanceof DeviceInfoResponse || message instanceof NoiseEncryptionSetKeyResponse
-                || message instanceof PingRequest || message instanceof PingResponse
-                || message instanceof DisconnectRequest || message instanceof DisconnectResponse)) {
+        if (provisioningConnection && !EncryptionKeyProvisioning.isAllowedDuringProvisioning(message)) {
             return;
         }
 
@@ -933,41 +915,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         if (provisioningKeyPending) {
             return;
         }
-        ManagedThingProvider provider = managedThingProvider;
-        if (!response.getApiEncryptionProvisionable() || !response.getApiEncryptionSupported() || provider == null
-                || provider.get(thing.getUID()) == null) {
-            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Device cannot be automatically adopted. Configure its existing encryptionKey manually");
-            return;
-        }
-        // Persist before changing the device so the credential survives a restart or lost response.
-        // Recheck the stored configuration to avoid replacing a key entered while connecting.
-        Thing storedThing = provider.get(thing.getUID());
-        if (storedThing == null
-                || StringUtils.isNotBlank((String) storedThing.getConfiguration().get(CONFIG_ENCRYPTION_KEY))) {
-            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Thing configuration changed during adoption; reconnect with the configured key");
-            return;
-        }
-        byte[] key = new byte[32];
-        SecureRandom random = new SecureRandom();
         String encodedKey;
-        do {
-            random.nextBytes(key);
-            encodedKey = Base64.getEncoder().encodeToString(key);
-        } while (PROVISIONING_KEY.equals(encodedKey));
-        var configuration = new org.openhab.core.config.core.Configuration(
-                storedThing.getConfiguration().getProperties());
-        configuration.put(CONFIG_ENCRYPTION_KEY, encodedKey);
         try {
-            updateConfiguration(configuration);
-            Thing savedThing = provider.get(thing.getUID());
-            if (savedThing == null || !encodedKey.equals(savedThing.getConfiguration().get(CONFIG_ENCRYPTION_KEY))) {
-                throw new IllegalStateException("Encryption key was not saved");
-            }
-        } catch (RuntimeException e) {
-            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Could not save encryption key to Thing configuration; device was not changed");
+            encodedKey = EncryptionKeyProvisioning.generateAndSaveKey(response, managedThingProvider, thing.getUID(),
+                    this::updateConfiguration);
+        } catch (AdoptionFailedException e) {
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, String.valueOf(e.getMessage()));
             return;
         }
         config.encryptionKey = encodedKey;
