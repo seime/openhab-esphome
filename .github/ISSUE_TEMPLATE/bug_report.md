@@ -14,7 +14,7 @@ assignees: ''
 - [ ] I'm running OH **FILL_IN_OH_VERSION**
 - [ ] The ESPHome device is running version **FILL_IN_VERSION**
 - [ ] Output of `openhab-cli` command `bundle:list|grep ESPHome` is **FILL_IN_OUTPUT**
-- [ ] The output above is from the latest version obtained from https://github.com/seime/openhab-esphome/releases/tag/latest_oh4
+- [ ] The version above is the latest build from https://github.com/seime/openhab-esphome/releases/tag/latest_oh4 (the release notes list its bundle version)
 
 **OH Logs**
 - [ ] Binding logs from logger `no.seime.openhab.binding.esphome` at level `DEBUG` is attached (HOWTO: https://www.openhab.org/docs/administration/logging.html#defining-what-to-log)

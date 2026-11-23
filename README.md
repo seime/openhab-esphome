@@ -29,7 +29,8 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 2. Create an ESPHome configuration for your device and flash it to your ESP8266 or ESP32
 3. Install the openHAB ESPHome binding by copying the jar file
    here https://github.com/seime/openhab-esphome/releases/tag/latest_oh4 into your `addons` folder, or by installing
-   from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849
+   from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849 (see
+   [Releases](#releases) for other versions)
 4. Wait for discovery to find your device - or add manually in a thing file.
 
 Devices that already have an API encryption key require `encryptionKey` in the Thing configuration, or a default
@@ -45,6 +46,26 @@ The device must have API encryption enabled and accept provisioning within its p
 provisioning protects against passive sniffing, but not an active attacker; use a trusted network for adoption.
 If provisioning fails after the key is saved, the key remains in the Thing configuration to avoid losing a credential
 the device may already have accepted. Check the device before clearing that key and retrying adoption.
+
+## Releases
+
+Every change to `master` is built and published as two
+[GitHub releases](https://github.com/seime/openhab-esphome/releases) for openHAB 4.2 and newer (including 5.x):
+
+- [`latest_oh4`](https://github.com/seime/openhab-esphome/releases/tag/latest_oh4) always contains the newest build.
+  This is what the Marketplace installs.
+- An immutable release named after the bundle version, e.g. `4.2.0.202611231545`. Use these to pin or roll back to
+  a specific build.
+
+The release name is the same as the version openHAB reports, so you can find the release you are running with
+`bundle:list | grep ESPHome` in the openHAB console:
+
+```
+253 │ Active │  80 │ 4.2.0.202611231545 │ Seime Add-ons :: Bundles :: ESPHome Native API
+```
+
+For openHAB 4.0 - 4.1 use the unmaintained
+[`latest_4.1_release`](https://github.com/seime/openhab-esphome/releases/tag/latest_4.1_release).
 
 ## Discovery
 
