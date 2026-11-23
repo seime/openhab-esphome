@@ -31,6 +31,18 @@ import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 @NonNullByDefault
 public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler<ESPHomeBluetoothDevice> {
 
+    /**
+     * Messages from an ESPHome device that are forwarded to {@link #handleBluetoothMessage}.
+     */
+    public static final Set<Class<? extends GeneratedMessage>> BLUETOOTH_MESSAGE_TYPES = Set.of(
+            BluetoothLEAdvertisementResponse.class, BluetoothLERawAdvertisementsResponse.class,
+            BluetoothDeviceConnectionResponse.class, BluetoothGATTGetServicesResponse.class,
+            BluetoothGATTGetServicesDoneResponse.class, BluetoothGATTReadResponse.class,
+            BluetoothGATTNotifyDataResponse.class, BluetoothConnectionsFreeResponse.class,
+            BluetoothGATTErrorResponse.class, BluetoothGATTWriteResponse.class, BluetoothGATTNotifyResponse.class,
+            BluetoothDevicePairingResponse.class, BluetoothDeviceUnpairingResponse.class,
+            BluetoothDeviceClearCacheResponse.class, BluetoothScannerStateResponse.class);
+
     private final ThingRegistry thingRegistry;
 
     @Nullable

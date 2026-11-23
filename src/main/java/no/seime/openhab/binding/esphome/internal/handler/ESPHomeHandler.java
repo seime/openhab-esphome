@@ -15,29 +15,20 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
 
 import java.math.BigDecimal;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioHTTPServer;
-import org.openhab.core.audio.AudioSink;
-import org.openhab.core.audio.AudioSource;
-import org.openhab.core.events.AbstractEvent;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.library.types.OpenClosedType;
 import org.openhab.core.library.types.StringType;
-import org.openhab.core.net.HttpServiceUtil;
 import org.openhab.core.net.NetworkAddressService;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
@@ -51,22 +42,18 @@ import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.net.InetAddresses;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
 import com.jano7.executor.KeySequentialExecutor;
 
 import io.esphome.api.*;
-import no.seime.openhab.binding.esphome.events.ESPHomeEventFactory;
 import no.seime.openhab.binding.esphome.internal.*;
-import no.seime.openhab.binding.esphome.internal.audio.AudioDialogProviderShim;
-import no.seime.openhab.binding.esphome.internal.audio.AudioUtil;
-import no.seime.openhab.binding.esphome.internal.audio.ESPHomeAudioSink;
-import no.seime.openhab.binding.esphome.internal.audio.ESPHomeVoiceAssistantAudioSource;
-import no.seime.openhab.binding.esphome.internal.audio.VoiceAssistantFeature;
+import no.seime.openhab.binding.esphome.internal.audio.DeviceAudioManager;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
+import no.seime.openhab.binding.esphome.internal.comm.ConnectionTargetResolver.ResolvedConnectionTarget;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
+import no.seime.openhab.binding.esphome.internal.handler.EncryptionKeyProvisioning.AdoptionFailedException;
 import no.seime.openhab.binding.esphome.internal.handler.action.AbstractESPHomeThingAction;
 import no.seime.openhab.binding.esphome.internal.handler.action.DynamicThingActionsGenerator;
 import no.seime.openhab.binding.esphome.internal.handler.action.FirmwareUpgradeAction;
@@ -84,20 +71,13 @@ import no.seime.openhab.binding.esphome.internal.serial.ESPHomeSerialPortProvide
 @NonNullByDefault
 public class ESPHomeHandler extends BaseThingHandler implements CommunicationListener, ESPHomeVersionListener {
 
-    private static final int VOICE_DIALOG_RETRY_MIN_MS = 5000;
-    private static final int VOICE_DIALOG_RETRY_MAX_MS = 60000;
-
     private static final int API_VERSION_MAJOR = 1;
     private static final int API_VERSION_MINOR = 14;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
-    private static final String ACTION_TAG_SCANNED = "esphome.tag_scanned";
-    static final String PROPERTY_LAST_KNOWN_IP_ADDRESS = "lastKnownIpAddress";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
 
-    // Reserved bootstrap PSK accepted only by unprovisioned Noise devices.
-    private static final String PROVISIONING_KEY = Base64.getEncoder().encodeToString(new byte[32]);
     private final @Nullable ManagedThingProvider managedThingProvider;
     private boolean provisioningConnection;
     private boolean provisioningKeyPending;
@@ -107,23 +87,19 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private final ESPStateDescriptionProvider stateDescriptionProvider;
-    private final Map<String, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> commandTypeToHandlerMap = new HashMap<>();
-    private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
+    private final EntityMessageHandlers entityMessageHandlers;
+    private final Map<Class<? extends GeneratedMessage>, MessageConsumer<GeneratedMessage>> controlMessageHandlers = new HashMap<>();
     private final List<Channel> dynamicChannels = new CopyOnWriteArrayList<>();
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredCompositeExecutorService executorService;
     private final KeySequentialExecutor packetProcessor;
-    private final EventPublisher eventPublisher;
+    private final HomeAssistantBridge homeAssistantBridge;
     @Nullable
     private final String bindingPropertyDefaultEncryptionKey;
-    @Nullable
-    private final String bindingPropertyAudioBaseUrl;
     private final BundleContext bundleContext;
     private final ESPHomeVersionService versionService;
     private final FirmwareUpgradeService firmwareUpgradeService;
-    private final ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
-    private final AudioHTTPServer audioHTTPServer;
-    private final NetworkAddressService networkAddressService;
+    private final ConnectionTargetResolver connectionTargetResolver;
     private final ESPHomeSerialPortProvider serialPortProvider;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
@@ -152,19 +128,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private String resolvedIpAddressForCurrentConnection;
 
     private final Set<ServiceRegistration<?>> thingActionServiceRegistrations = new HashSet<>();
-    private final Map<Integer, ListEntitiesMediaPlayerResponse> mediaPlayers = new HashMap<>();
-    private final Map<Integer, MediaPlayerStateResponse> mediaPlayerStates = new HashMap<>();
-    private final Map<Integer, ESPHomeAudioSink> audioSinks = new HashMap<>();
-    private final Map<Integer, ServiceRegistration<AudioSink>> audioSinkRegistrations = new HashMap<>();
-    private @Nullable ESPHomeVoiceAssistantAudioSource audioSource;
-    private @Nullable ServiceRegistration<AudioSource> audioSourceRegistration;
-    private final Object voiceDialogLock = new Object();
-    @Nullable
-    private ScheduledFuture<?> voiceDialogRestartFuture;
-    private final ExponentialBackoff voiceDialogBackoff = new ExponentialBackoff(VOICE_DIALOG_RETRY_MIN_MS,
-            VOICE_DIALOG_RETRY_MAX_MS);
-    private boolean voiceDialogRetryWarned;
-    private int voiceAssistantFeatureFlags;
+    private final DeviceAudioManager audioManager;
 
     private String logPrefix;
     @Nullable
@@ -192,65 +156,18 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.eventSubscriber = eventSubscriber;
         this.executorService = executorService;
         this.packetProcessor = packetProcessor;
-        this.eventPublisher = eventPublisher;
+        this.homeAssistantBridge = new HomeAssistantBridge(this, eventPublisher, eventSubscriber);
         this.bindingPropertyDefaultEncryptionKey = bindingPropertyDefaultEncryptionKey;
-        this.bindingPropertyAudioBaseUrl = bindingPropertyAudioBaseUrl;
         this.bundleContext = bundleContext;
         this.versionService = versionService;
         this.firmwareUpgradeService = firmwareUpgradeService;
-        this.mdnsHostnameResolver = mdnsHostnameResolver;
-        this.audioHTTPServer = audioHTTPServer;
-        this.networkAddressService = networkAddressService;
+        this.connectionTargetResolver = new ConnectionTargetResolver(mdnsHostnameResolver);
         this.serialPortProvider = serialPortProvider;
+        this.audioManager = new DeviceAudioManager(this, bundleContext, audioHTTPServer, networkAddressService,
+                bindingPropertyAudioBaseUrl, () -> config != null && config.voiceDialog, this::runIfConnected);
 
-        // Register message handlers for each type of message pairs
-        registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
-                SelectStateResponse.class);
-        registerMessageHandler(EntityTypes.SENSOR, new SensorMessageHandler(this), ListEntitiesSensorResponse.class,
-                SensorStateResponse.class);
-        registerMessageHandler(EntityTypes.BINARY_SENSOR, new BinarySensorMessageHandler(this),
-                ListEntitiesBinarySensorResponse.class, BinarySensorStateResponse.class);
-        registerMessageHandler(EntityTypes.TEXT_SENSOR, new TextSensorMessageHandler(this),
-                ListEntitiesTextSensorResponse.class, TextSensorStateResponse.class);
-        registerMessageHandler(EntityTypes.TEXT, new TextMessageHandler(this), ListEntitiesTextResponse.class,
-                TextStateResponse.class);
-        registerMessageHandler(EntityTypes.SWITCH, new SwitchMessageHandler(this), ListEntitiesSwitchResponse.class,
-                SwitchStateResponse.class);
-        registerMessageHandler(EntityTypes.CLIMATE, new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,
-                ClimateStateResponse.class);
-        registerMessageHandler(EntityTypes.NUMBER, new NumberMessageHandler(this), ListEntitiesNumberResponse.class,
-                NumberStateResponse.class);
-        registerMessageHandler(EntityTypes.LIGHT, new LightMessageHandler(this), ListEntitiesLightResponse.class,
-                LightStateResponse.class);
-        registerMessageHandler(EntityTypes.BUTTON, new ButtonMessageHandler(this), ListEntitiesButtonResponse.class,
-                ButtonCommandRequest.class);
-        registerMessageHandler(EntityTypes.COVER, new CoverMessageHandler(this), ListEntitiesCoverResponse.class,
-                CoverStateResponse.class);
-        registerMessageHandler(EntityTypes.FAN, new FanMessageHandler(this), ListEntitiesFanResponse.class,
-                FanStateResponse.class);
-        registerMessageHandler(EntityTypes.DATE, new DateMessageHandler(this), ListEntitiesDateResponse.class,
-                DateStateResponse.class);
-        registerMessageHandler(EntityTypes.DATE_TIME, new DateTimeMessageHandler(this),
-                ListEntitiesDateTimeResponse.class, DateTimeStateResponse.class);
-        registerMessageHandler(EntityTypes.TIME, new TimeMessageHandler(this), ListEntitiesTimeResponse.class,
-                TimeStateResponse.class);
-        registerMessageHandler(EntityTypes.LOCK, new LockMessageHandler(this), ListEntitiesLockResponse.class,
-                LockStateResponse.class);
-        registerMessageHandler(EntityTypes.VALVE, new ValveMessageHandler(this), ListEntitiesValveResponse.class,
-                ValveStateResponse.class);
-        registerMessageHandler(EntityTypes.EVENT, new EventMessageHandler(this), ListEntitiesEventResponse.class,
-                EventResponse.class);
-        registerMessageHandler(EntityTypes.MEDIA_PLAYER, new MediaPlayerMessageHandler(this),
-                ListEntitiesMediaPlayerResponse.class, MediaPlayerStateResponse.class);
-    }
-
-    private void registerMessageHandler(String entityType,
-            AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> messageHandler,
-            Class<? extends GeneratedMessage> listEntitiesClass, Class<? extends GeneratedMessage> stateClass) {
-
-        commandTypeToHandlerMap.put(entityType, messageHandler);
-        classToHandlerMap.put(listEntitiesClass, messageHandler);
-        classToHandlerMap.put(stateClass, messageHandler);
+        this.entityMessageHandlers = new EntityMessageHandlers(this);
+        registerControlMessageHandlers();
     }
 
     @Override
@@ -300,16 +217,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
             cancelDeepSleepWatchdog();
-            cancelVoiceDialogRestart();
-            // ThingActions
+            audioManager.dispose();
             clearThingActions();
-            // AudioSinks
-            unregisterAudioSinks();
-            mediaPlayers.clear();
-            mediaPlayerStates.clear();
-            // AudioSource
-            unregisterAudioSource();
-            // SerialProxies
             unregisterSerialProxies();
 
             if (frameHelper != null) {
@@ -349,265 +258,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     }
 
     private void refreshAudioServices() {
-        if (!interrogated || disposed || connectionState != ConnectionState.CONNECTED) {
-            unregisterAudioSinks();
-            unregisterAudioSource();
-            return;
-        }
-
-        refreshAudioSink();
-        refreshAudioSource();
-        refreshVoiceDialog();
+        audioManager.refresh(interrogated && !disposed && connectionState == ConnectionState.CONNECTED);
     }
 
-    private void refreshAudioSink() {
-        String baseUrl = resolveAudioSinkBaseUrl();
-        if (baseUrl == null) {
-            logger.debug(
-                    "[{}] Cannot register ESPHome audio sinks because no base URL is configured and the primary openHAB IPv4 address is unknown",
-                    logPrefix);
-            unregisterAudioSinks();
-            return;
-        }
-
-        Set<Integer> staleKeys = new HashSet<>(audioSinkRegistrations.keySet());
-        for (ListEntitiesMediaPlayerResponse mediaPlayer : mediaPlayers.values()) {
-            Set<AudioFormat> supportedFormats = AudioUtil
-                    .mapSupportedAudioFormats(mediaPlayer.getSupportedFormatsList());
-            if (supportedFormats.isEmpty()) {
-                continue;
-            }
-            staleKeys.remove(mediaPlayer.getKey());
-            ESPHomeAudioSink sink = audioSinks.get(mediaPlayer.getKey());
-            if (sink == null) {
-                ESPHomeAudioSink newAudioSink = new ESPHomeAudioSink(this, audioHTTPServer, mediaPlayer, baseUrl);
-                newAudioSink.updateState(mediaPlayerStates.get(mediaPlayer.getKey()));
-                audioSinkRegistrations.put(mediaPlayer.getKey(),
-                        bundleContext.registerService(AudioSink.class, newAudioSink, new Hashtable<>()));
-                audioSinks.put(mediaPlayer.getKey(), newAudioSink);
-            } else {
-                sink.setBaseUrl(baseUrl);
-                sink.updateState(mediaPlayerStates.get(mediaPlayer.getKey()));
-            }
-        }
-
-        for (Integer staleKey : staleKeys) {
-            ServiceRegistration<AudioSink> registration = audioSinkRegistrations.remove(staleKey);
-            if (registration != null) {
-                registration.unregister();
-            }
-            audioSinks.remove(staleKey);
-        }
-    }
-
-    private void refreshAudioSource() {
-        if (!supportsVoiceAssistantApiAudio()) {
-            ESPHomeVoiceAssistantAudioSource source = audioSource;
-            audioSource = null;
-            if (source != null) {
-                source.close();
-            }
-            ServiceRegistration<AudioSource> registration = audioSourceRegistration;
-            audioSourceRegistration = null;
-            if (registration != null) {
-                registration.unregister();
-            }
-            return;
-        }
-
-        if (audioSource == null) {
-            ESPHomeVoiceAssistantAudioSource newAudioSource = new ESPHomeVoiceAssistantAudioSource(this);
-            audioSourceRegistration = bundleContext.registerService(AudioSource.class, newAudioSource,
-                    new Hashtable<>());
-            audioSource = newAudioSource;
-        }
-    }
-
-    private void refreshVoiceDialog() {
-        ESPHomeVoiceAssistantAudioSource source = audioSource;
-        ESPHomeConfiguration cfg = config;
-        if (source == null || cfg == null || !cfg.voiceDialog) {
-            return;
-        }
-        if (!source.hasDialogTrigger() && !startVoiceDialog(source)) {
-            return;
-        }
-        if (!source.subscribeForDialogTrigger()) {
-            retryVoiceDialog("could not subscribe to the device");
-            return;
-        }
-        synchronized (voiceDialogLock) {
-            voiceDialogBackoff.reset();
-            voiceDialogRetryWarned = false;
-        }
-    }
-
-    /**
-     * @return true if the dialog started
-     */
-    private boolean startVoiceDialog(ESPHomeVoiceAssistantAudioSource source) {
-        ESPHomeAudioSink sink = voiceDialogSink();
-        if (sink == null) {
-            logger.debug(mediaPlayers.isEmpty() ? "[{}] No media player, not starting voice dialog"
-                    : "[{}] Media player has no audio sink, not starting voice dialog", logPrefix);
-            return false;
-        }
-        AtomicBoolean stopped = new AtomicBoolean();
-        Runnable trigger;
-        try {
-            trigger = AudioDialogProviderShim.startDialog(bundleContext, sink, source,
-                    () -> onVoiceDialogStopped(source, stopped), source::onDialogIdle);
-        } catch (UnsupportedOperationException e) {
-            logger.debug("[{}] Voice dialog not supported: {}", logPrefix, e.getMessage());
-            return false;
-        } catch (IllegalStateException e) {
-            retryVoiceDialog(String.valueOf(e.getMessage()));
-            return false;
-        }
-        synchronized (voiceDialogLock) {
-            // openHAB already stopped it
-            if (stopped.get()) {
-                return false;
-            }
-            source.setDialogTrigger(trigger);
-        }
-        audioSinks.values().forEach(s -> s.setVoiceAssistant(s == sink ? source : null));
-        logger.debug("[{}] Voice dialog started for {} and {}", logPrefix, source.getId(), sink.getId());
-        return true;
-    }
-
-    /**
-     * Prefers a media player that supports announcements.
-     */
-    private @Nullable ESPHomeAudioSink voiceDialogSink() {
-        return mediaPlayers.values().stream()
-                .sorted(Comparator.comparing((ListEntitiesMediaPlayerResponse p) -> !supportsAnnouncements(p))
-                        .thenComparing(ListEntitiesMediaPlayerResponse::getObjectId))
-                .map(p -> audioSinks.get(p.getKey())).filter(Objects::nonNull).findFirst().orElse(null);
-    }
-
-    private static boolean supportsAnnouncements(ListEntitiesMediaPlayerResponse mediaPlayer) {
-        return mediaPlayer.getSupportedFormatsList().stream()
-                .anyMatch(f -> f.getPurpose() == MediaPlayerFormatPurpose.MEDIA_PLAYER_FORMAT_PURPOSE_ANNOUNCEMENT);
-    }
-
-    /**
-     * Called when openHAB stops the dialog.
-     */
-    private void onVoiceDialogStopped(ESPHomeVoiceAssistantAudioSource source, AtomicBoolean stopped) {
-        synchronized (voiceDialogLock) {
-            stopped.set(true);
-            source.setDialogTrigger(null);
-        }
-        logger.debug("[{}] Voice dialog stopped by openHAB, restarting", logPrefix);
-        scheduleVoiceDialogRestart();
-    }
-
-    private void retryVoiceDialog(String reason) {
-        synchronized (voiceDialogLock) {
-            if (!voiceDialogRetryWarned) {
-                voiceDialogRetryWarned = true;
-                logger.warn("[{}] Cannot start voice dialog, retrying: {}", logPrefix, reason);
-            } else {
-                logger.debug("[{}] Cannot start voice dialog, retrying: {}", logPrefix, reason);
-            }
-        }
-        scheduleVoiceDialogRestart();
-    }
-
-    private void scheduleVoiceDialogRestart() {
-        if (disposed) {
-            return;
-        }
-        synchronized (voiceDialogLock) {
-            ScheduledFuture<?> pending = voiceDialogRestartFuture;
-            if (pending != null && !pending.isDone()) {
-                return;
-            }
-            voiceDialogRestartFuture = schedule(this::restartVoiceDialog, voiceDialogBackoff.getNextDelay(),
-                    TimeUnit.MILLISECONDS);
-        }
-    }
-
-    private void restartVoiceDialog() {
-        // block disconnects until the dialog has started
+    private void runIfConnected(Runnable task) {
         synchronized (connectionStateLock) {
-            synchronized (voiceDialogLock) {
-                voiceDialogRestartFuture = null;
+            if (!disposed && interrogated && connectionState == ConnectionState.CONNECTED) {
+                task.run();
             }
-            if (disposed || !interrogated || connectionState != ConnectionState.CONNECTED) {
-                return;
-            }
-            refreshVoiceDialog();
-        }
-    }
-
-    private void cancelVoiceDialogRestart() {
-        synchronized (voiceDialogLock) {
-            ScheduledFuture<?> pending = voiceDialogRestartFuture;
-            if (pending != null) {
-                pending.cancel(false);
-                voiceDialogRestartFuture = null;
-            }
-            voiceDialogBackoff.reset();
-            voiceDialogRetryWarned = false;
-        }
-    }
-
-    private @Nullable String resolveAudioSinkBaseUrl() {
-        if (StringUtils.isNotBlank(bindingPropertyAudioBaseUrl)) {
-            return bindingPropertyAudioBaseUrl.trim();
-        }
-        @Nullable
-        String primaryAddress = networkAddressService.getPrimaryIpv4HostAddress();
-        return primaryAddress != null
-                ? "http://" + primaryAddress + ":" + HttpServiceUtil.getHttpServicePort(bundleContext)
-                : null;
-    }
-
-    private void unregisterAudioSinks() {
-        for (ServiceRegistration<AudioSink> registration : audioSinkRegistrations.values()) {
-            if (registration != null) {
-                registration.unregister();
-            }
-        }
-        audioSinkRegistrations.clear();
-        for (ESPHomeAudioSink sink : audioSinks.values()) {
-            sink.dispose();
-        }
-        audioSinks.clear();
-    }
-
-    private void unregisterAudioSource() {
-        ESPHomeVoiceAssistantAudioSource source = audioSource;
-        if (source != null) {
-            source.close();
-            audioSource = null;
-        }
-        ServiceRegistration<AudioSource> sourceRegistration = audioSourceRegistration;
-        if (sourceRegistration != null) {
-            sourceRegistration.unregister();
-            audioSourceRegistration = null;
-        }
-    }
-
-    private boolean supportsVoiceAssistantApiAudio() {
-        return (voiceAssistantFeatureFlags & VoiceAssistantFeature.API_AUDIO.getFlag()) != 0;
-    }
-
-    private void handleMediaPlayerEntity(ListEntitiesMediaPlayerResponse message) {
-        mediaPlayers.put(message.getKey(), message);
-    }
-
-    private void handleMediaPlayerState(MediaPlayerStateResponse message) {
-        if (!mediaPlayers.containsKey(message.getKey())) {
-            return;
-        }
-
-        mediaPlayerStates.put(message.getKey(), message);
-        ESPHomeAudioSink sink = audioSinks.get(message.getKey());
-        if (sink != null) {
-            sink.updateState(message);
         }
     }
 
@@ -626,9 +284,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
                 String hostname = config.hostname;
                 int port = config.port;
-                ResolvedConnectionTarget connectionTarget = resolveConnectionTarget(hostname);
-                resolvedIpAddressForCurrentConnection = connectionTarget.cacheLastKnownIpAddress
-                        ? connectionTarget.ipAddress
+                ResolvedConnectionTarget connectionTarget = connectionTargetResolver.resolve(hostname,
+                        thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS), logPrefix);
+                resolvedIpAddressForCurrentConnection = connectionTarget.cacheLastKnownIpAddress()
+                        ? connectionTarget.ipAddress()
                         : null;
                 applyLastKnownIpAddressPolicy(connectionTarget);
 
@@ -650,16 +309,16 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                                 "No encryption key configured. Automatic adoption requires an editable Thing; configure encryptionKey manually");
                         return;
                     }
-                    encryptionKey = PROVISIONING_KEY;
+                    encryptionKey = EncryptionKeyProvisioning.PROVISIONING_KEY;
                     provisioningConnection = true;
                 } else {
-                    rejectProvisioningKey(Objects.requireNonNull(encryptionKey));
+                    EncryptionKeyProvisioning.rejectProvisioningKey(Objects.requireNonNull(encryptionKey));
                 }
 
                 frameHelper = new EncryptedFrameHelper(connectionSelector, createConnectionListener(generation),
                         encryptionKey, config.deviceId, logPrefix, packetProcessor);
 
-                frameHelper.connect(connectionTarget.connectHost, port);
+                frameHelper.connect(connectionTarget.connectHost(), port);
 
                 scheduleConnectionTimeoutWatchdog("Connection watchdog", "Connection attempt timed out");
 
@@ -698,17 +357,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                     scheduleConnect(exponentialBackoff.getNextDelay());
                 }
             }
-        }
-    }
-
-    private void rejectProvisioningKey(String encryptionKey) throws ProtocolAPIError {
-        try {
-            if (Arrays.equals(Base64.getDecoder().decode(encryptionKey), new byte[32])) {
-                throw new ProtocolAPIError(
-                        "The reserved bootstrap encryption key cannot be configured; remove it to adopt the device automatically");
-            }
-        } catch (IllegalArgumentException e) {
-            throw new ProtocolAPIError("Invalid base64 encryption key", e);
         }
     }
 
@@ -811,8 +459,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         return;
                     }
 
-                    AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = commandTypeToHandlerMap
-                            .get(entityType);
+                    AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = entityMessageHandlers
+                            .forEntityType(entityType);
                     if (abstractMessageHandler == null) {
                         logger.warn("[{}] No message handler for entity type {}", logPrefix, entityType);
                     } else {
@@ -898,11 +546,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             eventSubscriber.removeEventSubscriptions(this);
             cancelPingWatchdog();
             cancelConnectionTimeoutWatchdog();
-            unregisterAudioSinks();
-            unregisterAudioSource();
-            // unregistering above schedules a restart
-            cancelVoiceDialogRestart();
-            voiceAssistantFeatureFlags = 0;
+            audioManager.disconnect();
             unregisterSerialProxies();
 
             if (frameHelper != null) {
@@ -941,207 +585,192 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             return;
         }
 
-        // The bootstrap PSK is public. Do not trust this session with actions, state updates,
-        // proxy data, or other normal traffic until it reconnects using the saved private key.
-        if (provisioningConnection && !(message instanceof AuthenticationResponse
-                || message instanceof DeviceInfoResponse || message instanceof NoiseEncryptionSetKeyResponse
-                || message instanceof PingRequest || message instanceof PingResponse
-                || message instanceof DisconnectRequest || message instanceof DisconnectResponse)) {
+        if (provisioningConnection && !EncryptionKeyProvisioning.isAllowedDuringProvisioning(message)) {
             return;
         }
 
-        if (message instanceof AuthenticationResponse connectResponse) {
-            if (connectResponse.getInvalidPassword()) {
-                logger.trace("[{}] Received login response {}", logPrefix, connectResponse);
-
-                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
-            }
-            return;
+        MessageConsumer<GeneratedMessage> controlMessageHandler = controlMessageHandlers.get(message.getClass());
+        if (controlMessageHandler != null) {
+            controlMessageHandler.accept(message);
+        } else {
+            handleEntityMessage(message);
         }
+    }
 
-        if (message instanceof NoiseEncryptionSetKeyResponse response && provisioningKeyPending) {
-            provisioningKeyPending = false;
-            if (!response.getSuccess()) {
-                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                        "Device rejected the encryption key. The generated key remains in the Thing configuration");
-            } else {
-                logger.info("[{}] Device encryption key provisioned", logPrefix);
-                handleDisconnection(ThingStatusDetail.NONE, "Encryption key provisioned; reconnecting");
-            }
-            return;
-        }
-
-        if (message instanceof DeviceInfoResponse rsp) {
-            if (provisioningConnection) {
-                provisionEncryptionKey(rsp);
-                return;
-            }
-            Map<String, String> props = new HashMap<>(thing.getProperties());
-            props.put(Thing.PROPERTY_FIRMWARE_VERSION, rsp.getEsphomeVersion());
-            props.put(Thing.PROPERTY_MAC_ADDRESS, rsp.getMacAddress());
-            props.put(Thing.PROPERTY_MODEL_ID, rsp.getModel());
-            props.put("name", rsp.getName());
-            props.put(Thing.PROPERTY_VENDOR, rsp.getManufacturer());
-            props.put("compilationTime", rsp.getCompilationTime());
-            espHomeDeviceName = rsp.getName();
-            if (!rsp.getProjectName().isEmpty()) {
-                props.put("projectName", rsp.getProjectName());
-            } else {
-                props.remove("projectName");
-            }
-            if (!rsp.getProjectVersion().isEmpty()) {
-                props.put("projectVersion", rsp.getProjectVersion());
-            } else {
-                props.remove("projectVersion");
-            }
-            if (!rsp.getHasDeepSleep() && config.deepSleep) {
-                logger.warn(
-                        "[{}] Thing is configured with deep sleep, but the ESPHome device does not support it. Disabling deep sleep mode",
-                        logPrefix);
-                config.deepSleep = false;
-            }
-
-            voiceAssistantFeatureFlags = rsp.getVoiceAssistantFeatureFlags();
-
-            serialPortProvider.register(this, rsp.getSerialProxiesList());
-
-            updateThing(editThing().withProperties(props).build());
-
-            String compilationTime = rsp.getCompilationTime();
-            if (!compilationTime.isEmpty() && compilationTime.equals(interrogatedCompilationTime)) {
-                logger.debug(
-                        "[{}] Firmware compilation time '{}' unchanged since last interrogation, reusing existing channels and actions",
-                        logPrefix, compilationTime);
-                frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
-                frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
-                updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
-                        versionService.getLatestVersion());
-                refreshAudioServices();
-            } else {
-                logger.debug("[{}] Firmware compilation time changed from '{}' to '{}', starting device interrogation",
-                        logPrefix, interrogatedCompilationTime, compilationTime);
-                startInterrogation(compilationTime);
-            }
-        } else if (message instanceof ListEntitiesMediaPlayerResponse mediaPlayerResponse) {
-            handleMediaPlayerEntity(mediaPlayerResponse);
-            classToHandlerMap.get(message.getClass()).handleMessage(message);
-        } else if (message instanceof SerialProxyDataReceived serialProxyDataReceived) {
-            serialPortProvider.handleData(this, serialProxyDataReceived);
-        } else if (message instanceof SerialProxyGetModemPinsResponse serialProxyGetModemPinsResponse) {
-            serialPortProvider.handleModemPins(this, serialProxyGetModemPinsResponse);
-        } else if (message instanceof ListEntitiesDoneResponse) {
-
-            addFirmwareChannels();
-
-            thingActionServiceRegistrations.add(bundleContext.registerService(ThingActions.class,
-                    new FirmwareUpgradeAction(this), new Hashtable<>()));
-
-            updateThing(editThing().withChannels(dynamicChannels).build());
-            sweepOrphanedChannelTypes();
-            logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
-            interrogated = true;
-            interrogatedCompilationTime = pendingCompilationTime;
-            refreshAudioServices();
-            frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
-
-            updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
-                    versionService.getLatestVersion());
-
-        } else if (message instanceof PingRequest) {
+    /**
+     * Messages other than entity list and state messages; entity messages go to {@link EntityMessageHandlers}.
+     */
+    private void registerControlMessageHandlers() {
+        on(AuthenticationResponse.class, this::onAuthenticationResponse);
+        on(NoiseEncryptionSetKeyResponse.class, this::onNoiseEncryptionSetKeyResponse);
+        on(DeviceInfoResponse.class, this::onDeviceInfo);
+        on(ListEntitiesDoneResponse.class, m -> onListEntitiesDone());
+        on(ListEntitiesServicesResponse.class, this::onListEntitiesServices);
+        on(ListEntitiesMediaPlayerResponse.class, m -> {
+            audioManager.onMediaPlayerEntity(m);
+            handleEntityMessage(m);
+        });
+        on(MediaPlayerStateResponse.class, m -> {
+            audioManager.onMediaPlayerState(m);
+            handleEntityMessage(m);
+        });
+        on(PingRequest.class, m -> {
             logger.debug("[{}] Responding to ping request", logPrefix);
             frameHelper.send(PingResponse.getDefaultInstance());
-        } else if (message instanceof PingResponse) {
+        });
+        on(PingResponse.class, m -> {
             logger.debug("[{}] Received ping response", logPrefix);
             lastPong = Instant.now();
-        } else if (message instanceof DisconnectRequest) {
+        });
+        on(DisconnectRequest.class, m -> {
             frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
-        } else if (message instanceof DisconnectResponse) {
-            remoteDisconnect();
-        } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
-            deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
-        } else if (message instanceof VoiceAssistantRequest voiceAssistantRequest) {
-            ESPHomeVoiceAssistantAudioSource source = audioSource;
-            if (source != null) {
-                source.handleVoiceAssistantRequest(voiceAssistantRequest);
-            }
-        } else if (message instanceof VoiceAssistantAudio voiceAssistantAudio) {
-            ESPHomeVoiceAssistantAudioSource source = audioSource;
-            if (source != null) {
-                source.handleVoiceAssistantAudio(voiceAssistantAudio);
-            }
-        } else if (message instanceof VoiceAssistantAnnounceFinished) {
-            // the media player state already shows when a reply has played
-            logger.debug("[{}] Device finished playing a voice assistant reply", logPrefix);
-        } else if (message instanceof HomeassistantActionRequest serviceResponse) {
-            Map<String, String> data = convertPbListToMap(serviceResponse.getDataList());
-            Map<String, String> dataTemplate = convertPbListToMap(serviceResponse.getDataTemplateList());
-            Map<String, String> variables = convertPbListToMap(serviceResponse.getVariablesList());
-            AbstractEvent event;
-            if (serviceResponse.getIsEvent()) {
-                String tagId;
-                if (serviceResponse.getService().equals(ACTION_TAG_SCANNED) && dataTemplate.isEmpty()
-                        && variables.isEmpty() && data.size() == 1 && (tagId = data.get("tag_id")) != null) {
-                    event = ESPHomeEventFactory.createTagScannedEvent(config.deviceId, tagId);
-                } else {
-                    event = ESPHomeEventFactory.createEventEvent(config.deviceId, serviceResponse.getService(), data,
-                            dataTemplate, variables);
-                }
-            } else {
-                event = ESPHomeEventFactory.createActionEvent(config.deviceId, serviceResponse.getService(), data,
-                        dataTemplate, variables);
-            }
-            eventPublisher.post(event);
-        } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
-            initializeStateSubscription(subscribeHomeAssistantStateResponse);
-        } else if (message instanceof GetTimeRequest) {
+        });
+        on(DisconnectResponse.class, m -> remoteDisconnect());
+        on(GetTimeRequest.class, m -> {
             logger.debug("[{}] Received time sync request", logPrefix);
-            GetTimeResponse getTimeResponse = GetTimeResponse.newBuilder()
-                    .setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build();
-            frameHelper.send(getTimeResponse);
-        } else if (message instanceof BluetoothLEAdvertisementResponse
-                || message instanceof BluetoothLERawAdvertisementsResponse
-                || message instanceof BluetoothDeviceConnectionResponse
-                || message instanceof BluetoothGATTGetServicesResponse
-                || message instanceof BluetoothGATTGetServicesDoneResponse
-                || message instanceof BluetoothGATTReadResponse || message instanceof BluetoothGATTNotifyDataResponse
-                || message instanceof BluetoothConnectionsFreeResponse || message instanceof BluetoothGATTErrorResponse
-                || message instanceof BluetoothGATTWriteResponse || message instanceof BluetoothGATTNotifyResponse
-                || message instanceof BluetoothDevicePairingResponse
-                || message instanceof BluetoothDeviceUnpairingResponse
-                || message instanceof BluetoothDeviceClearCacheResponse
-                || message instanceof BluetoothScannerStateResponse) {
-            if (espHomeBluetoothProxyHandler != null) {
-                espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this);
-            }
-        } else if (message instanceof ListEntitiesServicesResponse listEntitiesServicesResponse) {
-            logger.debug("[{}] Received list entities services response {}", logPrefix, listEntitiesServicesResponse);
+            frameHelper.send(
+                    GetTimeResponse.newBuilder().setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build());
+        });
+        on(SubscribeLogsResponse.class, m -> deviceLogger.info("[{}] {}", logPrefix, m.getMessage().toStringUtf8()));
+        on(VoiceAssistantRequest.class, m -> audioManager.onVoiceAssistantRequest(m));
+        on(VoiceAssistantAudio.class, m -> audioManager.onVoiceAssistantAudio(m));
+        // the media player state already shows when a reply has played
+        on(VoiceAssistantAnnounceFinished.class,
+                m -> logger.debug("[{}] Device finished playing a voice assistant reply", logPrefix));
+        on(HomeassistantActionRequest.class, m -> homeAssistantBridge.onActionRequest(m, config.deviceId));
+        on(SubscribeHomeAssistantStateResponse.class, m -> sendStateToDevice(homeAssistantBridge.subscribe(m)));
+        on(SerialProxyDataReceived.class, m -> serialPortProvider.handleData(this, m));
+        on(SerialProxyGetModemPinsResponse.class, m -> serialPortProvider.handleModemPins(this, m));
+        ESPHomeBluetoothProxyHandler.BLUETOOTH_MESSAGE_TYPES.forEach(type -> on(type, this::onBluetoothMessage));
+    }
 
-            try {
-                AbstractESPHomeThingAction thingAction = DynamicThingActionsGenerator
-                        .generateDynamicThingAction(listEntitiesServicesResponse, thingActionClassLoader);
-                thingAction.setListEntitiesServicesResponse(listEntitiesServicesResponse);
-                thingAction.setThingHandler(this);
-                thingActionServiceRegistrations
-                        .add(bundleContext.registerService(ThingActions.class, thingAction, new Hashtable<>()));
+    private <T extends GeneratedMessage> void on(Class<T> type, MessageConsumer<T> consumer) {
+        controlMessageHandlers.put(type, message -> consumer.accept(type.cast(message)));
+    }
 
-            } catch (Exception e) {
-                logger.warn("[{}] Error generating dynamic actions from device: {}", logPrefix, e.getMessage(), e);
-            }
-
+    private void handleEntityMessage(GeneratedMessage message) {
+        AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> messageHandler = entityMessageHandlers
+                .forMessage(message);
+        if (messageHandler != null) {
+            messageHandler.handleMessage(message);
         } else {
-            if (message instanceof MediaPlayerStateResponse mediaPlayerStateResponse) {
-                handleMediaPlayerState(mediaPlayerStateResponse);
-            }
-            // Regular messages handled by message handlers
-            AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = classToHandlerMap
-                    .get(message.getClass());
-            if (abstractMessageHandler != null) {
-                abstractMessageHandler.handleMessage(message);
-            } else {
-                logger.warn("[{}] Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
-                        logPrefix, message.getClass().getName(), message);
-            }
+            logger.warn("[{}] Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
+                    logPrefix, message.getClass().getName(), message);
+        }
+    }
+
+    private void onAuthenticationResponse(AuthenticationResponse response) {
+        if (response.getInvalidPassword()) {
+            logger.trace("[{}] Received login response {}", logPrefix, response);
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
+        }
+    }
+
+    private void onNoiseEncryptionSetKeyResponse(NoiseEncryptionSetKeyResponse response) {
+        if (!provisioningKeyPending) {
+            handleEntityMessage(response);
+            return;
+        }
+        provisioningKeyPending = false;
+        if (!response.getSuccess()) {
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Device rejected the encryption key. The generated key remains in the Thing configuration");
+        } else {
+            logger.info("[{}] Device encryption key provisioned", logPrefix);
+            handleDisconnection(ThingStatusDetail.NONE, "Encryption key provisioned; reconnecting");
+        }
+    }
+
+    private void onDeviceInfo(DeviceInfoResponse rsp) throws ProtocolAPIError {
+        if (provisioningConnection) {
+            provisionEncryptionKey(rsp);
+            return;
+        }
+        Map<String, String> props = new HashMap<>(thing.getProperties());
+        props.put(Thing.PROPERTY_FIRMWARE_VERSION, rsp.getEsphomeVersion());
+        props.put(Thing.PROPERTY_MAC_ADDRESS, rsp.getMacAddress());
+        props.put(Thing.PROPERTY_MODEL_ID, rsp.getModel());
+        props.put("name", rsp.getName());
+        props.put(Thing.PROPERTY_VENDOR, rsp.getManufacturer());
+        props.put("compilationTime", rsp.getCompilationTime());
+        espHomeDeviceName = rsp.getName();
+        if (!rsp.getProjectName().isEmpty()) {
+            props.put("projectName", rsp.getProjectName());
+        } else {
+            props.remove("projectName");
+        }
+        if (!rsp.getProjectVersion().isEmpty()) {
+            props.put("projectVersion", rsp.getProjectVersion());
+        } else {
+            props.remove("projectVersion");
+        }
+        if (!rsp.getHasDeepSleep() && config.deepSleep) {
+            logger.warn(
+                    "[{}] Thing is configured with deep sleep, but the ESPHome device does not support it. Disabling deep sleep mode",
+                    logPrefix);
+            config.deepSleep = false;
+        }
+
+        audioManager.setVoiceAssistantFeatureFlags(rsp.getVoiceAssistantFeatureFlags());
+
+        serialPortProvider.register(this, rsp.getSerialProxiesList());
+
+        updateThing(editThing().withProperties(props).build());
+
+        String compilationTime = rsp.getCompilationTime();
+        if (!compilationTime.isEmpty() && compilationTime.equals(interrogatedCompilationTime)) {
+            logger.debug(
+                    "[{}] Firmware compilation time '{}' unchanged since last interrogation, reusing existing channels and actions",
+                    logPrefix, compilationTime);
+            frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
+            frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
+            updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
+                    versionService.getLatestVersion());
+            refreshAudioServices();
+        } else {
+            logger.debug("[{}] Firmware compilation time changed from '{}' to '{}', starting device interrogation",
+                    logPrefix, interrogatedCompilationTime, compilationTime);
+            startInterrogation(compilationTime);
+        }
+    }
+
+    private void onListEntitiesDone() throws ProtocolAPIError {
+        addFirmwareChannels();
+
+        thingActionServiceRegistrations.add(
+                bundleContext.registerService(ThingActions.class, new FirmwareUpgradeAction(this), new Hashtable<>()));
+
+        updateThing(editThing().withChannels(dynamicChannels).build());
+        sweepOrphanedChannelTypes();
+        logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
+        interrogated = true;
+        interrogatedCompilationTime = pendingCompilationTime;
+        refreshAudioServices();
+        frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
+
+        updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
+                versionService.getLatestVersion());
+    }
+
+    private void onListEntitiesServices(ListEntitiesServicesResponse response) {
+        logger.debug("[{}] Received list entities services response {}", logPrefix, response);
+        try {
+            AbstractESPHomeThingAction thingAction = DynamicThingActionsGenerator.generateDynamicThingAction(response,
+                    thingActionClassLoader);
+            thingAction.setListEntitiesServicesResponse(response);
+            thingAction.setThingHandler(this);
+            thingActionServiceRegistrations
+                    .add(bundleContext.registerService(ThingActions.class, thingAction, new Hashtable<>()));
+        } catch (Exception e) {
+            logger.warn("[{}] Error generating dynamic actions from device: {}", logPrefix, e.getMessage(), e);
+        }
+    }
+
+    private void onBluetoothMessage(GeneratedMessage message) {
+        ESPHomeBluetoothProxyHandler proxyHandler = espHomeBluetoothProxyHandler;
+        if (proxyHandler != null) {
+            proxyHandler.handleBluetoothMessage(message, this);
         }
     }
 
@@ -1175,29 +804,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private void initializeStateSubscription(SubscribeHomeAssistantStateResponse rsp) {
-        // Setup event subscriber
-        logger.debug("[{}] Start subscribe to OH events entity: {}, attribute: {}", logPrefix, rsp.getEntityId(),
-                rsp.getAttribute());
-
-        EventSubscription subscription = eventSubscriber.createEventSubscription(rsp.getEntityId(), rsp.getAttribute(),
-                this);
-        eventSubscriber.addEventSubscription(this, subscription);
-
-        String state = eventSubscriber.getInitialState(logPrefix, subscription);
-
-        logger.debug("[{}] Sending initial state for subscription {} with state '{}'", logPrefix, subscription, state);
-
-        HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
-                .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute()).setState(state)
-                .build();
-        try {
-            frameHelper.send(ohStateUpdate);
-        } catch (ProtocolAPIError e) {
-            logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
-        }
-    }
-
     public void handleOpenHABEvent(EventSubscription subscription, String esphomeState) {
         synchronized (connectionStateLock) {
             if (disposed || provisioningConnection || connectionState != ConnectionState.CONNECTED) {
@@ -1205,14 +811,15 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         subscription.getEntityId());
                 return;
             }
-            HomeAssistantStateResponse ohStateUpdate = HomeAssistantStateResponse.newBuilder()
-                    .setEntityId(subscription.getEntityId()).setAttribute(subscription.getAttribute())
-                    .setState(esphomeState).build();
-            try {
-                frameHelper.send(ohStateUpdate);
-            } catch (ProtocolAPIError e) {
-                logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
-            }
+            sendStateToDevice(HomeAssistantBridge.stateResponse(subscription, esphomeState));
+        }
+    }
+
+    private void sendStateToDevice(HomeAssistantStateResponse stateResponse) {
+        try {
+            frameHelper.send(stateResponse);
+        } catch (ProtocolAPIError e) {
+            logger.warn("[{}] Error sending OpenHAB state update to ESPHome", logPrefix, e);
         }
     }
 
@@ -1233,41 +840,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         if (provisioningKeyPending) {
             return;
         }
-        ManagedThingProvider provider = managedThingProvider;
-        if (!response.getApiEncryptionProvisionable() || !response.getApiEncryptionSupported() || provider == null
-                || provider.get(thing.getUID()) == null) {
-            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Device cannot be automatically adopted. Configure its existing encryptionKey manually");
-            return;
-        }
-        // Persist before changing the device so the credential survives a restart or lost response.
-        // Recheck the stored configuration to avoid replacing a key entered while connecting.
-        Thing storedThing = provider.get(thing.getUID());
-        if (storedThing == null
-                || StringUtils.isNotBlank((String) storedThing.getConfiguration().get(CONFIG_ENCRYPTION_KEY))) {
-            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Thing configuration changed during adoption; reconnect with the configured key");
-            return;
-        }
-        byte[] key = new byte[32];
-        SecureRandom random = new SecureRandom();
         String encodedKey;
-        do {
-            random.nextBytes(key);
-            encodedKey = Base64.getEncoder().encodeToString(key);
-        } while (PROVISIONING_KEY.equals(encodedKey));
-        var configuration = new org.openhab.core.config.core.Configuration(
-                storedThing.getConfiguration().getProperties());
-        configuration.put(CONFIG_ENCRYPTION_KEY, encodedKey);
         try {
-            updateConfiguration(configuration);
-            Thing savedThing = provider.get(thing.getUID());
-            if (savedThing == null || !encodedKey.equals(savedThing.getConfiguration().get(CONFIG_ENCRYPTION_KEY))) {
-                throw new IllegalStateException("Encryption key was not saved");
-            }
-        } catch (RuntimeException e) {
-            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Could not save encryption key to Thing configuration; device was not changed");
+            encodedKey = EncryptionKeyProvisioning.generateAndSaveKey(response, managedThingProvider, thing.getUID(),
+                    this::updateConfiguration);
+        } catch (AdoptionFailedException e) {
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, String.valueOf(e.getMessage()));
             return;
         }
         config.encryptionKey = encodedKey;
@@ -1359,10 +937,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         // Clean up old actions
         clearThingActions();
-        unregisterAudioSinks();
-        unregisterAudioSource();
-        mediaPlayers.clear();
-        mediaPlayerStates.clear();
+        audioManager.clearEntities();
         // Create a new classloader for the ThingActions generated from this device, to allow for proper
         // unloading of old classes when the device reappears with different actions after a reconnect
         thingActionClassLoader = new ClassLoader(getClass().getClassLoader()) {
@@ -1385,70 +960,30 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private ResolvedConnectionTarget resolveConnectionTarget(String configuredHostname) throws ProtocolAPIError {
-        if (InetAddresses.isInetAddress(configuredHostname)) {
-            InetAddress configuredAddress = InetAddresses.forString(configuredHostname);
-            String configuredIpAddress = configuredAddress.getHostAddress();
-            return new ResolvedConnectionTarget(configuredIpAddress, configuredIpAddress, configuredHostname,
-                    configuredHostname, false);
-        }
-
-        Optional<String> mdnsIp = mdnsHostnameResolver.resolve(configuredHostname);
-        if (mdnsIp.isPresent()) {
-            String ip = mdnsIp.get();
-            logger.debug("[{}] Resolved '{}' via mDNS cache to {}", logPrefix, configuredHostname, ip);
-            return new ResolvedConnectionTarget(ip, ip, configuredHostname + " (mDNS " + ip + ")", configuredHostname,
-                    true);
-        }
-
-        try {
-            InetAddress resolvedAddress = InetAddress.getByName(configuredHostname);
-            return new ResolvedConnectionTarget(resolvedAddress.getHostAddress(), resolvedAddress.getHostAddress(),
-                    configuredHostname, configuredHostname, true);
-        } catch (UnknownHostException e) {
-            String lastKnownIpAddress = StringUtils
-                    .trimToNull(thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS));
-            if (lastKnownIpAddress != null && InetAddresses.isInetAddress(lastKnownIpAddress)) {
-                logger.warn("[{}] Failed to resolve '{}'. Falling back to cached IP {}", logPrefix, configuredHostname,
-                        lastKnownIpAddress);
-                return new ResolvedConnectionTarget(lastKnownIpAddress, lastKnownIpAddress,
-                        configuredHostname + " (cached " + lastKnownIpAddress + ")", lastKnownIpAddress, true);
-            }
-            throw new ProtocolAPIError("Failed to resolve hostname '" + configuredHostname + "'", e);
-        }
-    }
-
     private void applyLastKnownIpAddressPolicy(ResolvedConnectionTarget connectionTarget) {
-        if (connectionTarget.cacheLastKnownIpAddress) {
-            return;
+        if (!connectionTarget.cacheLastKnownIpAddress()) {
+            setThingProperty(PROPERTY_LAST_KNOWN_IP_ADDRESS, null);
         }
-        removeLastKnownIpAddressProperty();
     }
 
     private void persistLastKnownIpAddress() {
         String ipAddress = resolvedIpAddressForCurrentConnection;
-        if (StringUtils.isBlank(ipAddress)
-                || ipAddress.equals(thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS))) {
-            return;
+        if (StringUtils.isNotBlank(ipAddress)) {
+            setThingProperty(PROPERTY_LAST_KNOWN_IP_ADDRESS, ipAddress);
         }
-
-        Map<String, String> props = new HashMap<>(thing.getProperties());
-        props.put(PROPERTY_LAST_KNOWN_IP_ADDRESS, ipAddress);
-        updateThing(editThing().withProperties(props).build());
     }
 
-    private void removeLastKnownIpAddressProperty() {
-        if (!thing.getProperties().containsKey(PROPERTY_LAST_KNOWN_IP_ADDRESS)) {
+    private void setThingProperty(String key, @Nullable String value) {
+        if (Objects.equals(thing.getProperties().get(key), value)) {
             return;
         }
-
         Map<String, String> props = new HashMap<>(thing.getProperties());
-        props.remove(PROPERTY_LAST_KNOWN_IP_ADDRESS);
+        if (value == null) {
+            props.remove(key);
+        } else {
+            props.put(key, value);
+        }
         updateThing(editThing().withProperties(props).build());
-    }
-
-    private record ResolvedConnectionTarget(String connectHost, String ipAddress, String logTarget, String statusTarget,
-            boolean cacheLastKnownIpAddress) {
     }
 
     public void addChannelType(ChannelType channelType) {
@@ -1583,14 +1118,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         return logPrefix;
     }
 
-    private Map<String, String> convertPbListToMap(List<HomeassistantServiceMap> list) {
-        Map<String, String> map = new HashMap<>();
-        for (HomeassistantServiceMap kv : list) {
-            map.put(kv.getKey(), kv.getValue());
-        }
-        return Collections.unmodifiableMap(map);
-    }
-
     public void onDeviceReappeared() {
         logger.debug("[{}] Device reappeared via mDNS, connection state {}", logPrefix, connectionState);
         synchronized (connectionStateLock) {
@@ -1648,6 +1175,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public @Nullable String getEspHomeDeviceName() {
         return espHomeDeviceName;
+    }
+
+    @FunctionalInterface
+    private interface MessageConsumer<T extends GeneratedMessage> {
+        void accept(T message) throws ProtocolAPIError;
     }
 
     private enum ConnectionState {

@@ -40,6 +40,9 @@ public class BindingConstants {
     public static final String CONFIG_DEVICE_LOG_LEVEL = "deviceLogLevel";
     public static final String CONFIG_ENABLE_BLUETOOTH_PROXY = "enableBluetoothProxy";
 
+    // Thing properties for THING_TYPE_DEVICE
+    public static final String PROPERTY_LAST_KNOWN_IP_ADDRESS = "lastKnownIpAddress";
+
     public static final String CHANNEL_CONFIGURATION_ENTITY_KEY = "entity_key";
     public static final String CHANNEL_CONFIGURATION_ENTITY_TYPE = "entity_type";
     public static final String CHANNEL_CONFIGURATION_ENTITY_FIELD = "entity_field";

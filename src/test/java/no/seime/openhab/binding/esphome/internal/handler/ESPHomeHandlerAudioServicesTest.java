@@ -97,6 +97,7 @@ import no.seime.openhab.binding.esphome.internal.ESPHomeConfiguration;
 import no.seime.openhab.binding.esphome.internal.ESPHomeVersionService;
 import no.seime.openhab.binding.esphome.internal.FirmwareUpgradeService;
 import no.seime.openhab.binding.esphome.internal.MonitoredCompositeExecutorService;
+import no.seime.openhab.binding.esphome.internal.audio.DeviceAudioManager;
 import no.seime.openhab.binding.esphome.internal.audio.ESPHomeAudioSink;
 import no.seime.openhab.binding.esphome.internal.audio.ESPHomeVoiceAssistantAudioSource;
 import no.seime.openhab.binding.esphome.internal.audio.MediaPlayerFeature;
@@ -638,7 +639,7 @@ class ESPHomeHandlerAudioServicesTest {
 
         verify(bundleContext).getServiceReference(DIALOG_PROVIDER);
         assertFalse(source.hasDialogTrigger());
-        assertNull(getField("voiceDialogRestartFuture"));
+        assertNull(getAudioManagerField("voiceDialogRestartFuture"));
     }
 
     @Test
@@ -654,7 +655,7 @@ class ESPHomeHandlerAudioServicesTest {
 
         verify(bundleContext).getServiceReference(DIALOG_PROVIDER);
         assertFalse(source.hasDialogTrigger());
-        assertNotNull(getField("voiceDialogRestartFuture"));
+        assertNotNull(getAudioManagerField("voiceDialogRestartFuture"));
     }
 
     private static boolean dialogProviderClassExists() {
@@ -674,7 +675,7 @@ class ESPHomeHandlerAudioServicesTest {
         ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
 
         assertFalse(source.hasDialogTrigger());
-        assertNull(getField("voiceDialogRestartFuture"));
+        assertNull(getAudioManagerField("voiceDialogRestartFuture"));
     }
 
     @Test
@@ -689,7 +690,7 @@ class ESPHomeHandlerAudioServicesTest {
 
         onAbort.getValue().run();
         assertFalse(source.hasDialogTrigger());
-        assertNotNull(getField("voiceDialogRestartFuture"));
+        assertNotNull(getAudioManagerField("voiceDialogRestartFuture"));
 
         restartVoiceDialog();
 
@@ -706,7 +707,7 @@ class ESPHomeHandlerAudioServicesTest {
 
         ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
         assertFalse(source.hasDialogTrigger());
-        assertNotNull(getField("voiceDialogRestartFuture"));
+        assertNotNull(getAudioManagerField("voiceDialogRestartFuture"));
 
         restartVoiceDialog();
 
@@ -726,7 +727,7 @@ class ESPHomeHandlerAudioServicesTest {
 
         ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
         assertFalse(source.hasDialogTrigger());
-        assertNotNull(getField("voiceDialogRestartFuture"));
+        assertNotNull(getAudioManagerField("voiceDialogRestartFuture"));
 
         restartVoiceDialog();
 
@@ -743,13 +744,13 @@ class ESPHomeHandlerAudioServicesTest {
 
         ESPHomeVoiceAssistantAudioSource source = (ESPHomeVoiceAssistantAudioSource) registerVoiceAssistantSourceWithMediaPlayer();
         assertTrue(source.hasDialogTrigger());
-        assertNotNull(getField("voiceDialogRestartFuture"));
+        assertNotNull(getAudioManagerField("voiceDialogRestartFuture"));
 
         restartVoiceDialog();
 
         verify(frameHelper, times(2)).send(SUBSCRIBE);
         verify(provider, times(1)).startDialog(any(), any(), any(), any(), any());
-        assertNull(getField("voiceDialogRestartFuture"));
+        assertNull(getAudioManagerField("voiceDialogRestartFuture"));
     }
 
     @Test
@@ -784,7 +785,7 @@ class ESPHomeHandlerAudioServicesTest {
                 new Class<?>[] { org.openhab.core.thing.ThingStatusDetail.class, String.class },
                 org.openhab.core.thing.ThingStatusDetail.COMMUNICATION_ERROR, "test");
 
-        assertNull(getField("voiceDialogRestartFuture"));
+        assertNull(getAudioManagerField("voiceDialogRestartFuture"));
         restartVoiceDialog();
         verify(provider, times(1)).startDialog(any(), any(), any(), any(), any());
     }
@@ -968,7 +969,7 @@ class ESPHomeHandlerAudioServicesTest {
     }
 
     private void restartVoiceDialog() throws Exception {
-        invokeMethod("restartVoiceDialog", new Class<?>[0]);
+        invokeAudioManagerMethod("restartVoiceDialog");
     }
 
     private static AudioStream openStream(AudioSource source) {
@@ -1223,7 +1224,7 @@ class ESPHomeHandlerAudioServicesTest {
 
     @Test
     void resolvesAudioSinkBaseUrlFromBindingConfiguration() throws Exception {
-        setField("bindingPropertyAudioBaseUrl", "https://custom-openhab.example.com/");
+        setAudioManagerField("bindingPropertyAudioBaseUrl", "https://custom-openhab.example.com/");
 
         ArgumentCaptor<AudioSink> sinkCaptor = ArgumentCaptor.forClass(AudioSink.class);
         when(bundleContext.registerService(eq(AudioSink.class), sinkCaptor.capture(), any(Dictionary.class)))
@@ -1256,7 +1257,7 @@ class ESPHomeHandlerAudioServicesTest {
 
     @Test
     void fallsBackToPrimaryIpv4WhenNoBindingAudioBaseUrlConfigured() throws Exception {
-        setField("bindingPropertyAudioBaseUrl", null);
+        setAudioManagerField("bindingPropertyAudioBaseUrl", null);
 
         ArgumentCaptor<AudioSink> sinkCaptor = ArgumentCaptor.forClass(AudioSink.class);
         when(bundleContext.registerService(eq(AudioSink.class), sinkCaptor.capture(), any(Dictionary.class)))
@@ -1279,7 +1280,7 @@ class ESPHomeHandlerAudioServicesTest {
         when(bundleContext.registerService(eq(AudioSink.class), any(AudioSink.class), any(Dictionary.class)))
                 .thenReturn(audioSinkRegistration);
 
-        setField("bindingPropertyAudioBaseUrl", "https://proxy.example.com");
+        setAudioManagerField("bindingPropertyAudioBaseUrl", "https://proxy.example.com");
 
         invokeHandleConnected(ListEntitiesMediaPlayerResponse.newBuilder().setKey(11).setObjectId("speaker_one")
                 .setName("Speaker One")
@@ -1291,7 +1292,7 @@ class ESPHomeHandlerAudioServicesTest {
 
     @Test
     void updatesBaseUrlOnExistingAudioSinkWhenRefreshed() throws Exception {
-        setField("bindingPropertyAudioBaseUrl", "https://initial-url.com");
+        setAudioManagerField("bindingPropertyAudioBaseUrl", "https://initial-url.com");
 
         ArgumentCaptor<AudioSink> sinkCaptor = ArgumentCaptor.forClass(AudioSink.class);
         when(bundleContext.registerService(eq(AudioSink.class), sinkCaptor.capture(), any(Dictionary.class)))
@@ -1306,8 +1307,8 @@ class ESPHomeHandlerAudioServicesTest {
         assertEquals("https://initial-url.com", ((ESPHomeAudioSink) sink).getBaseUrl());
 
         // Update binding property and refresh
-        setField("bindingPropertyAudioBaseUrl", "https://updated-url.com///");
-        invokeMethod("refreshAudioSink", new Class<?>[0]);
+        setAudioManagerField("bindingPropertyAudioBaseUrl", "https://updated-url.com///");
+        invokeAudioManagerMethod("refreshAudioSink");
 
         assertEquals("https://updated-url.com", ((ESPHomeAudioSink) sink).getBaseUrl());
     }
@@ -1381,6 +1382,24 @@ class ESPHomeHandlerAudioServicesTest {
         Field field = ESPHomeHandler.class.getDeclaredField(name);
         field.setAccessible(true);
         return field.get(handler);
+    }
+
+    private @Nullable Object getAudioManagerField(String name) throws Exception {
+        Field field = DeviceAudioManager.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(getField("audioManager"));
+    }
+
+    private void setAudioManagerField(String name, @Nullable Object value) throws Exception {
+        Field field = DeviceAudioManager.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(getField("audioManager"), value);
+    }
+
+    private void invokeAudioManagerMethod(String name) throws Exception {
+        Method method = DeviceAudioManager.class.getDeclaredMethod(name);
+        method.setAccessible(true);
+        method.invoke(getField("audioManager"));
     }
 
     private Class<?> getFieldType(String name) throws Exception {
