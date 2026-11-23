@@ -79,6 +79,9 @@ jobs:
       # a permanent download link (used by the openHAB Marketplace entry):
       #   https://github.com/<repo>/releases/latest/download/no.seime.openhab.binding.esphome.jar
       STABLE_JAR_NAME: no.seime.openhab.binding.esphome.jar
+      # Versioned releases older than KEEP_DAYS are deleted, but the newest KEEP_MIN are always kept
+      KEEP_DAYS: 90
+      KEEP_MIN: 5
 
     steps:
       - uses: actions/checkout@v7
@@ -153,3 +156,27 @@ jobs:
             --title "$VERSION" \
             --latest \
             --notes-file versioned-notes.md
+
+      - name: Prune old versioned releases
+        run: |
+          cutoff=$(date -u -d "-${KEEP_DAYS} days" +%s)
+          # Only bundle-version releases (e.g. 4.2.0.202611231545); latest_4.1_release etc. are never touched
+          gh release list --limit 1000 --json tagName,createdAt,isLatest \
+            --jq '[.[] | select(.tagName | test("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]{12}$"))]
+                  | sort_by(.createdAt) | reverse | .[]
+                  | [.tagName, .createdAt, .isLatest] | @tsv' > versioned.tsv
+          i=0
+          pruned=0
+          while IFS=$'\t' read -r tag created latest; do
+            i=$((i + 1))
+            if [ "$i" -le "$KEEP_MIN" ] || [ "$latest" = "true" ]; then
+              continue
+            fi
+            if [ "$(date -u -d "$created" +%s)" -ge "$cutoff" ]; then
+              continue
+            fi
+            echo "Pruning $tag (created $created)"
+            gh release delete "$tag" --cleanup-tag -y
+            pruned=$((pruned + 1))
+          done < versioned.tsv
+          echo "Kept $((i - pruned)) of $i versioned releases, pruned $pruned"

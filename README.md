@@ -52,8 +52,8 @@ the device may already have accepted. Check the device before clearing that key 
 
 Every change to `master` is built and published as a
 [GitHub release](https://github.com/seime/openhab-esphome/releases) for openHAB 4.2 and newer (including 5.x), named
-after the bundle version, e.g. `4.2.0.202611231545`. The newest one is marked *Latest*, and older ones stay
-available so you can pin or roll back to a specific build.
+after the bundle version, e.g. `4.2.0.202611231545`. The newest one is marked *Latest*. Older ones are kept
+for 90 days (the newest 5 are always kept), so you can pin or roll back to a specific build.
 
 Each release contains the same jar under two names: `no.seime.openhab.binding.esphome-<version>.jar` and
 `no.seime.openhab.binding.esphome.jar`. The second one gives a permanent link to the newest build, which is what
