@@ -6,12 +6,17 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.*;
 import org.openhab.binding.bluetooth.notification.BluetoothConnectionStatusNotification;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
+import org.openhab.core.thing.binding.ThingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +48,15 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     private final Map<Integer, CompletableFuture<@Nullable Void>> pendingWrites = new ConcurrentHashMap<>();
     private final Map<Integer, CompletableFuture<@Nullable Void>> pendingNotifyToggles = new ConcurrentHashMap<>();
     private final java.util.Set<Integer> notifyingHandles = ConcurrentHashMap.newKeySet();
+
+    /**
+     * How long to wait for the ESP to confirm a connect or disconnect. ESPHome gives up on a BLE connect itself after
+     * ~20 s (reporting e.g. error 133), so this only fires when the ESP does not answer at all.
+     */
+    static final long DEFAULT_STATE_TIMEOUT_MILLIS = 30_000;
+    private @Nullable ScheduledFuture<?> stateTimeout;
+    // Bumped on every state transition so a timeout that raced with a response becomes a no-op.
+    private final AtomicInteger stateGeneration = new AtomicInteger();
 
     public ESPHomeBluetoothDevice(BluetoothAdapter adapter, BluetoothAddress address) {
         super(adapter, address);
@@ -102,25 +116,71 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         logger.debug("[{}] Connection state changed: connected={}, error={}, mtu={}", address, connected, error,
                 rsp.getMtu());
 
+        cancelStateTimeout();
+        String espDevice = describeESPHomeDevice();
         if (connected) {
+            logger.info("Bluetooth thing {} connected to {} via ESPHome device {} (mtu={})", describeThings(), address,
+                    espDevice, rsp.getMtu());
             connectionState = ConnectionState.CONNECTED;
             notifyListeners(BluetoothEventType.CONNECTION_STATE,
                     new BluetoothConnectionStatusNotification(ConnectionState.CONNECTED));
         } else {
-            connectionState = ConnectionState.DISCONNECTED;
-            failAllPending(new BluetoothException(
+            logger.info("Bluetooth thing {} disconnected from {} via ESPHome device {}{}", describeThings(), address,
+                    espDevice, error != 0 ? " (esphome error=" + error + ")" : "");
+            releaseConnection(new BluetoothException(
                     "Device disconnected" + (error != 0 ? " (esphome error=" + error + ")" : "")));
-            // Keep supportedServices populated across reconnects — the peripheral's GATT structure is
-            // stable and BaseBluetoothDevice.servicesDiscovered is a private flag we cannot reset, so
-            // clearing services here would make the child handler unable to look up characteristics on
-            // subsequent reads. Notification subscriptions on the other hand are lost with the BLE
-            // connection and must be re-enabled after reconnect.
-            notifyingHandles.clear();
-            proxyHandler.unlinkDevice(this);
-            lockToHandler = null;
-            notifyListeners(BluetoothEventType.CONNECTION_STATE,
-                    new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTED));
         }
+    }
+
+    /**
+     * Drops the binding to the current ESP and reports DISCONNECTED, so a later connect() may pick any ESP.
+     */
+    private void releaseConnection(Throwable cause) {
+        connectionState = ConnectionState.DISCONNECTED;
+        failAllPending(cause);
+        // Keep supportedServices populated across reconnects — the peripheral's GATT structure is
+        // stable and BaseBluetoothDevice.servicesDiscovered is a private flag we cannot reset, so
+        // clearing services here would make the child handler unable to look up characteristics on
+        // subsequent reads. Notification subscriptions on the other hand are lost with the BLE
+        // connection and must be re-enabled after reconnect.
+        notifyingHandles.clear();
+        proxyHandler.unlinkDevice(this);
+        lockToHandler = null;
+        notifyListeners(BluetoothEventType.CONNECTION_STATE,
+                new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTED));
+    }
+
+    private void startStateTimeout(ConnectionState pendingState, ESPHomeHandler handler) {
+        cancelStateTimeout();
+        int generation = stateGeneration.get();
+        stateTimeout = proxyHandler.getScheduler().schedule(() -> onStateTimeout(generation, pendingState, handler),
+                DEFAULT_STATE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+    }
+
+    private void cancelStateTimeout() {
+        stateGeneration.incrementAndGet();
+        ScheduledFuture<?> timeout = stateTimeout;
+        stateTimeout = null;
+        if (timeout != null) {
+            timeout.cancel(false);
+        }
+    }
+
+    private void onStateTimeout(int generation, ConnectionState pendingState, ESPHomeHandler handler) {
+        if (generation != stateGeneration.get() || connectionState != pendingState || lockToHandler != handler) {
+            return; // The ESP answered, or the device moved on, before the timeout fired
+        }
+        logger.warn(
+                "Bluetooth thing {}: ESPHome device {} did not confirm {} {} within {} ms, releasing the connection",
+                describeThings(), handler.getThing().getUID(),
+                pendingState == ConnectionState.CONNECTING ? "connect to" : "disconnect from", address,
+                DEFAULT_STATE_TIMEOUT_MILLIS);
+        stateGeneration.incrementAndGet();
+        stateTimeout = null;
+        // Best effort: ask the ESP to drop whatever it may still hold, as we stop tracking its answers below.
+        handler.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder().setAddress(getAddressAsLong())
+                .setRequestType(BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_DISCONNECT).build());
+        releaseConnection(new BluetoothException("ESPHome device did not respond to " + pendingState));
     }
 
     public void handleGattServicesMessage(BluetoothGATTGetServicesResponse rsp) {
@@ -228,13 +288,22 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
             return;
         }
         logger.info("[{}] ESPHome proxy handler went offline while device was connected", address);
-        failAllPending(new BluetoothException("ESPHome proxy device went offline"));
-        // See handleConnectionsMessage: keep supportedServices, only drop notifications.
-        notifyingHandles.clear();
-        connectionState = ConnectionState.DISCONNECTED;
-        lockToHandler = null;
-        notifyListeners(BluetoothEventType.CONNECTION_STATE,
-                new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTED));
+        cancelStateTimeout();
+        releaseConnection(new BluetoothException("ESPHome proxy device went offline"));
+    }
+
+    /**
+     * UIDs of the openHAB things listening to this BLE device, for logging.
+     */
+    private String describeThings() {
+        String things = getListeners().stream().filter(ThingHandler.class::isInstance)
+                .map(l -> ((ThingHandler) l).getThing().getUID().toString()).collect(Collectors.joining(", "));
+        return things.isEmpty() ? "unknown thing" : things;
+    }
+
+    private String describeESPHomeDevice() {
+        ESPHomeHandler handler = lockToHandler;
+        return handler != null ? handler.getThing().getUID().toString() : "unknown";
     }
 
     private void failAllPending(Throwable throwable) {
@@ -269,8 +338,13 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public boolean connect() {
-        if (connectionState == ConnectionState.CONNECTED || connectionState == ConnectionState.CONNECTING) {
-            logger.debug("[{}] connect() called while already {}", address, connectionState);
+        // Refuse while still bound to an ESP (connecting, connected or disconnecting). Starting a new connection
+        // via another ESP would leave the old BLE link open, and the peripheral rejects the second connection.
+        // The binding is released when the ESP reports the disconnect or the ESP itself goes offline.
+        ESPHomeHandler currentHandler = lockToHandler;
+        if (currentHandler != null) {
+            logger.debug("[{}] connect() called while {} via ESPHome proxy {}", address, connectionState,
+                    currentHandler.getThing().getUID());
             return false;
         }
 
@@ -285,8 +359,11 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         lockToHandler = nearestESPHomeDevice;
         proxyHandler.linkDevice(this, nearestESPHomeDevice);
 
-        logger.debug("[{}] Connecting via ESPHome proxy {}", address, nearestESPHomeDevice.getThing().getUID());
+        logger.info("Bluetooth thing {} connecting to {} via ESPHome device {}", describeThings(), address,
+                nearestESPHomeDevice.getThing().getUID());
         connectionState = ConnectionState.CONNECTING;
+        // Armed before sending, so an immediate answer from the ESP cancels it.
+        startStateTimeout(ConnectionState.CONNECTING, nearestESPHomeDevice);
         notifyListeners(BluetoothEventType.CONNECTION_STATE,
                 new BluetoothConnectionStatusNotification(ConnectionState.CONNECTING));
 
@@ -306,6 +383,7 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         }
         logger.debug("[{}] Disconnecting via ESPHome proxy {}", address, handler.getThing().getUID());
         connectionState = ConnectionState.DISCONNECTING;
+        startStateTimeout(ConnectionState.DISCONNECTING, handler);
         handler.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder().setAddress(getAddressAsLong())
                 .setRequestType(BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_DISCONNECT).build());
         return true;
@@ -318,9 +396,9 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
             logger.debug("[{}] discoverServices() called with no proxy handler", address);
             return false;
         }
-        connectionState = ConnectionState.DISCOVERING;
-        notifyListeners(BluetoothEventType.CONNECTION_STATE,
-                new BluetoothConnectionStatusNotification(ConnectionState.DISCOVERING));
+        // Service discovery happens on an established connection, so the connection state stays CONNECTED.
+        // ConnectionState.DISCOVERING means "device not yet discovered / not available" in the openHAB API;
+        // reporting it here made handlers (e.g. Airthings) treat the device as disconnected and reconnect.
         handler.sendBluetoothCommand(
                 BluetoothGATTGetServicesRequest.newBuilder().setAddress(getAddressAsLong()).build());
         return true;

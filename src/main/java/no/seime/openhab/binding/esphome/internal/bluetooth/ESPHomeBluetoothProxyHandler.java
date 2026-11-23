@@ -393,6 +393,10 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         return null;
     }
 
+    public ScheduledExecutorService getScheduler() {
+        return executor;
+    }
+
     public void linkDevice(ESPHomeBluetoothDevice device, ESPHomeHandler lockToHandler) {
         long address = device.getAddressAsLong();
         connectedDevices.put(address, device);
