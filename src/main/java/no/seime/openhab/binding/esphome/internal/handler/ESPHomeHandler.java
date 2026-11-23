@@ -15,8 +15,6 @@ package no.seime.openhab.binding.esphome.internal.handler;
 import static no.seime.openhab.binding.esphome.internal.BindingConstants.*;
 
 import java.math.BigDecimal;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
@@ -46,7 +44,6 @@ import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.net.InetAddresses;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
 import com.jano7.executor.KeySequentialExecutor;
@@ -57,6 +54,7 @@ import no.seime.openhab.binding.esphome.internal.*;
 import no.seime.openhab.binding.esphome.internal.audio.DeviceAudioManager;
 import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler;
 import no.seime.openhab.binding.esphome.internal.comm.*;
+import no.seime.openhab.binding.esphome.internal.comm.ConnectionTargetResolver.ResolvedConnectionTarget;
 import no.seime.openhab.binding.esphome.internal.discovery.ESPHomeMDNSHostnameResolver;
 import no.seime.openhab.binding.esphome.internal.handler.action.AbstractESPHomeThingAction;
 import no.seime.openhab.binding.esphome.internal.handler.action.DynamicThingActionsGenerator;
@@ -79,7 +77,6 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private static final int API_VERSION_MINOR = 14;
     private static final String DEVICE_LOGGER_NAME = "ESPHOMEDEVICE";
     private static final String ACTION_TAG_SCANNED = "esphome.tag_scanned";
-    static final String PROPERTY_LAST_KNOWN_IP_ADDRESS = "lastKnownIpAddress";
 
     private final Logger logger = LoggerFactory.getLogger(ESPHomeHandler.class);
     private final Logger deviceLogger = LoggerFactory.getLogger(DEVICE_LOGGER_NAME);
@@ -107,7 +104,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final BundleContext bundleContext;
     private final ESPHomeVersionService versionService;
     private final FirmwareUpgradeService firmwareUpgradeService;
-    private final ESPHomeMDNSHostnameResolver mdnsHostnameResolver;
+    private final ConnectionTargetResolver connectionTargetResolver;
     private final ESPHomeSerialPortProvider serialPortProvider;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
@@ -169,7 +166,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.bundleContext = bundleContext;
         this.versionService = versionService;
         this.firmwareUpgradeService = firmwareUpgradeService;
-        this.mdnsHostnameResolver = mdnsHostnameResolver;
+        this.connectionTargetResolver = new ConnectionTargetResolver(mdnsHostnameResolver);
         this.serialPortProvider = serialPortProvider;
         this.audioManager = new DeviceAudioManager(this, bundleContext, audioHTTPServer, networkAddressService,
                 bindingPropertyAudioBaseUrl, () -> config != null && config.voiceDialog, this::runIfConnected);
@@ -338,9 +335,10 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
                 String hostname = config.hostname;
                 int port = config.port;
-                ResolvedConnectionTarget connectionTarget = resolveConnectionTarget(hostname);
-                resolvedIpAddressForCurrentConnection = connectionTarget.cacheLastKnownIpAddress
-                        ? connectionTarget.ipAddress
+                ResolvedConnectionTarget connectionTarget = connectionTargetResolver.resolve(hostname,
+                        thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS), logPrefix);
+                resolvedIpAddressForCurrentConnection = connectionTarget.cacheLastKnownIpAddress()
+                        ? connectionTarget.ipAddress()
                         : null;
                 applyLastKnownIpAddressPolicy(connectionTarget);
 
@@ -371,7 +369,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper = new EncryptedFrameHelper(connectionSelector, createConnectionListener(generation),
                         encryptionKey, config.deviceId, logPrefix, packetProcessor);
 
-                frameHelper.connect(connectionTarget.connectHost, port);
+                frameHelper.connect(connectionTarget.connectHost(), port);
 
                 scheduleConnectionTimeoutWatchdog("Connection watchdog", "Connection attempt timed out");
 
@@ -1084,70 +1082,30 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         }
     }
 
-    private ResolvedConnectionTarget resolveConnectionTarget(String configuredHostname) throws ProtocolAPIError {
-        if (InetAddresses.isInetAddress(configuredHostname)) {
-            InetAddress configuredAddress = InetAddresses.forString(configuredHostname);
-            String configuredIpAddress = configuredAddress.getHostAddress();
-            return new ResolvedConnectionTarget(configuredIpAddress, configuredIpAddress, configuredHostname,
-                    configuredHostname, false);
-        }
-
-        Optional<String> mdnsIp = mdnsHostnameResolver.resolve(configuredHostname);
-        if (mdnsIp.isPresent()) {
-            String ip = mdnsIp.get();
-            logger.debug("[{}] Resolved '{}' via mDNS cache to {}", logPrefix, configuredHostname, ip);
-            return new ResolvedConnectionTarget(ip, ip, configuredHostname + " (mDNS " + ip + ")", configuredHostname,
-                    true);
-        }
-
-        try {
-            InetAddress resolvedAddress = InetAddress.getByName(configuredHostname);
-            return new ResolvedConnectionTarget(resolvedAddress.getHostAddress(), resolvedAddress.getHostAddress(),
-                    configuredHostname, configuredHostname, true);
-        } catch (UnknownHostException e) {
-            String lastKnownIpAddress = StringUtils
-                    .trimToNull(thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS));
-            if (lastKnownIpAddress != null && InetAddresses.isInetAddress(lastKnownIpAddress)) {
-                logger.warn("[{}] Failed to resolve '{}'. Falling back to cached IP {}", logPrefix, configuredHostname,
-                        lastKnownIpAddress);
-                return new ResolvedConnectionTarget(lastKnownIpAddress, lastKnownIpAddress,
-                        configuredHostname + " (cached " + lastKnownIpAddress + ")", lastKnownIpAddress, true);
-            }
-            throw new ProtocolAPIError("Failed to resolve hostname '" + configuredHostname + "'", e);
-        }
-    }
-
     private void applyLastKnownIpAddressPolicy(ResolvedConnectionTarget connectionTarget) {
-        if (connectionTarget.cacheLastKnownIpAddress) {
-            return;
+        if (!connectionTarget.cacheLastKnownIpAddress()) {
+            setThingProperty(PROPERTY_LAST_KNOWN_IP_ADDRESS, null);
         }
-        removeLastKnownIpAddressProperty();
     }
 
     private void persistLastKnownIpAddress() {
         String ipAddress = resolvedIpAddressForCurrentConnection;
-        if (StringUtils.isBlank(ipAddress)
-                || ipAddress.equals(thing.getProperties().get(PROPERTY_LAST_KNOWN_IP_ADDRESS))) {
-            return;
+        if (StringUtils.isNotBlank(ipAddress)) {
+            setThingProperty(PROPERTY_LAST_KNOWN_IP_ADDRESS, ipAddress);
         }
-
-        Map<String, String> props = new HashMap<>(thing.getProperties());
-        props.put(PROPERTY_LAST_KNOWN_IP_ADDRESS, ipAddress);
-        updateThing(editThing().withProperties(props).build());
     }
 
-    private void removeLastKnownIpAddressProperty() {
-        if (!thing.getProperties().containsKey(PROPERTY_LAST_KNOWN_IP_ADDRESS)) {
+    private void setThingProperty(String key, @Nullable String value) {
+        if (Objects.equals(thing.getProperties().get(key), value)) {
             return;
         }
-
         Map<String, String> props = new HashMap<>(thing.getProperties());
-        props.remove(PROPERTY_LAST_KNOWN_IP_ADDRESS);
+        if (value == null) {
+            props.remove(key);
+        } else {
+            props.put(key, value);
+        }
         updateThing(editThing().withProperties(props).build());
-    }
-
-    private record ResolvedConnectionTarget(String connectHost, String ipAddress, String logTarget, String statusTarget,
-            boolean cacheLastKnownIpAddress) {
     }
 
     public void addChannelType(ChannelType channelType) {
