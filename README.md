@@ -28,9 +28,10 @@ Read more here: https://esphome.io/components/api#advantages-over-mqtt
 1. [Install ESPHome](https://esphome.io/guides/installing_esphome)
 2. Create an ESPHome configuration for your device and flash it to your ESP8266 or ESP32
 3. Install the openHAB ESPHome binding by copying the jar file
-   here https://github.com/seime/openhab-esphome/releases/tag/latest_oh4 into your `addons` folder, or by installing
-   from the Marketplace https://community.openhab.org/t/esphome-binding-for-the-native-api/146849 (see
-   [Releases](#releases) for other versions)
+   https://github.com/seime/openhab-esphome/releases/latest/download/no.seime.openhab.binding.esphome.jar into your
+   `addons` folder, or by installing from the Marketplace
+   https://community.openhab.org/t/esphome-binding-for-the-native-api/146849 (see [Releases](#releases) for other
+   versions)
 4. Wait for discovery to find your device - or add manually in a thing file.
 
 Devices that already have an API encryption key require `encryptionKey` in the Thing configuration, or a default
@@ -49,13 +50,15 @@ the device may already have accepted. Check the device before clearing that key 
 
 ## Releases
 
-Every change to `master` is built and published as two
-[GitHub releases](https://github.com/seime/openhab-esphome/releases) for openHAB 4.2 and newer (including 5.x):
+Every change to `master` is built and published as a
+[GitHub release](https://github.com/seime/openhab-esphome/releases) for openHAB 4.2 and newer (including 5.x), named
+after the bundle version, e.g. `4.2.0.202611231545`. The newest one is marked *Latest*, and older ones stay
+available so you can pin or roll back to a specific build.
 
-- [`latest_oh4`](https://github.com/seime/openhab-esphome/releases/tag/latest_oh4) always contains the newest build.
-  This is what the Marketplace installs.
-- An immutable release named after the bundle version, e.g. `4.2.0.202611231545`. Use these to pin or roll back to
-  a specific build.
+Each release contains the same jar under two names: `no.seime.openhab.binding.esphome-<version>.jar` and
+`no.seime.openhab.binding.esphome.jar`. The second one gives a permanent link to the newest build, which is what
+the Marketplace uses:
+https://github.com/seime/openhab-esphome/releases/latest/download/no.seime.openhab.binding.esphome.jar
 
 The release name is the same as the version openHAB reports, so you can find the release you are running with
 `bundle:list | grep ESPHome` in the openHAB console:
@@ -65,7 +68,8 @@ The release name is the same as the version openHAB reports, so you can find the
 ```
 
 For openHAB 4.0 - 4.1 use the unmaintained
-[`latest_4.1_release`](https://github.com/seime/openhab-esphome/releases/tag/latest_4.1_release).
+[`latest_4.1_release`](https://github.com/seime/openhab-esphome/releases/tag/latest_4.1_release). The old
+`latest_oh4` release is deprecated, but is kept up to date so existing links keep working.
 
 ## Discovery
 

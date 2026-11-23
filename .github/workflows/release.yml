@@ -75,10 +75,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      # Rolling release. The openHAB Marketplace entry links directly to
+      # Stable file name attached to every versioned release. Together with GitHub's "latest" redirect it gives
+      # a permanent download link (used by the openHAB Marketplace entry):
+      #   https://github.com/<repo>/releases/latest/download/no.seime.openhab.binding.esphome.jar
+      STABLE_JAR_NAME: no.seime.openhab.binding.esphome.jar
+      # Deprecated rolling release, kept up to date only so old links keep working:
       #   releases/download/latest_oh4/no.seime.openhab.binding.esphome-4.2.0-SNAPSHOT.jar
-      # so neither this tag nor the jar file name (Maven version in pom.xml) may change without updating it.
-      ROLLING_TAG: latest_oh4
+      LEGACY_TAG: latest_oh4
 
     steps:
       - uses: actions/checkout@v7
@@ -111,6 +114,43 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Bundle-Version: $version"
 
+      - name: Update legacy rolling release
+        env:
+          JAR: ${{ steps.version.outputs.jar }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$LEGACY_TAG" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$LEGACY_TAG"
+
+          {
+            echo "**Deprecated download location**, kept up to date for existing links only."
+            echo "Use https://github.com/$GH_REPO/releases/latest instead, or the permanent download link"
+            echo "https://github.com/$GH_REPO/releases/latest/download/$STABLE_JAR_NAME"
+            echo
+            echo "This build is bundle version \`$VERSION\` (as shown by \`bundle:list\`), see release [$VERSION](https://github.com/$GH_REPO/releases/tag/$VERSION)."
+          } > legacy-notes.md
+
+          title="Legacy link: latest build (deprecated)"
+          # Pre-release so it can never take GitHub's "Latest" badge from the versioned releases
+          if gh release view "$LEGACY_TAG" > /dev/null 2>&1; then
+            gh release edit "$LEGACY_TAG" --title "$title" --notes-file legacy-notes.md --prerelease --latest=false
+          else
+            gh release create "$LEGACY_TAG" --verify-tag --title "$title" --notes-file legacy-notes.md --prerelease --latest=false
+          fi
+
+          gh release upload "$LEGACY_TAG" "$JAR" --clobber
+
+          # Remove any other assets so stale jars can't pile up
+          keep=$(basename "$JAR")
+          gh release view "$LEGACY_TAG" --json assets --jq '.assets[].name' | while read -r asset; do
+            if [ "$asset" != "$keep" ]; then
+              echo "Deleting stale asset $asset"
+              gh release delete-asset "$LEGACY_TAG" "$asset" -y
+            fi
+          done
+
       - name: Create versioned release
         env:
           JAR: ${{ steps.version.outputs.jar }}
@@ -121,13 +161,21 @@ jobs:
             exit 0
           fi
           versioned_jar="target/no.seime.openhab.binding.esphome-${VERSION}.jar"
+          stable_jar="target/stable/$STABLE_JAR_NAME"
+          mkdir -p target/stable
           cp "$JAR" "$versioned_jar"
+          cp "$JAR" "$stable_jar"
 
-          # Notes list the commits since the previous versioned release (not the rolling one)
+          # Notes list the commits since the previous versioned release
           previous=$(gh release list --limit 100 --json tagName,createdAt \
             --jq '[.[] | select(.tagName | test("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]{12}$"))] | sort_by(.createdAt) | last | .tagName // empty')
           {
             echo "Build of \`master\` for openHAB 4.2 and newer (including 5.x). Bundle version \`$VERSION\`, as shown by \`bundle:list\`."
+            echo
+            echo "Both jars are identical: \`$STABLE_JAR_NAME\` has a fixed name for the permanent link"
+            echo "https://github.com/$GH_REPO/releases/latest/download/$STABLE_JAR_NAME"
+            echo
+            echo "Running openHAB 4.0 or 4.1? Use [latest_4.1_release](https://github.com/$GH_REPO/releases/tag/latest_4.1_release)."
             echo
             echo "## Changes"
             if [ -n "$previous" ] && git rev-parse -q --verify "refs/tags/$previous" > /dev/null; then
@@ -139,49 +187,9 @@ jobs:
             fi
           } > versioned-notes.md
 
-          gh release create "$VERSION" "$versioned_jar" \
+          # Created last and marked Latest, so /releases/latest always resolves to the newest build
+          gh release create "$VERSION" "$versioned_jar" "$stable_jar" \
             --target "$GITHUB_SHA" \
             --title "$VERSION" \
-            --latest=false \
+            --latest \
             --notes-file versioned-notes.md
-
-      - name: Update rolling release
-        env:
-          JAR: ${{ steps.version.outputs.jar }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f "$ROLLING_TAG" "$GITHUB_SHA"
-          git push -f origin "refs/tags/$ROLLING_TAG"
-
-          {
-            echo "Latest build from \`master\`, for openHAB 4.2 and newer (including 5.x)."
-            echo
-            echo "- Bundle version: \`$VERSION\` (as shown by \`bundle:list\`), also available as the immutable release [$VERSION](https://github.com/$GH_REPO/releases/tag/$VERSION)"
-            echo "- Commit: $GITHUB_SHA"
-            echo "- Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
-            echo
-            echo "Running openHAB 4.0 or 4.1? Use [latest_4.1_release](https://github.com/$GH_REPO/releases/tag/latest_4.1_release)."
-            echo
-            echo "## Recent commits"
-            git log -20 --format='- %h %s (%an)' "$GITHUB_SHA"
-          } > notes.md
-
-          title="Latest build $VERSION (OH 4.2+)"
-          if gh release view "$ROLLING_TAG" > /dev/null 2>&1; then
-            gh release edit "$ROLLING_TAG" --title "$title" --notes-file notes.md --prerelease=false --latest
-          else
-            gh release create "$ROLLING_TAG" --verify-tag --title "$title" --notes-file notes.md --latest
-          fi
-
-          gh release upload "$ROLLING_TAG" "$JAR" --clobber
-
-          # Remove any other assets so stale jars can't pile up
-          keep=$(basename "$JAR")
-          gh release view "$ROLLING_TAG" --json assets --jq '.assets[].name' | while read -r asset; do
-            if [ "$asset" != "$keep" ]; then
-              echo "Deleting stale asset $asset"
-              gh release delete-asset "$ROLLING_TAG" "$asset" -y
-            fi
-          done
