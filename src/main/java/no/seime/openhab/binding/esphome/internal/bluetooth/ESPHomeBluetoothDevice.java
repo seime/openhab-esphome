@@ -6,12 +6,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.*;
 import org.openhab.binding.bluetooth.notification.BluetoothConnectionStatusNotification;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
+import org.openhab.core.thing.binding.ThingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,11 +104,16 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         logger.debug("[{}] Connection state changed: connected={}, error={}, mtu={}", address, connected, error,
                 rsp.getMtu());
 
+        String espDevice = describeESPHomeDevice();
         if (connected) {
+            logger.info("Bluetooth thing {} connected to {} via ESPHome device {} (mtu={})", describeThings(), address,
+                    espDevice, rsp.getMtu());
             connectionState = ConnectionState.CONNECTED;
             notifyListeners(BluetoothEventType.CONNECTION_STATE,
                     new BluetoothConnectionStatusNotification(ConnectionState.CONNECTED));
         } else {
+            logger.info("Bluetooth thing {} disconnected from {} via ESPHome device {}{}", describeThings(), address,
+                    espDevice, error != 0 ? " (esphome error=" + error + ")" : "");
             connectionState = ConnectionState.DISCONNECTED;
             failAllPending(new BluetoothException(
                     "Device disconnected" + (error != 0 ? " (esphome error=" + error + ")" : "")));
@@ -237,6 +244,20 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
                 new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTED));
     }
 
+    /**
+     * UIDs of the openHAB things listening to this BLE device, for logging.
+     */
+    private String describeThings() {
+        String things = getListeners().stream().filter(ThingHandler.class::isInstance)
+                .map(l -> ((ThingHandler) l).getThing().getUID().toString()).collect(Collectors.joining(", "));
+        return things.isEmpty() ? "unknown thing" : things;
+    }
+
+    private String describeESPHomeDevice() {
+        ESPHomeHandler handler = lockToHandler;
+        return handler != null ? handler.getThing().getUID().toString() : "unknown";
+    }
+
     private void failAllPending(Throwable throwable) {
         pendingReads.values().forEach(f -> f.completeExceptionally(throwable));
         pendingReads.clear();
@@ -285,7 +306,8 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         lockToHandler = nearestESPHomeDevice;
         proxyHandler.linkDevice(this, nearestESPHomeDevice);
 
-        logger.debug("[{}] Connecting via ESPHome proxy {}", address, nearestESPHomeDevice.getThing().getUID());
+        logger.info("Bluetooth thing {} connecting to {} via ESPHome device {}", describeThings(), address,
+                nearestESPHomeDevice.getThing().getUID());
         connectionState = ConnectionState.CONNECTING;
         notifyListeners(BluetoothEventType.CONNECTION_STATE,
                 new BluetoothConnectionStatusNotification(ConnectionState.CONNECTING));
