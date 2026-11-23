@@ -87,8 +87,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private final ConnectionSelector connectionSelector;
     private final ESPChannelTypeProvider dynamicChannelTypeProvider;
     private final ESPStateDescriptionProvider stateDescriptionProvider;
-    private final Map<String, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> commandTypeToHandlerMap = new HashMap<>();
-    private final Map<Class<? extends GeneratedMessage>, AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage>> classToHandlerMap = new HashMap<>();
+    private final EntityMessageHandlers entityMessageHandlers;
+    private final Map<Class<? extends GeneratedMessage>, MessageConsumer<GeneratedMessage>> controlMessageHandlers = new HashMap<>();
     private final List<Channel> dynamicChannels = new CopyOnWriteArrayList<>();
     private final ESPHomeEventSubscriber eventSubscriber;
     private final MonitoredCompositeExecutorService executorService;
@@ -166,54 +166,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.audioManager = new DeviceAudioManager(this, bundleContext, audioHTTPServer, networkAddressService,
                 bindingPropertyAudioBaseUrl, () -> config != null && config.voiceDialog, this::runIfConnected);
 
-        // Register message handlers for each type of message pairs
-        registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
-                SelectStateResponse.class);
-        registerMessageHandler(EntityTypes.SENSOR, new SensorMessageHandler(this), ListEntitiesSensorResponse.class,
-                SensorStateResponse.class);
-        registerMessageHandler(EntityTypes.BINARY_SENSOR, new BinarySensorMessageHandler(this),
-                ListEntitiesBinarySensorResponse.class, BinarySensorStateResponse.class);
-        registerMessageHandler(EntityTypes.TEXT_SENSOR, new TextSensorMessageHandler(this),
-                ListEntitiesTextSensorResponse.class, TextSensorStateResponse.class);
-        registerMessageHandler(EntityTypes.TEXT, new TextMessageHandler(this), ListEntitiesTextResponse.class,
-                TextStateResponse.class);
-        registerMessageHandler(EntityTypes.SWITCH, new SwitchMessageHandler(this), ListEntitiesSwitchResponse.class,
-                SwitchStateResponse.class);
-        registerMessageHandler(EntityTypes.CLIMATE, new ClimateMessageHandler(this), ListEntitiesClimateResponse.class,
-                ClimateStateResponse.class);
-        registerMessageHandler(EntityTypes.NUMBER, new NumberMessageHandler(this), ListEntitiesNumberResponse.class,
-                NumberStateResponse.class);
-        registerMessageHandler(EntityTypes.LIGHT, new LightMessageHandler(this), ListEntitiesLightResponse.class,
-                LightStateResponse.class);
-        registerMessageHandler(EntityTypes.BUTTON, new ButtonMessageHandler(this), ListEntitiesButtonResponse.class,
-                ButtonCommandRequest.class);
-        registerMessageHandler(EntityTypes.COVER, new CoverMessageHandler(this), ListEntitiesCoverResponse.class,
-                CoverStateResponse.class);
-        registerMessageHandler(EntityTypes.FAN, new FanMessageHandler(this), ListEntitiesFanResponse.class,
-                FanStateResponse.class);
-        registerMessageHandler(EntityTypes.DATE, new DateMessageHandler(this), ListEntitiesDateResponse.class,
-                DateStateResponse.class);
-        registerMessageHandler(EntityTypes.DATE_TIME, new DateTimeMessageHandler(this),
-                ListEntitiesDateTimeResponse.class, DateTimeStateResponse.class);
-        registerMessageHandler(EntityTypes.TIME, new TimeMessageHandler(this), ListEntitiesTimeResponse.class,
-                TimeStateResponse.class);
-        registerMessageHandler(EntityTypes.LOCK, new LockMessageHandler(this), ListEntitiesLockResponse.class,
-                LockStateResponse.class);
-        registerMessageHandler(EntityTypes.VALVE, new ValveMessageHandler(this), ListEntitiesValveResponse.class,
-                ValveStateResponse.class);
-        registerMessageHandler(EntityTypes.EVENT, new EventMessageHandler(this), ListEntitiesEventResponse.class,
-                EventResponse.class);
-        registerMessageHandler(EntityTypes.MEDIA_PLAYER, new MediaPlayerMessageHandler(this),
-                ListEntitiesMediaPlayerResponse.class, MediaPlayerStateResponse.class);
-    }
-
-    private void registerMessageHandler(String entityType,
-            AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> messageHandler,
-            Class<? extends GeneratedMessage> listEntitiesClass, Class<? extends GeneratedMessage> stateClass) {
-
-        commandTypeToHandlerMap.put(entityType, messageHandler);
-        classToHandlerMap.put(listEntitiesClass, messageHandler);
-        classToHandlerMap.put(stateClass, messageHandler);
+        this.entityMessageHandlers = new EntityMessageHandlers(this);
+        registerControlMessageHandlers();
     }
 
     @Override
@@ -505,8 +459,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                         return;
                     }
 
-                    AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = commandTypeToHandlerMap
-                            .get(entityType);
+                    AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = entityMessageHandlers
+                            .forEntityType(entityType);
                     if (abstractMessageHandler == null) {
                         logger.warn("[{}] No message handler for entity type {}", logPrefix, entityType);
                     } else {
@@ -635,175 +589,188 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             return;
         }
 
-        if (message instanceof AuthenticationResponse connectResponse) {
-            if (connectResponse.getInvalidPassword()) {
-                logger.trace("[{}] Received login response {}", logPrefix, connectResponse);
-
-                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
-            }
-            return;
+        MessageConsumer<GeneratedMessage> controlMessageHandler = controlMessageHandlers.get(message.getClass());
+        if (controlMessageHandler != null) {
+            controlMessageHandler.accept(message);
+        } else {
+            handleEntityMessage(message);
         }
+    }
 
-        if (message instanceof NoiseEncryptionSetKeyResponse response && provisioningKeyPending) {
-            provisioningKeyPending = false;
-            if (!response.getSuccess()) {
-                handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
-                        "Device rejected the encryption key. The generated key remains in the Thing configuration");
-            } else {
-                logger.info("[{}] Device encryption key provisioned", logPrefix);
-                handleDisconnection(ThingStatusDetail.NONE, "Encryption key provisioned; reconnecting");
-            }
-            return;
-        }
-
-        if (message instanceof DeviceInfoResponse rsp) {
-            if (provisioningConnection) {
-                provisionEncryptionKey(rsp);
-                return;
-            }
-            Map<String, String> props = new HashMap<>(thing.getProperties());
-            props.put(Thing.PROPERTY_FIRMWARE_VERSION, rsp.getEsphomeVersion());
-            props.put(Thing.PROPERTY_MAC_ADDRESS, rsp.getMacAddress());
-            props.put(Thing.PROPERTY_MODEL_ID, rsp.getModel());
-            props.put("name", rsp.getName());
-            props.put(Thing.PROPERTY_VENDOR, rsp.getManufacturer());
-            props.put("compilationTime", rsp.getCompilationTime());
-            espHomeDeviceName = rsp.getName();
-            if (!rsp.getProjectName().isEmpty()) {
-                props.put("projectName", rsp.getProjectName());
-            } else {
-                props.remove("projectName");
-            }
-            if (!rsp.getProjectVersion().isEmpty()) {
-                props.put("projectVersion", rsp.getProjectVersion());
-            } else {
-                props.remove("projectVersion");
-            }
-            if (!rsp.getHasDeepSleep() && config.deepSleep) {
-                logger.warn(
-                        "[{}] Thing is configured with deep sleep, but the ESPHome device does not support it. Disabling deep sleep mode",
-                        logPrefix);
-                config.deepSleep = false;
-            }
-
-            audioManager.setVoiceAssistantFeatureFlags(rsp.getVoiceAssistantFeatureFlags());
-
-            serialPortProvider.register(this, rsp.getSerialProxiesList());
-
-            updateThing(editThing().withProperties(props).build());
-
-            String compilationTime = rsp.getCompilationTime();
-            if (!compilationTime.isEmpty() && compilationTime.equals(interrogatedCompilationTime)) {
-                logger.debug(
-                        "[{}] Firmware compilation time '{}' unchanged since last interrogation, reusing existing channels and actions",
-                        logPrefix, compilationTime);
-                frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
-                frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
-                updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
-                        versionService.getLatestVersion());
-                refreshAudioServices();
-            } else {
-                logger.debug("[{}] Firmware compilation time changed from '{}' to '{}', starting device interrogation",
-                        logPrefix, interrogatedCompilationTime, compilationTime);
-                startInterrogation(compilationTime);
-            }
-        } else if (message instanceof ListEntitiesMediaPlayerResponse mediaPlayerResponse) {
-            audioManager.onMediaPlayerEntity(mediaPlayerResponse);
-            classToHandlerMap.get(message.getClass()).handleMessage(message);
-        } else if (message instanceof SerialProxyDataReceived serialProxyDataReceived) {
-            serialPortProvider.handleData(this, serialProxyDataReceived);
-        } else if (message instanceof SerialProxyGetModemPinsResponse serialProxyGetModemPinsResponse) {
-            serialPortProvider.handleModemPins(this, serialProxyGetModemPinsResponse);
-        } else if (message instanceof ListEntitiesDoneResponse) {
-
-            addFirmwareChannels();
-
-            thingActionServiceRegistrations.add(bundleContext.registerService(ThingActions.class,
-                    new FirmwareUpgradeAction(this), new Hashtable<>()));
-
-            updateThing(editThing().withChannels(dynamicChannels).build());
-            sweepOrphanedChannelTypes();
-            logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
-            interrogated = true;
-            interrogatedCompilationTime = pendingCompilationTime;
-            refreshAudioServices();
-            frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
-
-            updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
-                    versionService.getLatestVersion());
-
-        } else if (message instanceof PingRequest) {
+    /**
+     * Messages other than entity list and state messages; entity messages go to {@link EntityMessageHandlers}.
+     */
+    private void registerControlMessageHandlers() {
+        on(AuthenticationResponse.class, this::onAuthenticationResponse);
+        on(NoiseEncryptionSetKeyResponse.class, this::onNoiseEncryptionSetKeyResponse);
+        on(DeviceInfoResponse.class, this::onDeviceInfo);
+        on(ListEntitiesDoneResponse.class, m -> onListEntitiesDone());
+        on(ListEntitiesServicesResponse.class, this::onListEntitiesServices);
+        on(ListEntitiesMediaPlayerResponse.class, m -> {
+            audioManager.onMediaPlayerEntity(m);
+            handleEntityMessage(m);
+        });
+        on(MediaPlayerStateResponse.class, m -> {
+            audioManager.onMediaPlayerState(m);
+            handleEntityMessage(m);
+        });
+        on(PingRequest.class, m -> {
             logger.debug("[{}] Responding to ping request", logPrefix);
             frameHelper.send(PingResponse.getDefaultInstance());
-        } else if (message instanceof PingResponse) {
+        });
+        on(PingResponse.class, m -> {
             logger.debug("[{}] Received ping response", logPrefix);
             lastPong = Instant.now();
-        } else if (message instanceof DisconnectRequest) {
+        });
+        on(DisconnectRequest.class, m -> {
             frameHelper.send(DisconnectResponse.getDefaultInstance());
             remoteDisconnect();
-        } else if (message instanceof DisconnectResponse) {
-            remoteDisconnect();
-        } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
-            deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
-        } else if (message instanceof VoiceAssistantRequest voiceAssistantRequest) {
-            audioManager.onVoiceAssistantRequest(voiceAssistantRequest);
-        } else if (message instanceof VoiceAssistantAudio voiceAssistantAudio) {
-            audioManager.onVoiceAssistantAudio(voiceAssistantAudio);
-        } else if (message instanceof VoiceAssistantAnnounceFinished) {
-            // the media player state already shows when a reply has played
-            logger.debug("[{}] Device finished playing a voice assistant reply", logPrefix);
-        } else if (message instanceof HomeassistantActionRequest actionRequest) {
-            homeAssistantBridge.onActionRequest(actionRequest, config.deviceId);
-        } else if (message instanceof SubscribeHomeAssistantStateResponse subscribeHomeAssistantStateResponse) {
-            sendStateToDevice(homeAssistantBridge.subscribe(subscribeHomeAssistantStateResponse));
-        } else if (message instanceof GetTimeRequest) {
+        });
+        on(DisconnectResponse.class, m -> remoteDisconnect());
+        on(GetTimeRequest.class, m -> {
             logger.debug("[{}] Received time sync request", logPrefix);
-            GetTimeResponse getTimeResponse = GetTimeResponse.newBuilder()
-                    .setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build();
-            frameHelper.send(getTimeResponse);
-        } else if (message instanceof BluetoothLEAdvertisementResponse
-                || message instanceof BluetoothLERawAdvertisementsResponse
-                || message instanceof BluetoothDeviceConnectionResponse
-                || message instanceof BluetoothGATTGetServicesResponse
-                || message instanceof BluetoothGATTGetServicesDoneResponse
-                || message instanceof BluetoothGATTReadResponse || message instanceof BluetoothGATTNotifyDataResponse
-                || message instanceof BluetoothConnectionsFreeResponse || message instanceof BluetoothGATTErrorResponse
-                || message instanceof BluetoothGATTWriteResponse || message instanceof BluetoothGATTNotifyResponse
-                || message instanceof BluetoothDevicePairingResponse
-                || message instanceof BluetoothDeviceUnpairingResponse
-                || message instanceof BluetoothDeviceClearCacheResponse
-                || message instanceof BluetoothScannerStateResponse) {
-            if (espHomeBluetoothProxyHandler != null) {
-                espHomeBluetoothProxyHandler.handleBluetoothMessage(message, this);
-            }
-        } else if (message instanceof ListEntitiesServicesResponse listEntitiesServicesResponse) {
-            logger.debug("[{}] Received list entities services response {}", logPrefix, listEntitiesServicesResponse);
+            frameHelper.send(
+                    GetTimeResponse.newBuilder().setEpochSeconds((int) (System.currentTimeMillis() / 1000)).build());
+        });
+        on(SubscribeLogsResponse.class, m -> deviceLogger.info("[{}] {}", logPrefix, m.getMessage().toStringUtf8()));
+        on(VoiceAssistantRequest.class, m -> audioManager.onVoiceAssistantRequest(m));
+        on(VoiceAssistantAudio.class, m -> audioManager.onVoiceAssistantAudio(m));
+        // the media player state already shows when a reply has played
+        on(VoiceAssistantAnnounceFinished.class,
+                m -> logger.debug("[{}] Device finished playing a voice assistant reply", logPrefix));
+        on(HomeassistantActionRequest.class, m -> homeAssistantBridge.onActionRequest(m, config.deviceId));
+        on(SubscribeHomeAssistantStateResponse.class, m -> sendStateToDevice(homeAssistantBridge.subscribe(m)));
+        on(SerialProxyDataReceived.class, m -> serialPortProvider.handleData(this, m));
+        on(SerialProxyGetModemPinsResponse.class, m -> serialPortProvider.handleModemPins(this, m));
+        ESPHomeBluetoothProxyHandler.BLUETOOTH_MESSAGE_TYPES.forEach(type -> on(type, this::onBluetoothMessage));
+    }
 
-            try {
-                AbstractESPHomeThingAction thingAction = DynamicThingActionsGenerator
-                        .generateDynamicThingAction(listEntitiesServicesResponse, thingActionClassLoader);
-                thingAction.setListEntitiesServicesResponse(listEntitiesServicesResponse);
-                thingAction.setThingHandler(this);
-                thingActionServiceRegistrations
-                        .add(bundleContext.registerService(ThingActions.class, thingAction, new Hashtable<>()));
+    private <T extends GeneratedMessage> void on(Class<T> type, MessageConsumer<T> consumer) {
+        controlMessageHandlers.put(type, message -> consumer.accept(type.cast(message)));
+    }
 
-            } catch (Exception e) {
-                logger.warn("[{}] Error generating dynamic actions from device: {}", logPrefix, e.getMessage(), e);
-            }
-
+    private void handleEntityMessage(GeneratedMessage message) {
+        AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> messageHandler = entityMessageHandlers
+                .forMessage(message);
+        if (messageHandler != null) {
+            messageHandler.handleMessage(message);
         } else {
-            if (message instanceof MediaPlayerStateResponse mediaPlayerStateResponse) {
-                audioManager.onMediaPlayerState(mediaPlayerStateResponse);
-            }
-            // Regular messages handled by message handlers
-            AbstractMessageHandler<? extends GeneratedMessage, ? extends GeneratedMessage> abstractMessageHandler = classToHandlerMap
-                    .get(message.getClass());
-            if (abstractMessageHandler != null) {
-                abstractMessageHandler.handleMessage(message);
-            } else {
-                logger.warn("[{}] Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
-                        logPrefix, message.getClass().getName(), message);
-            }
+            logger.warn("[{}] Unhandled message of type {}. This is lack of support in the binding. Content: '{}'.",
+                    logPrefix, message.getClass().getName(), message);
+        }
+    }
+
+    private void onAuthenticationResponse(AuthenticationResponse response) {
+        if (response.getInvalidPassword()) {
+            logger.trace("[{}] Received login response {}", logPrefix, response);
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR, "Invalid password");
+        }
+    }
+
+    private void onNoiseEncryptionSetKeyResponse(NoiseEncryptionSetKeyResponse response) {
+        if (!provisioningKeyPending) {
+            handleEntityMessage(response);
+            return;
+        }
+        provisioningKeyPending = false;
+        if (!response.getSuccess()) {
+            handleDisconnection(ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Device rejected the encryption key. The generated key remains in the Thing configuration");
+        } else {
+            logger.info("[{}] Device encryption key provisioned", logPrefix);
+            handleDisconnection(ThingStatusDetail.NONE, "Encryption key provisioned; reconnecting");
+        }
+    }
+
+    private void onDeviceInfo(DeviceInfoResponse rsp) throws ProtocolAPIError {
+        if (provisioningConnection) {
+            provisionEncryptionKey(rsp);
+            return;
+        }
+        Map<String, String> props = new HashMap<>(thing.getProperties());
+        props.put(Thing.PROPERTY_FIRMWARE_VERSION, rsp.getEsphomeVersion());
+        props.put(Thing.PROPERTY_MAC_ADDRESS, rsp.getMacAddress());
+        props.put(Thing.PROPERTY_MODEL_ID, rsp.getModel());
+        props.put("name", rsp.getName());
+        props.put(Thing.PROPERTY_VENDOR, rsp.getManufacturer());
+        props.put("compilationTime", rsp.getCompilationTime());
+        espHomeDeviceName = rsp.getName();
+        if (!rsp.getProjectName().isEmpty()) {
+            props.put("projectName", rsp.getProjectName());
+        } else {
+            props.remove("projectName");
+        }
+        if (!rsp.getProjectVersion().isEmpty()) {
+            props.put("projectVersion", rsp.getProjectVersion());
+        } else {
+            props.remove("projectVersion");
+        }
+        if (!rsp.getHasDeepSleep() && config.deepSleep) {
+            logger.warn(
+                    "[{}] Thing is configured with deep sleep, but the ESPHome device does not support it. Disabling deep sleep mode",
+                    logPrefix);
+            config.deepSleep = false;
+        }
+
+        audioManager.setVoiceAssistantFeatureFlags(rsp.getVoiceAssistantFeatureFlags());
+
+        serialPortProvider.register(this, rsp.getSerialProxiesList());
+
+        updateThing(editThing().withProperties(props).build());
+
+        String compilationTime = rsp.getCompilationTime();
+        if (!compilationTime.isEmpty() && compilationTime.equals(interrogatedCompilationTime)) {
+            logger.debug(
+                    "[{}] Firmware compilation time '{}' unchanged since last interrogation, reusing existing channels and actions",
+                    logPrefix, compilationTime);
+            frameHelper.send(SubscribeHomeAssistantStatesRequest.getDefaultInstance());
+            frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
+            updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
+                    versionService.getLatestVersion());
+            refreshAudioServices();
+        } else {
+            logger.debug("[{}] Firmware compilation time changed from '{}' to '{}', starting device interrogation",
+                    logPrefix, interrogatedCompilationTime, compilationTime);
+            startInterrogation(compilationTime);
+        }
+    }
+
+    private void onListEntitiesDone() throws ProtocolAPIError {
+        addFirmwareChannels();
+
+        thingActionServiceRegistrations.add(
+                bundleContext.registerService(ThingActions.class, new FirmwareUpgradeAction(this), new Hashtable<>()));
+
+        updateThing(editThing().withChannels(dynamicChannels).build());
+        sweepOrphanedChannelTypes();
+        logger.debug("[{}] Device interrogation complete, done updating thing channels", logPrefix);
+        interrogated = true;
+        interrogatedCompilationTime = pendingCompilationTime;
+        refreshAudioServices();
+        frameHelper.send(SubscribeStatesRequest.getDefaultInstance());
+
+        updateVersionChannels(thing.getProperties().get(Thing.PROPERTY_FIRMWARE_VERSION),
+                versionService.getLatestVersion());
+    }
+
+    private void onListEntitiesServices(ListEntitiesServicesResponse response) {
+        logger.debug("[{}] Received list entities services response {}", logPrefix, response);
+        try {
+            AbstractESPHomeThingAction thingAction = DynamicThingActionsGenerator.generateDynamicThingAction(response,
+                    thingActionClassLoader);
+            thingAction.setListEntitiesServicesResponse(response);
+            thingAction.setThingHandler(this);
+            thingActionServiceRegistrations
+                    .add(bundleContext.registerService(ThingActions.class, thingAction, new Hashtable<>()));
+        } catch (Exception e) {
+            logger.warn("[{}] Error generating dynamic actions from device: {}", logPrefix, e.getMessage(), e);
+        }
+    }
+
+    private void onBluetoothMessage(GeneratedMessage message) {
+        ESPHomeBluetoothProxyHandler proxyHandler = espHomeBluetoothProxyHandler;
+        if (proxyHandler != null) {
+            proxyHandler.handleBluetoothMessage(message, this);
         }
     }
 
@@ -1208,6 +1175,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     public @Nullable String getEspHomeDeviceName() {
         return espHomeDeviceName;
+    }
+
+    @FunctionalInterface
+    private interface MessageConsumer<T extends GeneratedMessage> {
+        void accept(T message) throws ProtocolAPIError;
     }
 
     private enum ConnectionState {
