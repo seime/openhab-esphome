@@ -1,10 +1,12 @@
 package no.seime.openhab.binding.esphome.internal.message;
 
 import static org.openhab.core.library.CoreItemFactory.STRING;
+import static org.openhab.core.library.CoreItemFactory.SWITCH;
 
 import java.math.BigDecimal;
 import java.util.Set;
 
+import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.*;
 import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.binding.builder.ChannelBuilder;
@@ -30,6 +32,8 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     public static final String CHANNEL_POSITION = "position";
     public static final String CHANNEL_TILT = "tilt";
     public static final String CHANNEL_CURRENT_OPERATION = "current_operation";
+    public static final String CHANNEL_TOGGLE = "toggle";
+    public static final String CONFIG_SUPPORTS_STOP_TILT = "supportsStopTilt";
 
     private final Logger logger = LoggerFactory.getLogger(CoverMessageHandler.class);
 
@@ -45,14 +49,18 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
     @Override
     public void handleCommand(Channel channel, Command command, int key) throws ProtocolAPIError {
         CoverCommandRequest.Builder builder = CoverCommandRequest.newBuilder().setKey(key);
+        String subCommand = (String) channel.getConfiguration()
+                .get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD);
 
         if (command == StopMoveType.STOP) {
-            builder.setStop(true);
-            builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_STOP);
+            if (CHANNEL_TILT.equals(subCommand) && supportsStopTilt(channel)) {
+                // Stop only the tilt movement, leave a running open/close alone
+                builder.setStopTilt(true);
+            } else {
+                builder.setStop(true);
+                builder.setLegacyCommand(LegacyCoverCommand.LEGACY_COVER_COMMAND_STOP);
+            }
         } else {
-
-            String subCommand = (String) channel.getConfiguration()
-                    .get(BindingConstants.CHANNEL_CONFIGURATION_ENTITY_FIELD);
             switch (subCommand) {
                 case CHANNEL_POSITION -> {
                     if (command instanceof QuantityType<?> number) {
@@ -87,6 +95,17 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     builder.setHasTilt(true);
                 }
 
+                case CHANNEL_TOGGLE -> {
+                    if (command instanceof OnOffType) {
+                        // Behaves like a push button, the cover reports the resulting movement
+                        handler.updateState(channel.getUID(), OnOffType.OFF);
+                        builder.setToggle(true);
+                    } else {
+                        logger.warn("[{}] Unsupported command type for cover toggle: {}, use OnOffType instead",
+                                handler.getLogPrefix(), command);
+                        return;
+                    }
+                }
                 case CHANNEL_CURRENT_OPERATION -> logger.warn("current_operation channel is read-only");
                 default -> logger.warn("[{}] Unknown Cover subcommand {}", handler.getLogPrefix(), subCommand);
             }
@@ -122,12 +141,27 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
                     rsp.getEntityCategory(), rsp.getDisabledByDefault());
             stateDescription = patternStateDescription("%d %%");
 
+            Configuration tiltConfiguration = configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT);
+            tiltConfiguration.put(CONFIG_SUPPORTS_STOP_TILT, rsp.getSupportsStopTilt());
+
             Channel channelTilt = ChannelBuilder
                     .create(createChannelUID(rsp.getName(), EntityTypes.COVER, CHANNEL_TILT))
                     .withLabel(createChannelLabel(rsp.getName(), "Tilt")).withKind(ChannelKind.STATE)
                     .withType(channelTypeTilt.getUID()).withAcceptedItemType(deviceClass.getItemType())
-                    .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TILT)).build();
+                    .withConfiguration(tiltConfiguration).build();
             super.registerChannel(channelTilt, channelTypeTilt, stateDescription);
+        }
+
+        if (rsp.getSupportsToggle()) {
+            ChannelType channelTypeToggle = addChannelType("Toggle", SWITCH, createSemanticTags("Switch", deviceClass),
+                    icon, rsp.getEntityCategory(), rsp.getDisabledByDefault());
+
+            Channel channelToggle = ChannelBuilder
+                    .create(createChannelUID(rsp.getName(), EntityTypes.COVER, CHANNEL_TOGGLE))
+                    .withLabel(createChannelLabel(rsp.getName(), "Toggle")).withKind(ChannelKind.STATE)
+                    .withType(channelTypeToggle.getUID()).withAcceptedItemType(SWITCH)
+                    .withConfiguration(configuration(EntityTypes.COVER, rsp.getKey(), CHANNEL_TOGGLE)).build();
+            super.registerChannel(channelToggle, channelTypeToggle);
         }
 
         // Operation status
@@ -159,6 +193,11 @@ public class CoverMessageHandler extends AbstractMessageHandler<ListEntitiesCove
         } else {
             return new PercentType(BigDecimal.valueOf(state * 100));
         }
+    }
+
+    private static boolean supportsStopTilt(Channel channel) {
+        // Channels created before stop_tilt support lack the property, they keep the old stop-everything behaviour
+        return Boolean.parseBoolean(String.valueOf(channel.getConfiguration().get(CONFIG_SUPPORTS_STOP_TILT)));
     }
 
     private float invert(float value) {
