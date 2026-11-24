@@ -9,6 +9,7 @@ import java.io.File;
 
 import org.junit.jupiter.api.Test;
 import org.openhab.core.library.types.DecimalType;
+import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.types.UpDownType;
@@ -19,6 +20,7 @@ import tech.units.indriya.unit.Units;
 public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
     public static final String POSITION_CHANNEL = "time-based_cover#position";
+    public static final String TOGGLE_CHANNEL = "time-based_cover#toggle";
 
     protected File getEspDeviceConfigurationYamlFileName() {
         return new File("src/test/resources/device_configurations/cover.yaml");
@@ -35,7 +37,10 @@ public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
         // Cover position
         // Cover state
 
-        assertEquals(6, thingHandler.getDynamicChannels().size());
+        // ESPHome 2026.11+ reports toggle support for time based covers, adding a toggle channel
+        boolean hasToggle = thingHandler.getDynamicChannels().stream()
+                .anyMatch(c -> c.getUID().getId().equals(TOGGLE_CHANNEL));
+        assertEquals(hasToggle ? 7 : 6, thingHandler.getDynamicChannels().size());
 
         // Send using PercentType
         // Remove all other invocations for log readability
@@ -80,6 +85,15 @@ public class CoverEsphomeDeviceTest extends AbstractESPHomeDeviceTest {
 
         verify(thingHandlerCallback, timeout(3000)).stateUpdated(eq(new ChannelUID(thing.getUID(), POSITION_CHANNEL)),
                 eq(new PercentType(0)));
+
+        if (hasToggle) {
+            // Cover is open, toggle closes it
+            reset(thingHandlerCallback);
+            thingHandler.handleCommand(new ChannelUID(thing.getUID(), TOGGLE_CHANNEL), OnOffType.ON);
+
+            verify(thingHandlerCallback, timeout(3000))
+                    .stateUpdated(eq(new ChannelUID(thing.getUID(), POSITION_CHANNEL)), eq(new PercentType(100)));
+        }
 
         thingHandler.dispose();
     }
