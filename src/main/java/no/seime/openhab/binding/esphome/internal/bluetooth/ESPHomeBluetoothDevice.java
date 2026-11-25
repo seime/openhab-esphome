@@ -17,6 +17,7 @@ import org.openhab.binding.bluetooth.*;
 import org.openhab.binding.bluetooth.notification.BluetoothConnectionStatusNotification;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
 import org.openhab.core.thing.binding.ThingHandler;
+import org.openhab.core.util.HexUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,8 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
     private final Map<Integer, CompletableFuture<byte[]>> pendingReads = new ConcurrentHashMap<>();
     private final Map<Integer, CompletableFuture<@Nullable Void>> pendingWrites = new ConcurrentHashMap<>();
     private final Map<Integer, CompletableFuture<@Nullable Void>> pendingNotifyToggles = new ConcurrentHashMap<>();
+    private static final UUID CLIENT_CHARACTERISTIC_CONFIGURATION_UUID = UUID
+            .fromString("00002902-0000-1000-8000-00805f9b34fb");
     private final java.util.Set<Integer> notifyingHandles = ConcurrentHashMap.newKeySet();
 
     /**
@@ -481,12 +484,17 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
             return CompletableFuture.completedFuture(null);
         }
 
-        CompletableFuture<@Nullable Void> future = new CompletableFuture<>();
-        CompletableFuture<@Nullable Void> existing = pendingNotifyToggles.putIfAbsent(handle, future);
+        CompletableFuture<@Nullable Void> notifyRegistered = new CompletableFuture<>();
+        CompletableFuture<@Nullable Void> existing = pendingNotifyToggles.putIfAbsent(handle, notifyRegistered);
         if (existing != null) {
             return CompletableFuture.failedFuture(
                     new BluetoothException("Notification toggle already in progress for handle " + handle));
         }
+        // With v3 proxy connections the proxy only registers for notifications locally; the client must write the
+        // Client Characteristic Configuration Descriptor itself (as bleak-esphome does), otherwise the peripheral
+        // never sends notifications.
+        CompletableFuture<@Nullable Void> future = notifyRegistered
+                .thenCompose(v -> writeClientCharacteristicConfiguration(handler, characteristic, enable));
         future.whenComplete((v, ex) -> {
             if (ex == null) {
                 if (enable) {
@@ -498,6 +506,35 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         });
         handler.sendBluetoothCommand(BluetoothGATTNotifyRequest.newBuilder().setAddress(getAddressAsLong())
                 .setHandle(handle).setEnable(enable).build());
+        return future;
+    }
+
+    private CompletableFuture<@Nullable Void> writeClientCharacteristicConfiguration(ESPHomeHandler handler,
+            BluetoothCharacteristic characteristic, boolean enable) {
+        BluetoothDescriptor cccd = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIGURATION_UUID);
+        if (cccd == null) {
+            logger.debug("[{}] No CCCD on characteristic {}, relying on the proxy", address, characteristic.getUuid());
+            return CompletableFuture.completedFuture(null);
+        }
+        byte[] value;
+        if (!enable) {
+            value = new byte[] { 0x00, 0x00 };
+        } else if (characteristic.hasPropertyEnabled(BluetoothCharacteristic.PROPERTY_NOTIFY)) {
+            value = new byte[] { 0x01, 0x00 };
+        } else {
+            value = new byte[] { 0x02, 0x00 };
+        }
+        int descriptorHandle = cccd.getHandle();
+        CompletableFuture<@Nullable Void> future = new CompletableFuture<>();
+        CompletableFuture<@Nullable Void> existing = pendingWrites.putIfAbsent(descriptorHandle, future);
+        if (existing != null) {
+            return CompletableFuture.failedFuture(
+                    new BluetoothException("Write already in progress for descriptor handle " + descriptorHandle));
+        }
+        logger.debug("[{}] Writing CCCD {} on handle {} for characteristic {}", address, HexUtils.bytesToHex(value),
+                descriptorHandle, characteristic.getUuid());
+        handler.sendBluetoothCommand(BluetoothGATTWriteDescriptorRequest.newBuilder().setAddress(getAddressAsLong())
+                .setHandle(descriptorHandle).setData(ByteString.copyFrom(value)).build());
         return future;
     }
 
