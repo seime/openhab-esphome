@@ -31,6 +31,7 @@ import io.esphome.api.BluetoothDeviceRequest;
 import io.esphome.api.BluetoothDeviceRequestType;
 import io.esphome.api.BluetoothGATTGetServicesDoneResponse;
 import io.esphome.api.BluetoothGATTGetServicesRequest;
+import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler.ConnectionCandidate;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 public class ESPHomeBluetoothDeviceTest {
@@ -72,8 +73,28 @@ public class ESPHomeBluetoothDeviceTest {
         return handler;
     }
 
+    /** Stubs the candidate ESPs, strongest first, with an unknown number of free slots. */
+    private void candidates(ESPHomeHandler... esps) {
+        List<ConnectionCandidate> list = new ArrayList<>();
+        int rssi = -50;
+        for (ESPHomeHandler esp : esps) {
+            list.add(new ConnectionCandidate(esp, rssi--, ConnectionCandidate.UNKNOWN_FREE_SLOTS));
+        }
+        when(proxyHandler.getConnectionCandidates(anyLong())).thenReturn(list);
+    }
+
+    private void refuseConnect(int error) {
+        device.handleConnectionsMessage(BluetoothDeviceConnectionResponse.newBuilder()
+                .setAddress(device.getAddressAsLong()).setConnected(false).setError(error).build());
+    }
+
+    private static boolean isConnectRequest(GeneratedMessage message) {
+        return message instanceof BluetoothDeviceRequest request && request
+                .getRequestType() == BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITHOUT_CACHE;
+    }
+
     private void connectVia(ESPHomeHandler esp) {
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(esp);
+        candidates(esp);
         assertTrue(device.connect());
         device.handleConnectionsMessage(BluetoothDeviceConnectionResponse.newBuilder()
                 .setAddress(device.getAddressAsLong()).setConnected(true).setMtu(247).build());
@@ -101,7 +122,7 @@ public class ESPHomeBluetoothDeviceTest {
         device.discoverServices();
 
         // A different ESP is now nearest; a second connect must not open a parallel link via it.
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        candidates(espB);
         assertFalse(device.connect());
         verify(espB, never()).sendBluetoothCommand(any(GeneratedMessage.class));
     }
@@ -112,7 +133,7 @@ public class ESPHomeBluetoothDeviceTest {
         assertTrue(device.disconnect());
         assertEquals(ConnectionState.DISCONNECTING, device.getConnectionState());
 
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        candidates(espB);
         assertFalse(device.connect());
         verify(espB, never()).sendBluetoothCommand(any(GeneratedMessage.class));
     }
@@ -125,7 +146,7 @@ public class ESPHomeBluetoothDeviceTest {
                 .setAddress(device.getAddressAsLong()).setConnected(false).build());
         assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
 
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        candidates(espB);
         assertTrue(device.connect());
         verify(espB).sendBluetoothCommand(BluetoothDeviceRequest.newBuilder().setAddress(device.getAddressAsLong())
                 .setAddressType(0).setHasAddressType(true)
@@ -139,7 +160,7 @@ public class ESPHomeBluetoothDeviceTest {
         device.handleESPHomeHandlerLost();
         assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
 
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        candidates(espB);
         assertTrue(device.connect());
     }
 
@@ -155,14 +176,14 @@ public class ESPHomeBluetoothDeviceTest {
 
     @Test
     void connectTimeoutUsesDefaultDelay() {
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espA);
+        candidates(espA);
         device.connect();
         assertEquals(List.of(ESPHomeBluetoothDevice.DEFAULT_STATE_TIMEOUT_MILLIS), scheduledDelaysMillis);
     }
 
     @Test
     void releasesConnectionWhenEspNeverAnswersConnect() {
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espA);
+        candidates(espA);
         assertTrue(device.connect());
         assertEquals(ConnectionState.CONNECTING, device.getConnectionState());
 
@@ -174,7 +195,7 @@ public class ESPHomeBluetoothDeviceTest {
         verify(proxyHandler).unlinkDevice(device);
 
         // No longer bound, so the next attempt may use another ESP.
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        candidates(espB);
         assertTrue(device.connect());
     }
 
@@ -186,7 +207,7 @@ public class ESPHomeBluetoothDeviceTest {
         fireLastTimeout();
 
         assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
-        when(proxyHandler.getNearestESPHomeDevice(anyLong())).thenReturn(espB);
+        candidates(espB);
         assertTrue(device.connect());
     }
 
@@ -253,5 +274,133 @@ public class ESPHomeBluetoothDeviceTest {
         long msb = 0x0011223344556677L;
         long lsb = 0x8899AABBCCDDEEFFL;
         assertEquals(new UUID(msb, lsb), ESPHomeBluetoothDevice.uuidFromProto(0, List.of(msb, lsb)));
+    }
+
+    @Test
+    void connectSkipsEspKnownToHaveNoFreeSlot() {
+        when(proxyHandler.getConnectionCandidates(anyLong()))
+                .thenReturn(List.of(new ConnectionCandidate(espA, -50, 0), new ConnectionCandidate(espB, -55, 2)));
+
+        assertTrue(device.connect());
+
+        verify(espA, never()).sendBluetoothCommand(any(GeneratedMessage.class));
+        verify(espB).sendBluetoothCommand(argThat(ESPHomeBluetoothDeviceTest::isConnectRequest));
+        verify(proxyHandler).reserveConnectionSlot(espB);
+    }
+
+    @Test
+    void refusedConnectFailsOverToNextEsp() {
+        candidates(espA, espB);
+        assertTrue(device.connect());
+        // espA has no free slot now; the proxy handler reflects that in the next candidate list
+        doAnswer(invocation -> {
+            when(proxyHandler.getConnectionCandidates(anyLong()))
+                    .thenReturn(List.of(new ConnectionCandidate(espA, -50, 0),
+                            new ConnectionCandidate(espB, -51, ConnectionCandidate.UNKNOWN_FREE_SLOTS)));
+            return null;
+        }).when(proxyHandler).markNoFreeConnectionSlot(espA);
+
+        refuseConnect(0);
+
+        verify(proxyHandler).markNoFreeConnectionSlot(espA);
+        verify(espB).sendBluetoothCommand(argThat(ESPHomeBluetoothDeviceTest::isConnectRequest));
+        assertEquals(ConnectionState.CONNECTING, device.getConnectionState());
+        assertFalse(notifiedStates.contains(ConnectionState.DISCONNECTED), "failover must not report DISCONNECTED");
+    }
+
+    @Test
+    void connectErrorFailsOverToNextEspWithoutMarkingItFull() {
+        candidates(espA, espB);
+        assertTrue(device.connect());
+
+        refuseConnect(133);
+
+        verify(proxyHandler, never()).markNoFreeConnectionSlot(any());
+        verify(espB).sendBluetoothCommand(argThat(ESPHomeBluetoothDeviceTest::isConnectRequest));
+    }
+
+    @Test
+    void connectWaitsForFreeSlotWhenAllEspsAreFull() {
+        when(proxyHandler.getConnectionCandidates(anyLong()))
+                .thenReturn(List.of(new ConnectionCandidate(espA, -50, 0)));
+
+        assertTrue(device.connect());
+
+        assertEquals(ConnectionState.CONNECTING, device.getConnectionState());
+        verify(espA, never()).sendBluetoothCommand(any(GeneratedMessage.class));
+        assertEquals(List.of(ESPHomeBluetoothDevice.SLOT_POLL_INTERVAL_MILLIS), scheduledDelaysMillis);
+
+        // A slot becomes free before the next poll
+        when(proxyHandler.getConnectionCandidates(anyLong()))
+                .thenReturn(List.of(new ConnectionCandidate(espA, -50, 1)));
+        fireLastTimeout();
+
+        verify(espA).sendBluetoothCommand(argThat(ESPHomeBluetoothDeviceTest::isConnectRequest));
+    }
+
+    @Test
+    void connectFailsWhenNoSlotFreesUp() throws InterruptedException {
+        when(proxyHandler.getConnectionCandidates(anyLong()))
+                .thenReturn(List.of(new ConnectionCandidate(espA, -50, 0)));
+        assertTrue(device.connect());
+
+        for (int i = 0; i < ESPHomeBluetoothDevice.MAX_SLOT_POLLS; i++) {
+            fireLastTimeout();
+        }
+
+        assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
+        assertEquals(ConnectionState.DISCONNECTED, notifiedStates.get(notifiedStates.size() - 1));
+        assertFalse(device.awaitConnection(10, TimeUnit.SECONDS), "must return at once");
+    }
+
+    @Test
+    void connectFailsAfterMaxAttempts() throws InterruptedException {
+        ESPHomeHandler espC = mockEspHandler("esphome:device:c");
+        ESPHomeHandler espD = mockEspHandler("esphome:device:d");
+        candidates(espA, espB, espC, espD);
+        assertTrue(device.connect());
+
+        for (int i = 0; i < ESPHomeBluetoothDevice.MAX_CONNECT_ATTEMPTS; i++) {
+            refuseConnect(133);
+        }
+
+        assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
+        verify(espD, never()).sendBluetoothCommand(any(GeneratedMessage.class));
+        assertFalse(device.awaitConnection(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void awaitConnectionReturnsEarlyWhenConnectIsRefusedFinally() throws InterruptedException {
+        candidates(espA);
+        assertTrue(device.connect());
+        refuseConnect(133);
+        // espA failed and is the only candidate: the connect waits for slot polls; let them run out
+        for (int i = 0; i < ESPHomeBluetoothDevice.MAX_SLOT_POLLS; i++) {
+            fireLastTimeout();
+        }
+
+        long start = System.nanoTime();
+        assertFalse(device.awaitConnection(10, TimeUnit.SECONDS));
+        assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(1), "awaitConnection waited for the timeout");
+    }
+
+    @Test
+    void awaitConnectionReturnsTrueWhenConnected() throws InterruptedException {
+        connectVia(espA);
+        assertTrue(device.awaitConnection(1, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void disconnectCancelsConnectWaitingForSlot() {
+        when(proxyHandler.getConnectionCandidates(anyLong()))
+                .thenReturn(List.of(new ConnectionCandidate(espA, -50, 0)));
+        assertTrue(device.connect());
+
+        assertTrue(device.disconnect());
+
+        assertEquals(ConnectionState.DISCONNECTED, device.getConnectionState());
+        verify(scheduledFutures.get(0)).cancel(false);
+        candidates(espA);
+        assertTrue(device.connect(), "a new connect is possible");
     }
 }
