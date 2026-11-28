@@ -1,5 +1,6 @@
 package no.seime.openhab.binding.esphome.internal.bluetooth;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
@@ -59,6 +60,23 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
     private final LoadingCache<Long, Optional<BluetoothLERawAdvertisement>> multipleAdvertisementPerPacketCache;
 
     private final Map<Long, SortedSet<DeviceAndRSSI>> knownDevices = new ConcurrentHashMap<>();
+
+    /**
+     * Candidate proxies for a connection must hear the device at most this much weaker than the strongest proxy.
+     */
+    static final int MAX_RSSI_SPREAD_DB = 10;
+    /** Candidate proxies other than the strongest must hear the device at least this strongly. */
+    static final int MIN_CANDIDATE_RSSI_DBM = -90;
+    /** RSSI readings older than this are ignored, unless no proxy has a newer one. */
+    static final Duration MAX_RSSI_AGE = Duration.ofMinutes(5);
+    /**
+     * A "no free slot" state that the ESP has not confirmed with a newer report is trusted this long, after which the
+     * proxy counts as unknown again.
+     */
+    static final Duration FULL_STATE_VALIDITY = Duration.ofSeconds(30);
+
+    /** Last known free connection slots per ESPHome device. */
+    private final Map<ThingUID, ConnectionSlots> connectionSlots = new ConcurrentHashMap<>();
 
     /**
      * Devices currently locked to a specific ESPHome proxy handler. Keyed by BLE address (as long) for
@@ -177,6 +195,7 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
     }
 
     private void notifyDevicesOfLostHandler(ESPHomeHandler handler) {
+        connectionSlots.remove(handler.getThing().getUID());
         List<Long> lostAddresses = deviceToHandler.entrySet().stream().filter(entry -> entry.getValue() == handler)
                 .map(Map.Entry::getKey).toList();
         for (Long address : lostAddresses) {
@@ -228,6 +247,8 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         } else if (message instanceof BluetoothConnectionsFreeResponse rsp) {
             logger.debug("[{}] {} of {} BLE connections free on ESP", handler.getThing().getUID(), rsp.getFree(),
                     rsp.getLimit());
+            connectionSlots.put(handler.getThing().getUID(),
+                    new ConnectionSlots(rsp.getFree(), rsp.getLimit(), Instant.now()));
         } else if (message instanceof BluetoothScannerStateResponse rsp) {
             logger.debug("Received BluetoothScannerStateResponse from {} with status {}, currently ignored",
                     handler.getThing().getUID(), rsp.getState());
@@ -343,24 +364,79 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         });
     }
 
-    @Nullable
-    public ESPHomeHandler getNearestESPHomeDevice(long address) {
+    /**
+     * Returns the ESPHome devices that may connect to a Bluetooth device, strongest signal first: devices that heard
+     * the device recently, at most {@link #MAX_RSSI_SPREAD_DB} weaker than the strongest and not weaker than
+     * {@link #MIN_CANDIDATE_RSSI_DBM} (the strongest is always included).
+     *
+     * @param address the Bluetooth device address
+     * @return the candidates with their free connection slots, possibly empty
+     */
+    public List<ConnectionCandidate> getConnectionCandidates(long address) {
         SortedSet<DeviceAndRSSI> deviceAndRSSIS = knownDevices.get(address);
         if (deviceAndRSSIS == null || deviceAndRSSIS.isEmpty()) {
-            return null;
+            return List.of();
         }
-
-        ThingUID device = deviceAndRSSIS.first().device;
-        @Nullable
-        Thing esphomeThing = thingRegistry.get(device);
-        if (esphomeThing != null) {
-            return (ESPHomeHandler) esphomeThing.getHandler();
-        } else {
-            return null;
+        Instant now = Instant.now();
+        List<DeviceAndRSSI> sightings = new ArrayList<>(deviceAndRSSIS);
+        List<DeviceAndRSSI> recent = sightings.stream()
+                .filter(e -> Duration.between(e.lastSeen(), now).compareTo(MAX_RSSI_AGE) <= 0).toList();
+        if (!recent.isEmpty()) {
+            sightings = recent;
         }
+        int best = sightings.get(0).rssi();
+        List<ConnectionCandidate> candidates = new ArrayList<>();
+        for (DeviceAndRSSI sighting : sightings) {
+            boolean strongest = candidates.isEmpty();
+            if (!strongest
+                    && (sighting.rssi() < best - MAX_RSSI_SPREAD_DB || sighting.rssi() < MIN_CANDIDATE_RSSI_DBM)) {
+                continue;
+            }
+            Thing esphomeThing = thingRegistry.get(sighting.device());
+            if (esphomeThing != null && esphomeThing.getHandler() instanceof ESPHomeHandler handler) {
+                candidates.add(new ConnectionCandidate(handler, sighting.rssi(), freeSlots(sighting.device(), now)));
+            }
+        }
+        return candidates;
     }
 
-    private void updateDeviceLocation(long address, int rssi, ESPHomeHandler handler) {
+    /**
+     * @return the free connection slots, or {@link ConnectionCandidate#UNKNOWN_FREE_SLOTS}
+     */
+    private int freeSlots(ThingUID device, Instant now) {
+        ConnectionSlots slots = connectionSlots.get(device);
+        if (slots == null) {
+            return ConnectionCandidate.UNKNOWN_FREE_SLOTS;
+        }
+        if (slots.free() == 0 && Duration.between(slots.updated(), now).compareTo(FULL_STATE_VALIDITY) > 0) {
+            return ConnectionCandidate.UNKNOWN_FREE_SLOTS;
+        }
+        return slots.free();
+    }
+
+    /**
+     * Counts a connection slot of an ESPHome device as taken until the ESP reports its free slots again, so that
+     * concurrent connects spread over several ESPs.
+     *
+     * @param handler the ESPHome device a connect was sent to
+     */
+    public void reserveConnectionSlot(ESPHomeHandler handler) {
+        connectionSlots.computeIfPresent(handler.getThing().getUID(),
+                (uid, slots) -> slots.free() > 0 ? new ConnectionSlots(slots.free() - 1, slots.limit(), Instant.now())
+                        : slots);
+    }
+
+    /**
+     * Records that an ESPHome device refused a connect for lack of free slots.
+     *
+     * @param handler the ESPHome device
+     */
+    public void markNoFreeConnectionSlot(ESPHomeHandler handler) {
+        connectionSlots.compute(handler.getThing().getUID(),
+                (uid, slots) -> new ConnectionSlots(0, slots == null ? 0 : slots.limit(), Instant.now()));
+    }
+
+    void updateDeviceLocation(long address, int rssi, ESPHomeHandler handler) {
         SortedSet<DeviceAndRSSI> deviceAndRSSIS = knownDevices.computeIfAbsent(address,
                 k -> new ConcurrentSkipListSet<>());
         deviceAndRSSIS.removeIf(e -> e.device.equals(handler.getThing().getUID())); // Remove previous entry for this
@@ -409,11 +485,35 @@ public class ESPHomeBluetoothProxyHandler extends AbstractBluetoothBridgeHandler
         deviceToHandler.remove(address);
     }
 
+    /**
+     * An ESPHome device that may connect to a Bluetooth device.
+     *
+     * @param handler the ESPHome device
+     * @param rssi the signal strength at which it hears the Bluetooth device
+     * @param freeSlots free connection slots, or {@link #UNKNOWN_FREE_SLOTS}
+     */
+    public record ConnectionCandidate(ESPHomeHandler handler, int rssi, int freeSlots) {
+
+        public static final int UNKNOWN_FREE_SLOTS = -1;
+
+        /**
+         * @return false only if the ESP is known to have no free connection slot
+         */
+        public boolean mayHaveFreeSlot() {
+            return freeSlots != 0;
+        }
+    }
+
+    private record ConnectionSlots(int free, int limit, Instant updated) {
+    }
+
     private record DeviceAndRSSI(ThingUID device, int rssi, Instant lastSeen) implements Comparable<DeviceAndRSSI> {
 
         @Override
         public int compareTo(DeviceAndRSSI o) {
-            return Integer.compare(o.rssi, rssi);
+            int byRssi = Integer.compare(o.rssi, rssi);
+            // Tie-break on the device, otherwise two ESPs with the same RSSI count as one entry of the sorted set
+            return byRssi != 0 ? byRssi : device.getAsString().compareTo(o.device.getAsString());
         }
     }
 }

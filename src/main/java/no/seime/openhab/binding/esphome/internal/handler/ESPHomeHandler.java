@@ -122,6 +122,11 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Nullable
     private String pendingCompilationTime;
     private boolean bluetoothProxyStarted = false;
+
+    /** ESPHome {@code BluetoothProxyFeature::FEATURE_ACTIVE_CONNECTIONS} (bluetooth_proxy.h). */
+    static final int BLUETOOTH_PROXY_FEATURE_ACTIVE_CONNECTIONS = 1 << 1;
+    /** Bluetooth proxy feature flags from the device info; 0 until it is received. */
+    private volatile int bluetoothProxyFeatureFlags;
     // default is not used initialized in initialize()
     private ExponentialBackoff exponentialBackoff = new ExponentialBackoff(10, 500);
     @Nullable
@@ -714,6 +719,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
         audioManager.setVoiceAssistantFeatureFlags(rsp.getVoiceAssistantFeatureFlags());
 
+        bluetoothProxyFeatureFlags = rsp.getBluetoothProxyFeatureFlags();
+        synchronized (connectionStateLock) {
+            if (bluetoothProxyStarted) {
+                // The proxy was started before the device info arrived
+                subscribeBluetoothConnectionsFree();
+            }
+        }
+
         serialPortProvider.register(this, rsp.getSerialProxiesList());
 
         updateThing(editThing().withProperties(props).build());
@@ -1018,7 +1031,29 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 } catch (Exception e) {
                     logger.error("[{}] Error starting BLE proxy", logPrefix, e);
                 }
+                if (bluetoothProxyStarted) {
+                    subscribeBluetoothConnectionsFree();
+                }
             }
+        }
+    }
+
+    /**
+     * Asks a proxy that supports active connections for its free connection slots. The ESP answers with its current
+     * count and afterwards reports every change, which the proxy handler uses to pick an ESP for connects. Only sent
+     * when the device info announced active connections; other proxies are not sent the request. Call with
+     * {@code connectionStateLock} held.
+     */
+    private void subscribeBluetoothConnectionsFree() {
+        if ((bluetoothProxyFeatureFlags & BLUETOOTH_PROXY_FEATURE_ACTIVE_CONNECTIONS) == 0
+                || connectionState != ConnectionState.CONNECTED || provisioningConnection) {
+            return;
+        }
+        try {
+            logger.debug("[{}] Subscribing to free BLE connection slots", logPrefix);
+            frameHelper.send(SubscribeBluetoothConnectionsFreeRequest.getDefaultInstance());
+        } catch (Exception e) {
+            logger.warn("[{}] Error subscribing to free BLE connection slots", logPrefix, e);
         }
     }
 

@@ -261,6 +261,34 @@ class ESPHomeHandlerProvisioningTest extends AbstractESPHomeHandlerTest {
     }
 
     @Test
+    void bluetoothProxyWithActiveConnectionsSubscribesToFreeConnectionSlots() throws Exception {
+        setConnected();
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.enableBluetoothProxy = true;
+        setField("config", configuration);
+        setField("bluetoothProxyFeatureFlags", 0b111);
+
+        handler.listenForBLEAdvertisements(mock(ESPHomeBluetoothProxyHandler.class));
+
+        verify(frameHelper).send(io.esphome.api.SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+        verify(frameHelper).send(io.esphome.api.SubscribeBluetoothConnectionsFreeRequest.getDefaultInstance());
+    }
+
+    @Test
+    void passiveBluetoothProxyIsNotAskedForFreeConnectionSlots() throws Exception {
+        setConnected();
+        ESPHomeConfiguration configuration = new ESPHomeConfiguration();
+        configuration.enableBluetoothProxy = true;
+        setField("config", configuration);
+        setField("bluetoothProxyFeatureFlags", 0b1);
+
+        handler.listenForBLEAdvertisements(mock(ESPHomeBluetoothProxyHandler.class));
+
+        verify(frameHelper).send(io.esphome.api.SubscribeBluetoothLEAdvertisementsRequest.getDefaultInstance());
+        verify(frameHelper, never()).send(io.esphome.api.SubscribeBluetoothConnectionsFreeRequest.getDefaultInstance());
+    }
+
+    @Test
     void deepSleepAdoptionFailurePublishesConfigurationErrorWithoutReconnect() throws Exception {
         setConnected();
         setField("provisioningConnection", true);

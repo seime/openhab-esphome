@@ -1,8 +1,11 @@
 package no.seime.openhab.binding.esphome.internal.bluetooth;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,6 +19,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.*;
 import org.openhab.binding.bluetooth.notification.BluetoothConnectionStatusNotification;
 import org.openhab.binding.bluetooth.notification.BluetoothScanNotification;
+import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.util.HexUtils;
 import org.slf4j.Logger;
@@ -27,6 +31,7 @@ import com.neovisionaries.bluetooth.ble.advertising.ADStructure;
 import com.neovisionaries.bluetooth.ble.advertising.ServiceData;
 
 import io.esphome.api.*;
+import no.seime.openhab.binding.esphome.internal.bluetooth.ESPHomeBluetoothProxyHandler.ConnectionCandidate;
 import no.seime.openhab.binding.esphome.internal.handler.ESPHomeHandler;
 
 @NonNullByDefault
@@ -58,6 +63,27 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
      */
     static final long DEFAULT_STATE_TIMEOUT_MILLIS = 30_000;
     private @Nullable ScheduledFuture<?> stateTimeout;
+
+    /** Connect attempts (ESPs tried) per connect() call, see {@link #tryConnect()}. */
+    static final int MAX_CONNECT_ATTEMPTS = 3;
+    /** How often to look for a free connection slot while every candidate ESP is full. */
+    static final long SLOT_POLL_INTERVAL_MILLIS = 1_000;
+    /** How many times to look for a free slot before the connect fails. */
+    static final int MAX_SLOT_POLLS = 20;
+
+    /**
+     * Guards the connect state machine (pending connect, attempts, failed ESPs) and is the monitor that
+     * {@link #awaitConnection} waits on.
+     */
+    private final Object connectMonitor = new Object();
+    // True from connect() until the device is connected or the connect has finally failed
+    private boolean connectPending;
+    // True when the last connect() finally failed; makes awaitConnection() return early
+    private boolean connectFailed;
+    private int connectAttempts;
+    private int slotPollsLeft;
+    private final Set<ThingUID> failedHandlers = new HashSet<>();
+    private @Nullable ScheduledFuture<?> slotWait;
     // Bumped on every state transition so a timeout that raced with a response becomes a no-op.
     private final AtomicInteger stateGeneration = new AtomicInteger();
 
@@ -124,9 +150,15 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
         if (connected) {
             logger.info("Bluetooth thing {} connected to {} via ESPHome device {} (mtu={})", describeThings(), address,
                     espDevice, rsp.getMtu());
-            connectionState = ConnectionState.CONNECTED;
+            synchronized (connectMonitor) {
+                connectPending = false;
+                connectionState = ConnectionState.CONNECTED;
+                connectMonitor.notifyAll();
+            }
             notifyListeners(BluetoothEventType.CONNECTION_STATE,
                     new BluetoothConnectionStatusNotification(ConnectionState.CONNECTED));
+        } else if (retryConnectAfterFailure(error)) {
+            // the next ESP is tried, or a free slot is awaited
         } else {
             logger.info("Bluetooth thing {} disconnected from {} via ESPHome device {}{}", describeThings(), address,
                     espDevice, error != 0 ? " (esphome error=" + error + ")" : "");
@@ -139,7 +171,15 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
      * Drops the binding to the current ESP and reports DISCONNECTED, so a later connect() may pick any ESP.
      */
     private void releaseConnection(Throwable cause) {
-        connectionState = ConnectionState.DISCONNECTED;
+        synchronized (connectMonitor) {
+            if (connectPending || connectionState == ConnectionState.CONNECTING) {
+                connectFailed = true;
+            }
+            connectPending = false;
+            cancelSlotWait();
+            connectionState = ConnectionState.DISCONNECTED;
+            connectMonitor.notifyAll();
+        }
         failAllPending(cause);
         // Keep supportedServices populated across reconnects — the peripheral's GATT structure is
         // stable and BaseBluetoothDevice.servicesDiscovered is a private flag we cannot reset, so
@@ -341,48 +381,173 @@ public class ESPHomeBluetoothDevice extends BaseBluetoothDevice {
 
     @Override
     public boolean connect() {
-        // Refuse while still bound to an ESP (connecting, connected or disconnecting). Starting a new connection
-        // via another ESP would leave the old BLE link open, and the peripheral rejects the second connection.
-        // The binding is released when the ESP reports the disconnect or the ESP itself goes offline.
-        ESPHomeHandler currentHandler = lockToHandler;
-        if (currentHandler != null) {
-            logger.debug("[{}] connect() called while {} via ESPHome proxy {}", address, connectionState,
-                    currentHandler.getThing().getUID());
-            return false;
+        synchronized (connectMonitor) {
+            // Refuse while still bound to an ESP (connecting, connected or disconnecting) or while a connect waits for
+            // a
+            // free slot. Starting a new connection via another ESP would leave the old BLE link open, and the
+            // peripheral rejects the second connection. The binding is released when the ESP reports the disconnect
+            // or the ESP itself goes offline.
+            ESPHomeHandler currentHandler = lockToHandler;
+            if (currentHandler != null || connectPending) {
+                logger.debug("[{}] connect() called while {} via ESPHome proxy {}", address, connectionState,
+                        currentHandler == null ? "(waiting for a free slot)" : currentHandler.getThing().getUID());
+                return false;
+            }
+            if (proxyHandler.getConnectionCandidates(getAddressAsLong()).isEmpty()) {
+                logger.warn("[{}] No ESPHome proxy device available for connect", address);
+                return false;
+            }
+            connectPending = true;
+            connectFailed = false;
+            connectAttempts = 0;
+            slotPollsLeft = MAX_SLOT_POLLS;
+            failedHandlers.clear();
+            connectionState = ConnectionState.CONNECTING;
         }
-
-        // Select the nearest ESP once, at connect time, and lock the connection to it so that
-        // subsequent RSSI changes on other ESPs do not switch the proxy mid-session.
-        ESPHomeHandler nearestESPHomeDevice = proxyHandler.getNearestESPHomeDevice(getAddressAsLong());
-        if (nearestESPHomeDevice == null) {
-            logger.warn("[{}] No ESPHome proxy device available for connect", address);
-            return false;
-        }
-
-        lockToHandler = nearestESPHomeDevice;
-        proxyHandler.linkDevice(this, nearestESPHomeDevice);
-
-        logger.info("Bluetooth thing {} connecting to {} via ESPHome device {}", describeThings(), address,
-                nearestESPHomeDevice.getThing().getUID());
-        connectionState = ConnectionState.CONNECTING;
-        // Armed before sending, so an immediate answer from the ESP cancels it.
-        startStateTimeout(ConnectionState.CONNECTING, nearestESPHomeDevice);
         notifyListeners(BluetoothEventType.CONNECTION_STATE,
                 new BluetoothConnectionStatusNotification(ConnectionState.CONNECTING));
-
-        nearestESPHomeDevice.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder().setAddress(getAddressAsLong())
-                .setAddressType(addressType).setHasAddressType(true)
-                .setRequestType(BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITHOUT_CACHE)
-                .build());
-
+        tryConnect();
         return true;
+    }
+
+    /**
+     * Sends the connect to the strongest candidate ESP that may have a free slot and has not failed during this
+     * connect. If every candidate is known to be full, looks again every {@link #SLOT_POLL_INTERVAL_MILLIS} up to
+     * {@link #MAX_SLOT_POLLS} times, then fails the connect.
+     */
+    private void tryConnect() {
+        boolean failed = false;
+        synchronized (connectMonitor) {
+            slotWait = null;
+            if (!connectPending || lockToHandler != null) {
+                return;
+            }
+            List<ConnectionCandidate> candidates = proxyHandler.getConnectionCandidates(getAddressAsLong()).stream()
+                    .filter(c -> !failedHandlers.contains(c.handler().getThing().getUID())).toList();
+            Optional<ConnectionCandidate> withSlot = candidates.stream().filter(ConnectionCandidate::mayHaveFreeSlot)
+                    .findFirst();
+            if (withSlot.isPresent()) {
+                // Select the ESP once, at connect time, and lock the connection to it so that subsequent RSSI changes
+                // on other ESPs do not switch the proxy mid-session.
+                ESPHomeHandler esp = withSlot.get().handler();
+                connectAttempts++;
+                lockToHandler = esp;
+                proxyHandler.linkDevice(this, esp);
+                proxyHandler.reserveConnectionSlot(esp);
+                logger.info("Bluetooth thing {} connecting to {} via ESPHome device {}{}", describeThings(), address,
+                        esp.getThing().getUID(), connectAttempts > 1 ? " (attempt " + connectAttempts + ")" : "");
+                // Armed before sending, so an immediate answer from the ESP cancels it.
+                startStateTimeout(ConnectionState.CONNECTING, esp);
+                esp.sendBluetoothCommand(BluetoothDeviceRequest.newBuilder().setAddress(getAddressAsLong())
+                        .setAddressType(addressType).setHasAddressType(true)
+                        .setRequestType(
+                                BluetoothDeviceRequestType.BLUETOOTH_DEVICE_REQUEST_TYPE_CONNECT_V3_WITHOUT_CACHE)
+                        .build());
+                return;
+            }
+            if (candidates.isEmpty() && failedHandlers.isEmpty()) {
+                failed = true;
+            } else if (slotPollsLeft-- > 0) {
+                logger.debug("[{}] No ESPHome proxy with a free connection slot, waiting", address);
+                slotWait = proxyHandler.getScheduler().schedule(this::tryConnect, SLOT_POLL_INTERVAL_MILLIS,
+                        TimeUnit.MILLISECONDS);
+            } else {
+                failed = true;
+            }
+        }
+        if (failed) {
+            logger.info("Bluetooth thing {} could not connect to {}: no ESPHome proxy with a free connection slot",
+                    describeThings(), address);
+            releaseConnection(new BluetoothException("No ESPHome proxy with a free connection slot"));
+        }
+    }
+
+    /**
+     * Handles a connect that the ESP reports as failed before the device was connected: an ESP without a free slot
+     * refuses at once (error 0), other errors mean the ESP could not reach the device. Another ESP is tried while
+     * attempts are left.
+     *
+     * @param error the ESPHome error code
+     * @return true if the connect goes on, false if the failure is final
+     */
+    private boolean retryConnectAfterFailure(int error) {
+        synchronized (connectMonitor) {
+            ESPHomeHandler failedHandler = lockToHandler;
+            if (!connectPending || connectionState != ConnectionState.CONNECTING || failedHandler == null) {
+                return false;
+            }
+            if (connectAttempts >= MAX_CONNECT_ATTEMPTS) {
+                return false;
+            }
+            if (error == 0) {
+                logger.debug("[{}] ESPHome proxy {} has no free connection slot", address,
+                        failedHandler.getThing().getUID());
+                proxyHandler.markNoFreeConnectionSlot(failedHandler);
+            } else {
+                logger.debug("[{}] ESPHome proxy {} failed to connect (esphome error={})", address,
+                        failedHandler.getThing().getUID(), error);
+                failedHandlers.add(failedHandler.getThing().getUID());
+            }
+            proxyHandler.unlinkDevice(this);
+            lockToHandler = null;
+        }
+        tryConnect();
+        return true;
+    }
+
+    private void cancelSlotWait() {
+        ScheduledFuture<?> wait = slotWait;
+        slotWait = null;
+        if (wait != null) {
+            wait.cancel(false);
+        }
+    }
+
+    /**
+     * Waits until the device is connected, like the base class, but returns false as soon as the connect started
+     * by {@link #connect()} has finally failed instead of waiting for the whole timeout.
+     */
+    @Override
+    public boolean awaitConnection(long timeout, TimeUnit unit) throws InterruptedException {
+        long deadline = System.nanoTime() + unit.toNanos(timeout);
+        synchronized (connectMonitor) {
+            while (connectionState != ConnectionState.CONNECTED) {
+                if (connectFailed) {
+                    return false;
+                }
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    return false;
+                }
+                TimeUnit.NANOSECONDS.timedWait(connectMonitor, remaining);
+            }
+            return true;
+        }
     }
 
     @Override
     public boolean disconnect() {
-        ESPHomeHandler handler = lockToHandler;
+        ESPHomeHandler handler;
+        synchronized (connectMonitor) {
+            handler = lockToHandler;
+            if (handler == null) {
+                if (!connectPending) {
+                    return false;
+                }
+                // Waiting for a free slot: nothing to tell an ESP, just stop
+                cancelSlotWait();
+                connectPending = false;
+                connectionState = ConnectionState.DISCONNECTED;
+                connectMonitor.notifyAll();
+            } else {
+                // No failover on the disconnect answer
+                connectPending = false;
+            }
+        }
         if (handler == null) {
-            return false;
+            notifyListeners(BluetoothEventType.CONNECTION_STATE,
+                    new BluetoothConnectionStatusNotification(ConnectionState.DISCONNECTED));
+            return true;
         }
         logger.debug("[{}] Disconnecting via ESPHome proxy {}", address, handler.getThing().getUID());
         connectionState = ConnectionState.DISCONNECTING;
